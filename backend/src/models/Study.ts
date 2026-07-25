@@ -194,6 +194,13 @@ const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T
   }
 };
 
+const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
+
+const isDatabaseUnavailable = (error: unknown) =>
+  localAuthFallbackEnabled() &&
+  error instanceof Error &&
+  /Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message);
+
 const mapStudyRow = (row: StudyRow): StudySummary => ({
   id: String(row.id),
   title: row.title,
@@ -254,39 +261,47 @@ const mapStudyRow = (row: StudyRow): StudySummary => ({
 });
 
 export const listStudiesByUser = async (principalInvestigatorId: string): Promise<StudySummary[]> => {
-  const result = await query<StudyRow>(
-    `
-      SELECT
-        studies.*,
-        principal_investigator.full_name AS principal_investigator_name,
-        principal_investigator.academic_id AS principal_investigator_academic_id,
-        co_researcher.full_name AS co_researcher_name,
-        co_researcher.academic_id AS co_researcher_academic_id,
-        supervisor.full_name AS supervisor_name,
-        supervisor.academic_id AS supervisor_academic_id,
-        assistant_supervisor.full_name AS assistant_supervisor_name,
-        assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
-        assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
-        assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
-        locked_by.full_name AS locked_by_name,
-        reviewer.full_name AS reviewed_by_name,
-        clinical_evaluator.full_name AS clinical_evaluated_by_name
-      FROM studies
-      JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
-      LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
-      LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
-      LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
-      LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
-      LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
-      LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
-      LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
-      WHERE studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1
-      ORDER BY studies.created_at DESC
-    `,
-    [principalInvestigatorId],
-  );
+  try {
+    const result = await query<StudyRow>(
+      `
+        SELECT
+          studies.*,
+          principal_investigator.full_name AS principal_investigator_name,
+          principal_investigator.academic_id AS principal_investigator_academic_id,
+          co_researcher.full_name AS co_researcher_name,
+          co_researcher.academic_id AS co_researcher_academic_id,
+          supervisor.full_name AS supervisor_name,
+          supervisor.academic_id AS supervisor_academic_id,
+          assistant_supervisor.full_name AS assistant_supervisor_name,
+          assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
+          assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
+          assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
+          locked_by.full_name AS locked_by_name,
+          reviewer.full_name AS reviewed_by_name,
+          clinical_evaluator.full_name AS clinical_evaluated_by_name
+        FROM studies
+        JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
+        LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
+        LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
+        LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
+        LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
+        LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
+        LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
+        LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
+        WHERE studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1
+        ORDER BY studies.created_at DESC
+      `,
+      [principalInvestigatorId],
+    );
 
-  return result.rows.map(mapStudyRow);
+    return result.rows.map(mapStudyRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    return [];
+  }
 };
 
 export const findStudyByIdForUser = async (

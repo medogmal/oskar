@@ -66,6 +66,8 @@ ENV/
 analytics/node_modules/
 backend/node_modules/
 backend/data/
+logs/
+tools/
 rag_index_db.json
 backend/python_analytics/data/
 *.db.json
