@@ -1,0 +1,4 @@
+- الطالب: student.test@clinresearch.local
+- المشرف: supervisor.test@clinresearch.local
+- المؤسسة: institution.test@clinresearch.local
+- كلمة المرور: Test@12345

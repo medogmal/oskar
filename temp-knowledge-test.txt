@@ -1,0 +1,3 @@
+Randomisation must use a concealed allocation sequence.
+Blinding should specify the blinded parties and assessment masking workflow.
+Clinical protocol summaries should retain outcome definitions and sample size assumptions.

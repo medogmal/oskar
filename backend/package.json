@@ -1,0 +1,41 @@
+{
+  "name": "clinical-research-backend",
+  "version": "1.0.0",
+  "description": "Backend for Clinical Research Management Platform",
+  "main": "src/server.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "seed:test-accounts": "node scripts/seedTestAccounts.mjs",
+    "analytics:install": "pip install -r python_analytics/requirements.txt",
+    "analytics:dev": "python -m uvicorn python_analytics.app.main:app --host 0.0.0.0 --port 8001"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.1.1",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.20.0",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.23.0",
+    "typescript": "~6.0.2"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "docx": "^9.7.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "pdfkit": "^0.19.1",
+    "pg": "^8.16.3",
+    "xlsx": "^0.18.5"
+  }
+}

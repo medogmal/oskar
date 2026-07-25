@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OrthoClinical | منصة الأبحاث السريرية لتقويم الأسنان — لوحة الباحث الرئيسي</title>
+
+<!-- Tailwind CSS (CDN) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- FontAwesome Icons (CDN) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<!-- Arabic Font: Cairo -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<script>
+/* إعداد Tailwind: هوية لونية طبية (Teal) + خط Cairo */
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { cairo: ['Cairo','ui-sans-serif','system-ui','sans-serif'] },
+      colors: {
+        brand: {50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a',950:'#042f2e'}
+      },
+      boxShadow: {
+        soft: '0 8px 30px rgba(2,6,23,.07)',
+        card: '0 2px 10px rgba(2,6,23,.05), 0 12px 32px rgba(2,6,23,.06)'
+      }
+    }
+  }
+}
+</script>
+
+<style>
+/* ============ أساسيات ============ */
+html { scroll-behavior:smooth; }
+body { font-family:'Cairo',sans-serif; background:#f1f5f9; }
+::-webkit-scrollbar { width:9px; height:9px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:99px; border:2px solid #f1f5f9; }
+::-webkit-scrollbar-thumb:hover { background:#94a3b8; }
+aside ::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border:none; }
+
+/* ============ التنقل بين الصفحات (SPA) ============ */
+.page { display:none; }
+.page.active { display:block; animation:pageIn .4s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes pageIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+/* ============ الشريط الجانبي ============ */
+.nav-item { display:flex; align-items:center; gap:.8rem; width:100%; padding:.72rem 1rem; border-radius:.9rem;
+  color:#8ea3b8; font-weight:600; font-size:.92rem; transition:all .22s ease; position:relative; text-align:right; }
+.nav-item:hover { background:rgba(255,255,255,.06); color:#e2e8f0; transform:translateX(-2px); }
+.nav-item.active { background:linear-gradient(135deg,#0d9488,#0f766e); color:#fff; box-shadow:0 10px 25px -8px rgba(13,148,136,.55); }
+.nav-item.active::before { content:''; position:absolute; right:-12px; top:50%; transform:translateY(-50%);
+  width:4px; height:55%; border-radius:99px; background:#2dd4bf; box-shadow:0 0 12px #2dd4bf; }
+.nav-item .en { margin-right:auto; font-size:.62rem; font-weight:500; letter-spacing:.04em; color:inherit; opacity:.5; }
+
+/* ============ مفتاح التبديل (Toggle Switch) ============ */
+.switch { position:relative; width:56px; height:30px; background:#cbd5e1; border-radius:99px; transition:.25s; cursor:pointer; flex-shrink:0; }
+.switch::after { content:''; position:absolute; top:3px; right:3px; width:24px; height:24px; background:#fff; border-radius:50%;
+  transition:.25s cubic-bezier(.3,1.4,.5,1); box-shadow:0 2px 6px rgba(0,0,0,.22); }
+.switch.on { background:linear-gradient(135deg,#14b8a6,#0d9488); }
+.switch.on::after { transform:translateX(-26px); }
+.switch.disabled { opacity:.35; cursor:not-allowed; filter:grayscale(.6); }
+
+/* ============ النوافذ المنبثقة (Modals) ============ */
+.modal { position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center; padding:1rem; }
+.modal.open { display:flex; }
+.modal .backdrop { position:absolute; inset:0; background:rgba(2,6,23,.62); backdrop-filter:blur(5px); animation:fadeIn .2s both; }
+.modal .panel { position:relative; animation:popIn .3s cubic-bezier(.2,.9,.3,1.15) both; max-height:92vh; overflow-y:auto; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes popIn { from{opacity:0; transform:scale(.92) translateY(16px)} to{opacity:1; transform:scale(1) translateY(0)} }
+
+/* ============ القائمة المنسدلة للإجراءات (⋮) ============ */
+#rowMenu { position:fixed; z-index:80; min-width:230px; animation:popIn .18s ease both; }
+.menu-item { display:flex; align-items:center; gap:.7rem; width:100%; padding:.65rem 1rem; font-size:.86rem; font-weight:600;
+  color:#334155; border-radius:.6rem; transition:.15s; text-align:right; }
+.menu-item:hover { background:#f1f5f9; }
+.menu-item i { width:18px; text-align:center; }
+
+/* ============ شريط الخطوات (Stepper) ============ */
+.step-dot { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:.85rem; background:#e2e8f0; color:#64748b; transition:.3s; flex-shrink:0; }
+.step-item.active .step-dot { background:linear-gradient(135deg,#14b8a6,#0f766e); color:#fff; box-shadow:0 8px 18px -6px rgba(13,148,136,.55); }
+.step-item.done .step-dot { background:#0f766e; color:#fff; }
+.step-item .step-label { font-size:.78rem; font-weight:700; color:#94a3b8; transition:.3s; }
+.step-item.active .step-label { color:#0f766e; }
+.step-line { height:2px; flex:1; background:#e2e8f0; margin:0 .5rem; margin-top:-18px; border-radius:99px; }
+.step-line.done { background:#14b8a6; }
+
+/* ============ شارات الحالات الملونة (حسب مواصفات الوثيقة) ============ */
+.badge { display:inline-flex; align-items:center; gap:.4rem; padding:.28rem .8rem; border-radius:99px; font-size:.75rem; font-weight:800; }
+.badge .dot { width:8px; height:8px; border-radius:50%; }
+.b-active    { background:#fff7ed; color:#ea580c; border:1px solid #fed7aa; } .b-active .dot    { background:#f97316; box-shadow:0 0 8px #f97316; }
+.b-completed { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; } .b-completed .dot { background:#22c55e; box-shadow:0 0 8px #22c55e; }
+.b-withdrawn { background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; } .b-withdrawn .dot { background:#3b82f6; box-shadow:0 0 8px #3b82f6; }
+.b-lost      { background:#faf5ff; color:#9333ea; border:1px solid #e9d5ff; } .b-lost .dot      { background:#a855f7; box-shadow:0 0 8px #a855f7; }
+.b-excluded  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; } .b-excluded .dot  { background:#ef4444; box-shadow:0 0 8px #ef4444; }
+
+/* ============ شارة استنتاج نوع التعمية ============ */
+.blind-badge { transition:all .35s ease; }
+.blind-open      { background:#f1f5f9; color:#475569; border:2px solid #cbd5e1; }
+.blind-single    { background:#eff6ff; color:#1d4ed8; border:2px solid #93c5fd; box-shadow:0 10px 25px -10px rgba(59,130,246,.4); }
+.blind-double    { background:#faf5ff; color:#7e22ce; border:2px solid #d8b4fe; box-shadow:0 10px 25px -10px rgba(168,85,247,.4); }
+.blind-triple    { background:#fffbeb; color:#b45309; border:2px solid #fcd34d; box-shadow:0 10px 25px -10px rgba(245,158,11,.4); }
+.blind-quadruple { background:#ecfdf5; color:#047857; border:2px solid #6ee7b7; box-shadow:0 10px 25px -10px rgba(16,185,129,.4); }
+
+/* ============ كروت قابلة للاختيار (Radio Cards / Chips) ============ */
+.pick-card { border:2px solid #e2e8f0; border-radius:1rem; padding:1rem; cursor:pointer; transition:.22s; background:#fff; }
+.pick-card:hover { border-color:#99f6e4; transform:translateY(-2px); box-shadow:0 10px 22px -12px rgba(13,148,136,.35); }
+.pick-card.selected { border-color:#0d9488; background:#f0fdfa; box-shadow:0 12px 26px -12px rgba(13,148,136,.45); }
+.pick-card.selected .pick-check { opacity:1; transform:scale(1); }
+.pick-check { width:22px; height:22px; border-radius:50%; background:#0d9488; color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:.65rem; opacity:0; transform:scale(.4); transition:.25s; }
+.chip { padding:.45rem 1rem; border-radius:99px; border:1.5px solid #e2e8f0; font-size:.8rem; font-weight:700; color:#64748b;
+  cursor:pointer; transition:.2s; background:#fff; }
+.chip:hover { border-color:#5eead4; }
+.chip.selected { background:#0d9488; border-color:#0d9488; color:#fff; box-shadow:0 6px 16px -6px rgba(13,148,136,.5); }
+
+/* ============ منطقة الرفع (Dropzone) ============ */
+.dropzone { border:2px dashed #cbd5e1; border-radius:1rem; transition:.25s; cursor:pointer; }
+.dropzone:hover { border-color:#14b8a6; background:#f0fdfa; }
+
+/* ============ نافذة التحميل الذكي (AI Loader) ============ */
+#aiOverlay { position:fixed; inset:0; z-index:90; display:none; align-items:center; justify-content:center;
+  background:rgba(2,6,23,.72); backdrop-filter:blur(8px); }
+#aiOverlay.open { display:flex; animation:fadeIn .25s both; }
+.spinner-ring { width:84px; height:84px; border-radius:50%; border:5px solid rgba(45,212,191,.15); border-top-color:#2dd4bf;
+  animation:spin 1s linear infinite; position:relative; }
+.spinner-ring::after { content:''; position:absolute; inset:8px; border-radius:50%; border:3px solid transparent; border-bottom-color:rgba(45,212,191,.5);
+  animation:spin .7s linear infinite reverse; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.ai-step-text { animation:fadeSlide .5s ease both; }
+@keyframes fadeSlide { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+
+/* ============ التنبيهات العائمة (Toasts) ============ */
+#toastWrap { position:fixed; bottom:1.5rem; left:1.5rem; z-index:100; display:flex; flex-direction:column; gap:.6rem; max-width:400px; }
+.toast { display:flex; align-items:flex-start; gap:.7rem; background:#0f172a; color:#fff; padding:.9rem 1.1rem; border-radius:1rem;
+  box-shadow:0 18px 40px -12px rgba(2,6,23,.5); animation:toastIn .35s cubic-bezier(.2,.9,.3,1.2) both; font-size:.85rem; font-weight:600; }
+.toast.hide { animation:toastOut .3s ease both; }
+@keyframes toastIn { from{opacity:0; transform:translateY(16px) scale(.95)} to{opacity:1; transform:translateY(0) scale(1)} }
+@keyframes toastOut { from{opacity:1} to{opacity:0; transform:translateX(-20px)} }
+
+/* ============ وضع قفل الدراسة (External Evaluation Lock) ============ */
+#lockBanner { display:none; }
+body.locked #lockBanner { display:flex; animation:slideDown .4s ease both; }
+@keyframes slideDown { from{transform:translateY(-100%)} to{transform:translateY(0)} }
+body.locked .lockable { opacity:.4 !important; filter:grayscale(.55); cursor:not-allowed !important; }
+body.locked { padding-top:56px; }
+
+/* ============ ورقة الاستمارة (A4 Sheet) ============ */
+.a4-sheet { background:#fff; width:100%; max-width:920px; margin:0 auto; border-radius:1.2rem; box-shadow:0 24px 60px -20px rgba(2,6,23,.18);
+  position:relative; overflow:hidden; }
+.wm-span { font-size:1.05rem; font-weight:800; color:#0f766e; white-space:nowrap; }
+.field-box { border:1.5px solid #e2e8f0; border-radius:.8rem; padding:.6rem .9rem; background:#f8fafc; }
+.field-box input, .field-box select, .field-box textarea { background:transparent; outline:none; width:100%; font-weight:700; color:#0f172a; font-size:.9rem; }
+.field-box input.invalid { color:#dc2626; }
+.field-box.invalid { border-color:#f87171; background:#fef2f2; animation:shake .3s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(4px)} 75%{transform:translateX(-4px)} }
+
+/* ============ صورة السيفالومتريك (WebCeph Mock) ============ */
+.ceph-svg .landmark, .ceph-svg .trace-line { opacity:0; transition:opacity .8s ease; }
+.ceph-svg.analyzed .landmark { opacity:1; }
+.ceph-svg.analyzed .trace-line { opacity:1; }
+.ceph-svg .landmark { animation:pulseDot 1.6s ease infinite; }
+@keyframes pulseDot { 0%,100%{r:4} 50%{r:6} }
+.scanline { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,#2dd4bf,transparent);
+  animation:scanMove 2.2s ease-in-out infinite; opacity:0; }
+.scanning .scanline { opacity:1; }
+@keyframes scanMove { 0%{top:4%} 50%{top:94%} 100%{top:4%} }
+
+/* ============ المستعرض ثلاثي الأبعاد الوهمي (STL Mock) ============ */
+.viewport3d { perspective:1000px; }
+.jaws { transform-style:preserve-3d; animation:orbit 16s linear infinite; position:relative; width:230px; height:230px; margin:0 auto; }
+@keyframes orbit { from{transform:rotateX(62deg) rotateZ(0deg)} to{transform:rotateX(62deg) rotateZ(360deg)} }
+.arch { position:absolute; inset:0; border-radius:50%; }
+.arch.upper { border:15px solid #22d3ee; box-shadow:0 0 26px rgba(34,211,238,.5), inset 0 0 26px rgba(34,211,238,.35); transform:translateZ(38px); }
+.arch.lower { border:15px solid #f472b6; box-shadow:0 0 26px rgba(244,114,182,.5), inset 0 0 26px rgba(244,114,182,.35); transform:translateZ(-38px); transition:opacity .4s, transform .4s; }
+.jaws.single .arch.lower { opacity:.12; }
+.jaws.occluded .arch.upper { transform:translateZ(16px); }
+.jaws.occluded .arch.lower { transform:translateZ(-16px); }
+.tooth-dot { position:absolute; width:7px; height:7px; border-radius:50%; background:#fff; opacity:.85; }
+.vp-corner { position:absolute; width:26px; height:26px; border-color:rgba(45,212,191,.6); }
+.grid-floor { position:absolute; inset:auto 0 0 0; height:46%; background:
+  linear-gradient(rgba(45,212,191,.12) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(45,212,191,.12) 1px, transparent 1px);
+  background-size:26px 26px; transform:perspective(500px) rotateX(60deg); transform-origin:bottom; }
+
+/* ============ متفرقات ============ */
+.stat-card { transition:.25s; }
+.stat-card:hover { transform:translateY(-4px); box-shadow:0 18px 36px -14px rgba(2,6,23,.16); }
+.progress-track { height:10px; border-radius:99px; background:#e2e8f0; overflow:hidden; }
+.progress-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#2dd4bf,#0d9488); transition:width .8s cubic-bezier(.2,.8,.3,1); }
+.cal-chip { font-size:.72rem; font-weight:700; padding:.4rem .55rem; border-radius:.6rem; line-height:1.5; cursor:pointer; transition:.2s; border-right:3px solid; }
+.cal-chip:hover { transform:scale(1.03); }
+input[type="date"] { font-family:'Cairo',sans-serif; }
+.paper { background:linear-gradient(180deg,#fffdf7,#fff); border:1px solid #e7e5d9; }
+.tab-btn { padding:.4rem 1rem; border-radius:.7rem; font-size:.78rem; font-weight:800; color:#64748b; transition:.2s; }
+.tab-btn.active { background:#0f766e; color:#fff; }
+</style>
+</head>
+
+<body class="font-cairo text-slate-800">
+
+<!-- ==================== شريط قفل الدراسة (يظهر أعلى الشاشة عند القفل) ==================== -->
+<div id="lockBanner" class="fixed top-0 inset-x-0 z-[95] items-center justify-between gap-4 px-6 py-3 bg-gradient-to-l from-red-700 via-red-600 to-rose-600 text-white shadow-2xl">
+  <div class="flex items-center gap-3">
+    <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center"><i class="fa-solid fa-lock"></i></span>
+    <div>
+      <p class="font-extrabold text-sm">الدراسة مقفلة حالياً وتحت التقييم الخارجي (Study Locked for External Evaluation)</p>
+      <p class="text-[11px] text-red-100">تم تجميد جميع صلاحيات الإضافة والتعديل — لا يمكن إضافة عينات أو تعديل بيانات لمنع كسر التعمية أو تخريب عملية التقييم المستمرة.</p>
+    </div>
+  </div>
+  <button onclick="toggleLock(false)" class="lockable-off shrink-0 bg-white/15 hover:bg-white/25 transition rounded-xl px-4 py-2 text-xs font-extrabold flex items-center gap-2">
+    <i class="fa-solid fa-unlock"></i> إلغاء القفل (وضع تجريبي)
+  </button>
+</div>
+
+<!-- ==================== هيكل التطبيق ==================== -->
+<div class="flex">
+
+  <!-- ============ الشريط الجانبي (Sidebar) ============ -->
+  <aside class="fixed right-0 top-0 h-screen w-72 bg-gradient-to-b from-slate-950 via-slate-900 to-teal-950 text-white flex flex-col z-40 shadow-2xl">
+    <!-- الشعار -->
+    <div class="px-6 pt-6 pb-5 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-700 flex items-center justify-center shadow-lg shadow-brand-900/50">
+          <i class="fa-solid fa-tooth text-xl text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-black text-lg leading-tight">Ortho<span class="text-brand-400">Clinical</span></h1>
+          <p class="text-[10px] text-slate-400 font-semibold">منصة الأبحاث والتجارب السريرية للتقويم</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- عناصر التنقل -->
+    <nav id="sideNav" class="flex-1 overflow-y-auto py-5 px-3 space-y-1.5">
+      <p class="px-3 pb-1 text-[10px] font-bold tracking-widest text-slate-500">القائمة الرئيسية</p>
+      <button class="nav-item active" data-page="dashboard" onclick="go('dashboard')">
+        <i class="fa-solid fa-gauge-high w-5 text-center"></i><span>لوحة التحكم</span><span class="en">Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="setup" onclick="go('setup')">
+        <i class="fa-solid fa-flask-vial w-5 text-center"></i><span>تأسيس الدراسة</span><span class="en">Study Setup</span>
+      </button>
+      <button class="nav-item" data-page="methodology" onclick="go('methodology')">
+        <i class="fa-solid fa-shuffle w-5 text-center"></i><span>معالج المنهجية</span><span class="en">Methodology</span>
+      </button>
+      <button class="nav-item" data-page="samples" onclick="go('samples')">
+        <i class="fa-solid fa-users w-5 text-center"></i><span>دليل العينات والتحقق</span><span class="en">Samples</span>
+      </button>
+      <button class="nav-item" data-page="form" onclick="go('form')">
+        <i class="fa-solid fa-file-medical w-5 text-center"></i><span>استعراض الاستمارة</span><span class="en">Form Specs</span>
+      </button>
+      <button class="nav-item" data-page="calendar" onclick="go('calendar')">
+        <i class="fa-solid fa-calendar-days w-5 text-center"></i><span>التقويم والزيارات</span><span class="en">Calendar</span>
+      </button>
+      <button class="nav-item" data-page="collab" onclick="go('collab')">
+        <i class="fa-solid fa-user-shield w-5 text-center"></i><span>الصلاحيات والمشرفون</span><span class="en">Access</span>
+      </button>
+    </nav>
+
+    <!-- بطاقة المستخدم -->
+    <div class="p-4 border-t border-white/10">
+      <div class="flex items-center gap-3 bg-white/5 rounded-2xl p-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 flex items-center justify-center font-black text-sm">أ ح</div>
+        <div class="min-w-0">
+          <p class="text-sm font-extrabold truncate">د. أحمد الحربي</p>
+          <p class="text-[10px] text-brand-300 font-bold">باحث رئيسي (Principal Investigator)</p>
+        </div>
+        <i class="fa-solid fa-circle text-[7px] text-emerald-400 mr-auto"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ المحتوى الرئيسي ============ -->
+  <main class="flex-1 mr-72 min-h-screen">
+
+    <!-- الشريط العلوي (Topbar) -->
+    <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-lg border-b border-slate-200 px-8 py-4 flex items-center gap-5">
+      <div class="min-w-0">
+        <h2 id="pageTitle" class="text-xl font-black text-slate-800 truncate">لوحة التحكم الرئيسية</h2>
+        <p id="pageSubtitle" class="text-xs text-slate-400 font-semibold truncate">نظرة شاملة على أداء الدراسة وحالة العينات (PI Dashboard)</p>
+      </div>
+      <div class="mr-auto flex items-center gap-3">
+        <!-- شارة الدراسة الحالية -->
+        <div class="hidden lg:flex items-center gap-2 bg-brand-50 border border-brand-100 rounded-xl px-3.5 py-2">
+          <i class="fa-solid fa-tooth text-brand-600 text-sm"></i>
+          <div class="leading-tight">
+            <p class="text-[11px] font-extrabold text-brand-800">دراسة فعالية التقويم ذاتي التسريع</p>
+            <p class="text-[9px] text-brand-500 font-bold">RCT — المرحلة الثانية</p>
+          </div>
+        </div>
+        <!-- التاريخ -->
+        <div class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl px-3.5 py-2.5">
+          <i class="fa-regular fa-calendar"></i> الجمعة، 17 يوليو 2026
+        </div>
+        <!-- الإشعارات -->
+        <button class="relative w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center text-slate-500">
+          <i class="fa-regular fa-bell"></i>
+          <span class="absolute top-2 left-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- حاوية الصفحات -->
+    <div class="p-8">
+
+<!-- ============================================================
+     الصفحة 1: لوحة التحكم (Dashboard)
+============================================================ -->
+<section id="page-dashboard" class="page active space-y-8">
+
+  <!-- بطاقة الترحيب -->
+  <div class="relative overflow-hidden rounded-3xl bg-gradient-to-l from-slate-900 via-teal-950 to-brand-900 text-white p-8 shadow-card">
+    <div class="absolute -left-16 -top-16 w-64 h-64 rounded-full bg-brand-500/10 blur-2xl"></div>
+    <div class="absolute left-24 bottom-0 w-40 h-40 rounded-full bg-cyan-400/10 blur-2xl"></div>
+    <i class="fa-solid fa-tooth absolute left-10 top-1/2 -translate-y-1/2 text-[150px] text-white/[.04]"></i>
+    <div class="relative">
+      <p class="text-brand-300 text-xs font-extrabold mb-1">مسار الباحث الرئيسي (Principal Investigator Journey)</p>
+      <h3 class="text-2xl font-black mb-2">مرحباً د. أحمد — اختر مسار بدء العمل</h3>
+      <p class="text-slate-300 text-sm max-w-2xl leading-relaxed">تظهر لك لوحة التحكم مباشرة بعد تسجيل الدخول، وتتيح الاختيار بين مسارين رئيسيين: بدء دراسة رقمية جديدة من الصفر، أو رقمنة دراسة قائمة بدأت بالفعل على أرض الواقع.</p>
+    </div>
+  </div>
+
+  <!-- المساران الرئيسيان -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- مسار: دراسة جديدة -->
+    <div id="pathCardNew" class="pick-card selected relative overflow-hidden !p-6">
+      <div class="absolute top-5 left-5 pick-check"><i class="fa-solid fa-check"></i></div>
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-brand-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-brand-600/30 shrink-0">
+          <i class="fa-solid fa-rocket"></i>
+        </div>
+        <div>
+          <h4 class="font-black text-lg text-slate-800">إنشاء دراسة جديدة <span class="text-brand-600 text-sm font-extrabold">(New Study)</span></h4>
+          <p class="text-xs text-slate-500 font-semibold leading-relaxed mt-1">للبحوث الرقمية التي تبدأ من الصفر وتطبق بروتوكولات العشوائية والتعمية كاملة داخل المنصة.</p>
+        </div>
+      </div>
+      <ul class="mt-4 space-y-2 text-xs font-bold text-slate-600">
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-brand-500"></i> تفعيل خوارزميات العشوائية التلقائية (Simple / Block / Stratified)</li>
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-brand-500"></i> تخصيص آلي للعينات مع إخفاء تسلسل التوزيع (Allocation Concealment)</li>
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-brand-500"></i> توليد استمارة الفحص ذكياً من ملف المقترح</li>
+      </ul>
+      <button onclick="selectPath('new')" class="lockable mt-5 w-full bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-sm rounded-xl py-3 transition shadow-lg shadow-brand-600/25 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-play"></i> بدء تأسيس دراسة جديدة
+      </button>
+    </div>
+
+    <!-- مسار: دراسة حالية -->
+    <div id="pathCardExisting" class="pick-card relative overflow-hidden !p-6">
+      <div class="absolute top-5 left-5 pick-check"><i class="fa-solid fa-check"></i></div>
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-slate-700 text-white flex items-center justify-center text-2xl shadow-lg shadow-slate-700/30 shrink-0">
+          <i class="fa-solid fa-file-import"></i>
+        </div>
+        <div>
+          <h4 class="font-black text-lg text-slate-800">إنشاء دراسة حالية <span class="text-slate-500 text-sm font-extrabold">(Current Existing Study)</span></h4>
+          <p class="text-xs text-slate-500 font-semibold leading-relaxed mt-1">للبحوث المكتملة أو التي بدأت فعلياً بالأساليب التقليدية، ويريد الباحث رقمنتها ونقلها للمنصة.</p>
+        </div>
+      </div>
+      <ul class="mt-4 space-y-2 text-xs font-bold text-slate-600">
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-slate-400"></i> استيراد استمارات الفحص الورقية عبر القراءة الآلية (OCR)</li>
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-slate-400"></i> تعطيل العشوائية التلقائية — المرضى موزعون مسبقاً على أرض الواقع</li>
+        <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-slate-400"></i> إدخال المجموعة العلاجية يدوياً مع تأمين التعمية أثناء OCR</li>
+      </ul>
+      <button onclick="selectPath('existing')" class="lockable mt-5 w-full bg-slate-700 hover:bg-slate-800 text-white font-extrabold text-sm rounded-xl py-3 transition shadow-lg shadow-slate-700/25 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-upload"></i> استيراد دراسة قائمة
+      </button>
+    </div>
+  </div>
+
+  <!-- الكروت الإحصائية للحالات -->
+  <div>
+    <div class="flex items-center justify-between mb-4">
+      <h4 class="font-black text-slate-700">حالات العينات — القيادة البصرية والإحصائية</h4>
+      <span class="text-[11px] font-bold text-slate-400">تُحدَّث تلقائياً عند كل إجراء (CONSORT Flow)</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <!-- نشطة -->
+      <div class="stat-card bg-white rounded-2xl p-5 shadow-card border-t-4 border-orange-400">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-xl bg-orange-100 text-orange-500 flex items-center justify-center"><i class="fa-solid fa-circle-dot"></i></div>
+          <span class="text-[10px] font-extrabold text-orange-400 bg-orange-50 rounded-full px-2 py-0.5">Active</span>
+        </div>
+        <p id="statActive" class="text-3xl font-black text-slate-800 mt-3">0</p>
+        <p class="text-xs font-bold text-slate-400">عينات نشطة — مستمرة بالمعالجة والمتابعة الدورية</p>
+      </div>
+      <!-- مكتملة -->
+      <div class="stat-card bg-white rounded-2xl p-5 shadow-card border-t-4 border-green-400">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-xl bg-green-100 text-green-500 flex items-center justify-center"><i class="fa-solid fa-circle-check"></i></div>
+          <span class="text-[10px] font-extrabold text-green-500 bg-green-50 rounded-full px-2 py-0.5">Completed</span>
+        </div>
+        <p id="statCompleted" class="text-3xl font-black text-slate-800 mt-3">0</p>
+        <p class="text-xs font-bold text-slate-400">أكملت جميع الزيارات والبروتوكولات المجدولة بنجاح</p>
+      </div>
+      <!-- منسحبة -->
+      <div class="stat-card bg-white rounded-2xl p-5 shadow-card border-t-4 border-blue-400">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
+          <span class="text-[10px] font-extrabold text-blue-500 bg-blue-50 rounded-full px-2 py-0.5">Withdrawn</span>
+        </div>
+        <p id="statWithdrawn" class="text-3xl font-black text-slate-800 mt-3">0</p>
+        <p class="text-xs font-bold text-slate-400">انسحب المشارك بإرادته أو بقرار من الباحث لدواعٍ منهجية</p>
+      </div>
+      <!-- مفقودة -->
+      <div class="stat-card bg-white rounded-2xl p-5 shadow-card border-t-4 border-purple-400">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-xl bg-purple-100 text-purple-500 flex items-center justify-center"><i class="fa-solid fa-user-slash"></i></div>
+          <span class="text-[10px] font-extrabold text-purple-500 bg-purple-50 rounded-full px-2 py-0.5">Lost to FU</span>
+        </div>
+        <p id="statLost" class="text-3xl font-black text-slate-800 mt-3">0</p>
+        <p class="text-xs font-bold text-slate-400">انقطع الاتصال تماماً بالعينات ولم يعد ممكناً تتبعها</p>
+      </div>
+      <!-- مستبعدة -->
+      <div class="stat-card bg-white rounded-2xl p-5 shadow-card border-t-4 border-red-400">
+        <div class="flex items-center justify-between">
+          <div class="w-11 h-11 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"><i class="fa-solid fa-ban"></i></div>
+          <span class="text-[10px] font-extrabold text-red-500 bg-red-50 rounded-full px-2 py-0.5">Excluded</span>
+        </div>
+        <p id="statExcluded" class="text-3xl font-black text-slate-800 mt-3">0</p>
+        <p class="text-xs font-bold text-slate-400">استُبعدت لاكتشاف عدم استيفاء شروط الأهلية لاحقاً</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- صف: حجم العينة + معدل الانسحاب + توزيع المجموعات -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- حجم العينة المطلوب -->
+    <div class="bg-white rounded-2xl p-6 shadow-card">
+      <div class="flex items-center justify-between mb-1">
+        <h5 class="font-black text-slate-700 text-sm">حجم العينة المطلوب للدراسة</h5>
+        <i class="fa-solid fa-vials text-brand-500"></i>
+      </div>
+      <div class="flex items-end gap-2 mt-2">
+        <p class="text-4xl font-black text-slate-800"><span id="registeredNum">0</span><span class="text-lg text-slate-300 font-bold"> / <span id="sampleSizeNum">40</span></span></p>
+        <p class="text-[11px] font-bold text-slate-400 mb-1.5">عينة مسجلة</p>
+      </div>
+      <div class="progress-track mt-3"><div id="sampleProgress" class="progress-fill" style="width:0%"></div></div>
+      <p class="mt-3 text-[11px] font-bold text-slate-400 leading-relaxed"><i class="fa-solid fa-circle-info text-brand-400 ml-1"></i>عند الموافقة على استبدال عينة منسحبة، يزيد النظام حجم العينة المطلوب تلقائياً بمقدار (+1) لتعويضها.</p>
+    </div>
+
+    <!-- معدل الانسحاب -->
+    <div class="bg-white rounded-2xl p-6 shadow-card">
+      <div class="flex items-center justify-between mb-1">
+        <h5 class="font-black text-slate-700 text-sm">معدل الانسحاب العام للدراسة</h5>
+        <i class="fa-solid fa-chart-line text-blue-500"></i>
+      </div>
+      <p class="text-4xl font-black text-slate-800 mt-2"><span id="withdrawRate">0</span><span class="text-lg text-slate-300 font-bold">%</span></p>
+      <p class="text-[11px] font-extrabold text-blue-500 mt-1">(Withdrawal Rate) — يُحتسب تلقائياً</p>
+      <p class="mt-3 text-[11px] font-bold text-slate-400 leading-relaxed">يُستخدم مع توزيع أسباب ومراحل الانسحاب الزمنية تلقائياً لبناء مخطط تدفق المرضى (CONSORT Flow Diagram) للتقارير الأكاديمية النهائية.</p>
+    </div>
+
+    <!-- توزيع المجموعات -->
+    <div class="bg-white rounded-2xl p-6 shadow-card">
+      <div class="flex items-center justify-between mb-4">
+        <h5 class="font-black text-slate-700 text-sm">توزيع العينات على المجموعات</h5>
+        <i class="fa-solid fa-chart-simple text-brand-500"></i>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <div class="flex justify-between text-xs font-extrabold mb-1.5"><span class="text-slate-600">المجموعة التجريبية (Group A)</span><span id="groupANum" class="text-brand-600">0</span></div>
+          <div class="progress-track"><div id="groupABar" class="progress-fill" style="width:0%"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-xs font-extrabold mb-1.5"><span class="text-slate-600">المجموعة الضابطة (Group B)</span><span id="groupBNum" class="text-slate-500">0</span></div>
+          <div class="progress-track"><div id="groupBBar" class="h-full rounded-full bg-slate-400 transition-all duration-700" style="width:0%"></div></div>
+        </div>
+      </div>
+      <p class="mt-4 text-[11px] font-bold text-slate-400 leading-relaxed"><i class="fa-solid fa-shield-halved text-brand-400 ml-1"></i>تُعرض للباحث المُعمّى أكواد التوزيع العشوائي فقط دون المجموعة الحقيقية حفاظاً على نزاهة التجربة.</p>
+    </div>
+  </div>
+
+  <!-- صف: مخطط CONSORT + المواعيد القادمة -->
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <!-- مخطط تدفق المرضى -->
+    <div class="xl:col-span-3 bg-white rounded-2xl p-6 shadow-card">
+      <div class="flex items-center justify-between mb-5">
+        <h5 class="font-black text-slate-700 text-sm">مخطط تدفق المرضى (CONSORT Flow) — معاينة حية</h5>
+        <span class="text-[10px] font-extrabold text-brand-600 bg-brand-50 rounded-full px-3 py-1">يُبنى تلقائياً</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-[130px] rounded-2xl border-2 border-slate-200 p-4 text-center bg-slate-50">
+          <p class="text-2xl font-black text-slate-700" id="consortScreened">0</p>
+          <p class="text-[11px] font-bold text-slate-400 mt-1">تم تقييم الأهلية</p>
+        </div>
+        <i class="fa-solid fa-arrow-left text-slate-300"></i>
+        <div class="flex-1 min-w-[130px] rounded-2xl border-2 border-brand-200 p-4 text-center bg-brand-50">
+          <p class="text-2xl font-black text-brand-700" id="consortRandomized">0</p>
+          <p class="text-[11px] font-bold text-brand-500 mt-1">تمت العشوائية والتخصيص</p>
+        </div>
+        <i class="fa-solid fa-arrow-left text-slate-300"></i>
+        <div class="flex-1 min-w-[130px] rounded-2xl border-2 border-orange-200 p-4 text-center bg-orange-50">
+          <p class="text-2xl font-black text-orange-600" id="consortFollow">0</p>
+          <p class="text-[11px] font-bold text-orange-400 mt-1">في المتابعة والمعالجة</p>
+        </div>
+        <i class="fa-solid fa-arrow-left text-slate-300"></i>
+        <div class="flex-1 min-w-[130px] rounded-2xl border-2 border-green-200 p-4 text-center bg-green-50">
+          <p class="text-2xl font-black text-green-600" id="consortAnalysis">0</p>
+          <p class="text-[11px] font-bold text-green-500 mt-1">دخلوا التحليل النهائي</p>
+        </div>
+      </div>
+      <div id="consortNotes" class="mt-4 flex flex-wrap gap-2 text-[11px] font-bold text-slate-500"></div>
+    </div>
+
+    <!-- المواعيد القادمة -->
+    <div class="xl:col-span-2 bg-white rounded-2xl p-6 shadow-card">
+      <div class="flex items-center justify-between mb-4">
+        <h5 class="font-black text-slate-700 text-sm">الزيارات القادمة</h5>
+        <button onclick="go('calendar')" class="text-[11px] font-extrabold text-brand-600 hover:text-brand-700 transition">فتح التقويم <i class="fa-solid fa-arrow-left text-[9px]"></i></button>
+      </div>
+      <div class="space-y-3" id="upcomingVisits">
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex flex-col items-center justify-center leading-none"><span class="text-sm font-black">19</span><span class="text-[8px] font-bold">يوليو</span></div>
+          <div class="min-w-0"><p class="text-xs font-extrabold text-slate-700 truncate">سارة العتيبي — متابعة دورية</p><p class="text-[10px] font-bold text-slate-400">10:00 ص — عيادة التقويم 2</p></div>
+          <span class="mr-auto text-[9px] font-extrabold text-orange-500 bg-orange-50 rounded-full px-2 py-0.5">بعد يومين</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex flex-col items-center justify-center leading-none"><span class="text-sm font-black">20</span><span class="text-[8px] font-bold">يوليو</span></div>
+          <div class="min-w-0"><p class="text-xs font-extrabold text-slate-700 truncate">محمد الدوسري — شد وتنشيط</p><p class="text-[10px] font-bold text-slate-400">09:30 ص — عيادة التقويم 1</p></div>
+          <span class="mr-auto text-[9px] font-extrabold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">بعد 3 أيام</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+          <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex flex-col items-center justify-center leading-none"><span class="text-sm font-black">22</span><span class="text-[8px] font-bold">يوليو</span></div>
+          <div class="min-w-0"><p class="text-xs font-extrabold text-slate-700 truncate">لمى الزهراني — أخذ قياسات</p><p class="text-[10px] font-bold text-slate-400">12:00 م — مختبر التخطيط</p></div>
+          <span class="mr-auto text-[9px] font-extrabold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">بعد 5 أيام</span>
+        </div>
+      </div>
+      <p class="mt-4 text-[10px] font-bold text-slate-400 leading-relaxed"><i class="fa-solid fa-bell text-brand-400 ml-1"></i>يُرسل النظام تذكيراً تلقائياً للباحث قبل موعد زيارة المريض بيومين.</p>
+    </div>
+  </div>
+
+  <!-- آخر النشاطات -->
+  <div class="bg-white rounded-2xl p-6 shadow-card">
+    <h5 class="font-black text-slate-700 text-sm mb-4">آخر النشاطات والعمليات (Audit Trail — معاينة)</h5>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-xs font-bold text-slate-500">
+      <div class="flex items-start gap-3"><span class="w-8 h-8 rounded-lg bg-green-100 text-green-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-check"></i></span><p>تسجيل عينة جديدة <b class="text-slate-700">PT-007</b> وتخصيصها تلقائياً<span class="block text-[10px] text-slate-300 mt-0.5">قبل 3 ساعات — د. أحمد الحربي</span></p></div>
+      <div class="flex items-start gap-3"><span class="w-8 h-8 rounded-lg bg-sky-100 text-sky-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-file-pdf"></i></span><p>تصدير استمارة الفحص التراكمية للمريض <b class="text-slate-700">PT-002</b><span class="block text-[10px] text-slate-300 mt-0.5">أمس — د. لينا العمري (مساعد)</span></p></div>
+      <div class="flex items-start gap-3"><span class="w-8 h-8 rounded-lg bg-violet-100 text-violet-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-wand-magic-sparkles"></i></span><p>توليد فقرة بروتوكول التعمية بصياغة <b class="text-slate-700">CONSORT</b> أكاديمية<span class="block text-[10px] text-slate-300 mt-0.5">قبل يومين — الذكاء الاصطناعي</span></p></div>
+      <div class="flex items-start gap-3"><span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-500 flex items-center justify-center shrink-0"><i class="fa-solid fa-calendar-plus"></i></span><p>جدولة موعد متابعة للمريضة <b class="text-slate-700">سارة العتيبي</b><span class="block text-[10px] text-slate-300 mt-0.5">قبل يومين — النظام</span></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     الصفحة 2: تأسيس وإطلاق الدراسة (Study Initialization)
+============================================================ -->
+<section id="page-setup" class="page space-y-6">
+
+  <!-- شريط المسار الحالي -->
+  <div id="pathBanner" class="flex items-center gap-3 rounded-2xl border-2 border-brand-200 bg-brand-50 px-5 py-4">
+    <i class="fa-solid fa-route text-brand-600 text-lg"></i>
+    <p class="text-sm font-extrabold text-brand-800">المسار الحالي: <span id="pathBannerText">دراسة جديدة (New Study)</span></p>
+    <button onclick="go('dashboard')" class="lockable mr-auto text-[11px] font-extrabold text-brand-600 hover:text-brand-800 transition"><i class="fa-solid fa-arrow-rotate-right ml-1"></i>تغيير المسار من لوحة التحكم</button>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <!-- العمود الأيمن: البيانات الأساسية -->
+    <div class="xl:col-span-3 space-y-6">
+      <div class="bg-white rounded-2xl p-6 shadow-card">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-file-signature"></i></span>
+          <div><h4 class="font-black text-slate-800">واجهة تأسيس الدراسة</h4><p class="text-[11px] font-bold text-slate-400">إدخال البيانات المطلوبة لإطلاق الدراسة (Study Initialization)</p></div>
+        </div>
+
+        <!-- عنوان الدراسة -->
+        <label class="block mb-5">
+          <span class="text-xs font-extrabold text-slate-600 block mb-2">1. عنوان الدراسة (Study Title) <b class="text-red-400">*</b></span>
+          <input id="studyTitle" type="text" value="فعالية التقويم ذاتي التسريع مقارنة بالتقويم التقليدي في تصحيح سوء الإطباق من الدرجة الثانية: تجربة سريرية عشوائية محكومة"
+            class="w-full border-2 border-slate-200 focus:border-brand-500 rounded-xl px-4 py-3 text-sm font-bold outline-none transition bg-slate-50 focus:bg-white" placeholder="أدخل العنوان العلمي الكامل للدراسة">
+        </label>
+
+        <!-- رفع المقترح -->
+        <div class="mb-2">
+          <span class="text-xs font-extrabold text-slate-600 block mb-2">2. رفع ملف مقترح البحث (Upload Research Proposal)</span>
+          <div id="proposalDrop" class="dropzone p-6 text-center" onclick="fakeUpload('proposal')">
+            <div id="proposalEmpty">
+              <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-300 mb-2"></i>
+              <p class="text-sm font-extrabold text-slate-500">اسحب ملف المقترح هنا أو اضغط للاختيار</p>
+              <p class="text-[10px] font-bold text-slate-300 mt-1">PDF / DOCX — بحد أقصى 25 ميغابايت</p>
+            </div>
+            <div id="proposalDone" class="hidden items-center justify-center gap-3">
+              <span class="w-11 h-11 rounded-xl bg-red-100 text-red-500 flex items-center justify-center text-xl"><i class="fa-solid fa-file-pdf"></i></span>
+              <div class="text-right"><p class="text-sm font-extrabold text-slate-700">research-proposal.pdf</p><p class="text-[10px] font-bold text-slate-400">2.4 MB — تم الرفع بنجاح <i class="fa-solid fa-circle-check text-green-500"></i></p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- تحديد الخيارات المنهجية -->
+      <div class="bg-white rounded-2xl p-6 shadow-card">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="w-9 h-9 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"><i class="fa-solid fa-sliders"></i></span>
+          <div><h4 class="font-black text-slate-800">3. تحديد الخيارات المنهجية والتحكيم</h4><p class="text-[11px] font-bold text-slate-400">تنعكس هذه الخيارات مباشرة على معالج المنهجية</p></div>
+        </div>
+        <div class="space-y-4">
+          <!-- العشوائية -->
+          <div class="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+            <span class="w-11 h-11 rounded-xl bg-white shadow text-brand-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-shuffle"></i></span>
+            <div class="flex-1">
+              <p class="text-sm font-extrabold text-slate-700">تفعيل خيار العشوائية (Randomization)</p>
+              <p id="randHint" class="text-[11px] font-bold text-slate-400">تخصيص العينات للمجموعات آلياً وفق خوارزمية محكومة</p>
+            </div>
+            <span class="text-[11px] font-black text-slate-400">لا</span>
+            <div id="toggleRandom" class="switch on" onclick="toggleSwitch('random')"></div>
+            <span class="text-[11px] font-black text-brand-600">نعم</span>
+          </div>
+          <!-- التعمية -->
+          <div class="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+            <span class="w-11 h-11 rounded-xl bg-white shadow text-violet-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-eye-slash"></i></span>
+            <div class="flex-1">
+              <p class="text-sm font-extrabold text-slate-700">تفعيل خيار التعمية (Blinding)</p>
+              <p class="text-[11px] font-bold text-slate-400">إخفاء التخصيص العلاجي عن الأطراف المحددة لحماية حياد التجربة</p>
+            </div>
+            <span class="text-[11px] font-black text-slate-400">لا</span>
+            <div id="toggleBlind" class="switch on" onclick="toggleSwitch('blind')"></div>
+            <span class="text-[11px] font-black text-brand-600">نعم</span>
+          </div>
+          <!-- مقيم خارجي -->
+          <div class="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+            <span class="w-11 h-11 rounded-xl bg-white shadow text-sky-600 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-check"></i></span>
+            <div class="flex-1">
+              <p class="text-sm font-extrabold text-slate-700">طلب مقيّم خارجي (External Evaluator)</p>
+              <p class="text-[11px] font-bold text-slate-400">إرسال العينات لتقييم خارجي مستقل بعد قفل الدراسة كاملة</p>
+            </div>
+            <span class="text-[11px] font-black text-slate-400">لا</span>
+            <div id="toggleExternal" class="switch" onclick="toggleSwitch('external')"></div>
+            <span class="text-[11px] font-black text-brand-600">نعم</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- العمود الأيسر: الهوية والتوثيق -->
+    <div class="xl:col-span-2 space-y-6">
+      <div class="bg-white rounded-2xl p-6 shadow-card">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-id-card"></i></span>
+          <div><h4 class="font-black text-slate-800">4. إضافات اختيارية للهوية والتوثيق</h4><p class="text-[11px] font-bold text-slate-400">تظهر تلقائياً في ترويسة استمارة الفحص</p></div>
+        </div>
+        <!-- شعار الجامعة -->
+        <span class="text-xs font-extrabold text-slate-600 block mb-2">إضافة شعار الجامعة (بصيغة صورة) — اختياري</span>
+        <div class="dropzone p-4 flex items-center gap-4 mb-5" onclick="fakeUpload('logo')">
+          <div id="logoPreview" class="w-16 h-16 rounded-2xl bg-brand-50 border-2 border-brand-100 flex items-center justify-center text-brand-500 text-2xl shrink-0 overflow-hidden">
+            <i class="fa-solid fa-university"></i>
+          </div>
+          <div><p id="logoText" class="text-xs font-extrabold text-slate-500">اضغط لرفع شعار الجامعة</p><p class="text-[10px] font-bold text-slate-300 mt-0.5">PNG / JPG — يفضّل خلفية شفافة</p></div>
+        </div>
+        <!-- الرقم الأخلاقي -->
+        <label class="block mb-4">
+          <span class="text-xs font-extrabold text-slate-600 block mb-2">رقم الموافقة الأخلاقية (اختياري)</span>
+          <input id="ethicsNo" type="text" value="KSU-REC-2026-114" class="w-full border-2 border-slate-200 focus:border-brand-500 rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition bg-slate-50 focus:bg-white" placeholder="مثال: KSU-REC-2026-114">
+        </label>
+        <!-- رقم التسجيل السريري -->
+        <label class="block">
+          <span class="text-xs font-extrabold text-slate-600 block mb-2">رقم التسجيل السريري للدراسة (اختياري)</span>
+          <input id="trialNo" type="text" value="NCT-05874211" class="w-full border-2 border-slate-200 focus:border-brand-500 rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition bg-slate-50 focus:bg-white" placeholder="مثال: NCT05874211">
+        </label>
+      </div>
+
+      <!-- زر إنشاء الدراسة -->
+      <button onclick="createStudy()" class="lockable w-full bg-gradient-to-l from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white rounded-2xl py-4 font-black text-base shadow-xl shadow-brand-600/30 transition flex items-center justify-center gap-3">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> 5. إنشاء الدراسة (Create Study)
+      </button>
+      <p class="text-[11px] font-bold text-slate-400 text-center leading-relaxed">بمجرد الضغط، يقوم المساعد الذكي (AI) بفحص المقترح واستخراج المجموعات وحجم العينة تلقائياً (AI Scanning &amp; Setup)</p>
+
+      <!-- لوحة مراجعة الهيكل المستخرج ذكياً (تظهر بعد الفحص) -->
+      <div id="aiResultPanel" class="hidden bg-white rounded-2xl p-6 shadow-card border-2 border-brand-200">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center"><i class="fa-solid fa-robot"></i></span>
+          <div><h4 class="font-black text-slate-800">الهيكل المبني للمقترح — مراجعة الباحث</h4><p class="text-[11px] font-bold text-slate-400">استُخرج آلياً وخُزّن في جدول الدراسات (Studies)</p></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="rounded-2xl border-2 border-brand-100 bg-brand-50/60 p-4 text-center">
+            <p class="text-[11px] font-extrabold text-brand-600 mb-1">المجموعة التجريبية (Experimental)</p>
+            <p class="text-xs font-bold text-slate-600">تقويم ذاتي التسريع</p>
+            <p class="text-3xl font-black text-brand-700 mt-2">ن = 20</p>
+          </div>
+          <div class="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 text-center">
+            <p class="text-[11px] font-extrabold text-slate-500 mb-1">المجموعة الضابطة (Control)</p>
+            <p class="text-xs font-bold text-slate-600">تقويم تقليدي معدني</p>
+            <p class="text-3xl font-black text-slate-600 mt-2">ن = 20</p>
+          </div>
+        </div>
+        <p class="text-[11px] font-bold text-slate-400 leading-relaxed mb-4"><i class="fa-solid fa-lightbulb text-amber-400 ml-1"></i>يمتلك الباحث مرونة التعديل اليدوي أو التحدث مع روبوت المحادثة لتعديل التصميم قبل الاعتماد النهائي.</p>
+        <!-- محادثة الذكاء الاصطناعي (محاكاة) -->
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3 mb-4">
+          <div class="flex items-start gap-2 mb-3">
+            <span class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-robot"></i></span>
+            <p class="text-[11px] font-bold text-slate-600 bg-white rounded-xl rounded-tr-none p-2.5 shadow-sm">هل ترغب بتعديل حجم العينة أو أسماء المجموعات قبل الاعتماد؟</p>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" placeholder="اكتب طلب تعديل للمساعد الذكي..." class="flex-1 text-xs font-bold border-2 border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-brand-400 bg-white">
+            <button onclick="toast('أرسل المساعد الذكي اقتراحاً محدثاً للهيكل — راجعه ثم اعتمده','info')" class="lockable bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-4 text-xs font-extrabold transition"><i class="fa-solid fa-paper-plane"></i></button>
+          </div>
+        </div>
+        <button onclick="approveStructure()" class="lockable w-full bg-slate-800 hover:bg-slate-900 text-white rounded-xl py-3 font-extrabold text-sm transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-check-double"></i> الاعتماد النهائي — حفظ التحديثات في قاعدة البيانات
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     الصفحة 3: معالج المنهجية السريرية (Methodology Wizard)
+============================================================ -->
+<section id="page-methodology" class="page space-y-6">
+
+  <!-- شريط خطوات المعالج -->
+  <div class="bg-white rounded-2xl p-5 shadow-card">
+    <div class="flex items-center max-w-3xl mx-auto">
+      <div class="step-item active flex flex-col items-center gap-1.5" data-step="1" onclick="wizardGo(1)">
+        <div class="step-dot">1</div><span class="step-label">إعدادات العشوائية</span><span class="text-[9px] font-bold text-slate-300 -mt-1">Randomization</span>
+      </div>
+      <div class="step-line" id="line1"></div>
+      <div class="step-item flex flex-col items-center gap-1.5 cursor-pointer" data-step="2" onclick="wizardGo(2)">
+        <div class="step-dot">2</div><span class="step-label">إعدادات التعمية</span><span class="text-[9px] font-bold text-slate-300 -mt-1">Blinding</span>
+      </div>
+      <div class="step-line" id="line2"></div>
+      <div class="step-item flex flex-col items-center gap-1.5 cursor-pointer" data-step="3" onclick="wizardGo(3)">
+        <div class="step-dot"><i class="fa-solid fa-check"></i></div><span class="step-label">التحقق الذكي والحفظ</span><span class="text-[9px] font-bold text-slate-300 -mt-1">Verify &amp; Save</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ الخطوة 1: العشوائية ============ -->
+  <div id="wizStep1" class="wiz-panel space-y-6">
+    <!-- حالة التعطيل (دراسة حالية أو العشوائية غير مفعلة) -->
+    <div id="randDisabled" class="hidden bg-white rounded-2xl p-8 shadow-card border-2 border-dashed border-slate-300 text-center">
+      <span class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-4"><i class="fa-solid fa-ban"></i></span>
+      <h4 class="font-black text-slate-700 text-lg mb-2">خوارزمية التوزيع العشوائي التلقائي معطّلة وموقوفة</h4>
+      <p id="randDisabledText" class="text-sm font-bold text-slate-400 max-w-xl mx-auto leading-relaxed">لأن المرضى تم توزيعهم مسبقاً على أرض الواقع في مسار «دراسة حالية» — سيظهر حقل المجموعة العلاجية كإدخال يدوي مباشر للباحث عند تسجيل العينات، أو تُقرأ قيمته آلياً من واقع استمارات الفحص الورقية التاريخية عبر نظام (OCR).</p>
+    </div>
+
+    <!-- محتوى العشوائية -->
+    <div id="randContent" class="space-y-6">
+      <div class="bg-white rounded-2xl p-6 shadow-card">
+        <h4 class="font-black text-slate-800 mb-1">1. تحديد خوارزمية العشوائية</h4>
+        <p class="text-[11px] font-bold text-slate-400 mb-5">يظهر هذا المعالج فقط في مسار «دراسة جديدة» وعند تفعيل خيار العشوائية</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- بسيطة -->
+          <div class="pick-card rand-alg selected" data-alg="simple" onclick="pickAlg(this,'simple')">
+            <div class="flex items-center justify-between mb-3"><span class="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-dice"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+            <p class="font-extrabold text-sm text-slate-700">عشوائية بسيطة</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-0.5">(Simple Randomization)</p>
+          </div>
+          <!-- كتل -->
+          <div class="pick-card rand-alg" data-alg="block" onclick="pickAlg(this,'block')">
+            <div class="flex items-center justify-between mb-3"><span class="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"><i class="fa-solid fa-cubes"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+            <p class="font-extrabold text-sm text-slate-700">عشوائية بالكتل المتوازنة</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-0.5">(Block Randomization)</p>
+          </div>
+          <!-- طبقية -->
+          <div class="pick-card rand-alg" data-alg="stratified" onclick="pickAlg(this,'stratified')">
+            <div class="flex items-center justify-between mb-3"><span class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-layer-group"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+            <p class="font-extrabold text-sm text-slate-700">عشوائية طبقية</p>
+            <p class="text-[10px] font-bold text-slate-400 mt-0.5">(Stratified Randomization)</p>
+          </div>
+        </div>
+        <!-- حجم الكتلة -->
+        <div id="blockSizeRow" class="hidden mt-5 flex items-center gap-4 p-4 rounded-2xl bg-violet-50 border border-violet-100">
+          <i class="fa-solid fa-cubes text-violet-500"></i>
+          <p class="text-xs font-extrabold text-violet-700">تحديد حجم الكتلة (Block Sizes):</p>
+          <div class="flex gap-2">
+            <button class="chip block-chip selected" onclick="pickChip(this,'.block-chip')">4</button>
+            <button class="chip block-chip" onclick="pickChip(this,'.block-chip')">6</button>
+            <button class="chip block-chip" onclick="pickChip(this,'.block-chip')">8</button>
+          </div>
+        </div>
+        <!-- متغيرات الطبقية -->
+        <div id="strataRow" class="hidden mt-5 p-4 rounded-2xl bg-amber-50 border border-amber-100">
+          <p class="text-xs font-extrabold text-amber-700 mb-3"><i class="fa-solid fa-layer-group ml-1"></i>تحديد المتغيرات الطبقية (Stratification Factors):</p>
+          <div class="flex flex-wrap gap-2">
+            <button class="chip strata-chip selected" onclick="this.classList.toggle('selected')">الجنس</button>
+            <button class="chip strata-chip selected" onclick="this.classList.toggle('selected')">الفئة العمرية</button>
+            <button class="chip strata-chip" onclick="this.classList.toggle('selected')">شدة الحالة</button>
+            <button class="chip strata-chip" onclick="this.classList.toggle('selected')">نوع سوء الإطباق</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- نسبة التوزيع -->
+        <div class="bg-white rounded-2xl p-6 shadow-card">
+          <h4 class="font-black text-slate-800 mb-1">2. نسبة التوزيع (Allocation Ratio)</h4>
+          <p class="text-[11px] font-bold text-slate-400 mb-4">تحديد نسبة التوزيع بين المجموعات</p>
+          <div class="flex gap-2">
+            <button class="chip ratio-chip selected flex-1 !py-3" onclick="pickChip(this,'.ratio-chip')">1 : 1</button>
+            <button class="chip ratio-chip flex-1 !py-3" onclick="pickChip(this,'.ratio-chip')">2 : 1</button>
+            <button class="chip ratio-chip flex-1 !py-3" onclick="pickChip(this,'.ratio-chip')">1 : 1 : 1</button>
+          </div>
+        </div>
+        <!-- أمان التوزيع -->
+        <div class="bg-white rounded-2xl p-6 shadow-card">
+          <h4 class="font-black text-slate-800 mb-1">3. أمان التوزيع (Allocation Concealment)</h4>
+          <p class="text-[11px] font-bold text-slate-400 mb-4">تحديد طريقة إخفاء تسلسل التوزيع</p>
+          <div class="space-y-2.5">
+            <div class="pick-card conceal-card selected !p-3.5 flex items-center gap-3" onclick="pickConceal(this)">
+              <i class="fa-solid fa-barcode text-brand-600"></i><p class="text-xs font-extrabold text-slate-600 flex-1">أكواد رقمية مخفية التسلسل (Opaque Sealed Codes)</p><span class="pick-check"><i class="fa-solid fa-check"></i></span>
+            </div>
+            <div class="pick-card conceal-card !p-3.5 flex items-center gap-3" onclick="pickConceal(this)">
+              <i class="fa-solid fa-server text-brand-600"></i><p class="text-xs font-extrabold text-slate-600 flex-1">النظام الإلكتروني المؤتمت المركزي (Centralized Automated System)</p><span class="pick-check"><i class="fa-solid fa-check"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button onclick="wizardGo(2)" class="bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-8 py-3 font-extrabold text-sm transition shadow-lg shadow-brand-600/25 flex items-center gap-2">التالي: إعدادات التعمية <i class="fa-solid fa-arrow-left"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ الخطوة 2: التعمية ============ -->
+  <div id="wizStep2" class="wiz-panel hidden space-y-6">
+    <!-- تعطيل التعمية -->
+    <div id="blindDisabled" class="hidden bg-white rounded-2xl p-8 shadow-card border-2 border-dashed border-slate-300 text-center">
+      <span class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center text-2xl mx-auto mb-4"><i class="fa-solid fa-eye"></i></span>
+      <h4 class="font-black text-slate-700 text-lg mb-2">دراسة مفتوحة (Open-Label) — التعمية غير مفعلة</h4>
+      <p class="text-sm font-bold text-slate-400 max-w-lg mx-auto leading-relaxed">لم يتم تفعيل خيار التعمية أثناء تأسيس الدراسة. يمكنك تفعيله من شاشة تأسيس الدراسة.</p>
+      <button onclick="go('setup')" class="lockable mt-4 bg-slate-700 hover:bg-slate-800 text-white rounded-xl px-6 py-2.5 text-xs font-extrabold transition">الانتقال لتأسيس الدراسة</button>
+    </div>
+
+    <div id="blindContent" class="space-y-6">
+      <!-- الخطوة 1: أطراف التعمية + الاستنتاج -->
+      <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <div class="xl:col-span-3 bg-white rounded-2xl p-6 shadow-card">
+          <h4 class="font-black text-slate-800 mb-1">الخطوة 1: تحديد أطراف التعمية (Blinded Parties)</h4>
+          <p class="text-[11px] font-bold text-slate-400 mb-5">حدد الأشخاص الذين لن يعرفوا التخصيص العلاجي</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="pick-card party-card selected !p-4" data-party="participant" onclick="pickParty(this)">
+              <div class="flex items-center justify-between mb-2"><span class="w-9 h-9 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center"><i class="fa-solid fa-user"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+              <p class="text-xs font-extrabold text-slate-700">المشارك (المريض)</p>
+              <p class="text-[10px] font-bold text-slate-400 mt-1 leading-relaxed">لا يعرف المادة أو المعالجة التي يتلقاها</p>
+            </div>
+            <div class="pick-card party-card selected !p-4" data-party="researcher" onclick="pickParty(this)">
+              <div class="flex items-center justify-between mb-2"><span class="w-9 h-9 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-user-doctor"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+              <p class="text-xs font-extrabold text-slate-700">الباحث / المعالج</p>
+              <p class="text-[10px] font-bold text-slate-400 mt-1 leading-relaxed">لا يعرف المادة أو التدخل الذي يطبقه سريرياً</p>
+            </div>
+            <div class="pick-card party-card !p-4" data-party="assessor" onclick="pickParty(this)">
+              <div class="flex items-center justify-between mb-2"><span class="w-9 h-9 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center"><i class="fa-solid fa-clipboard-check"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+              <p class="text-xs font-extrabold text-slate-700">مقيّم النتائج (الخارجي)</p>
+              <p class="text-[10px] font-bold text-slate-400 mt-1 leading-relaxed">يقيّم النتائج دون معرفة المجموعة العلاجية</p>
+            </div>
+            <div class="pick-card party-card !p-4" data-party="analyst" onclick="pickParty(this)">
+              <div class="flex items-center justify-between mb-2"><span class="w-9 h-9 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-calculator"></i></span><span class="pick-check"><i class="fa-solid fa-check"></i></span></div>
+              <p class="text-xs font-extrabold text-slate-700">المحلل الإحصائي</p>
+              <p class="text-[10px] font-bold text-slate-400 mt-1 leading-relaxed">يستلم البيانات مرمزة بالكامل (Group A / B) دون معرفة المجموعات الحقيقية</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- شارة الاستنتاج التلقائي -->
+        <div class="xl:col-span-2 bg-white rounded-2xl p-6 shadow-card flex flex-col">
+          <div class="flex items-center gap-2 mb-4">
+            <i class="fa-solid fa-wand-magic-sparkles text-brand-500"></i>
+            <p class="text-xs font-extrabold text-slate-500">الاستنتاج التلقائي للذكاء الاصطناعي (AI Cross-sectional Inference)</p>
+          </div>
+          <div id="blindBadge" class="blind-badge blind-double rounded-3xl p-6 text-center flex-1 flex flex-col items-center justify-center transition-all">
+            <i id="blindBadgeIcon" class="fa-solid fa-eye-low-vision text-4xl mb-3"></i>
+            <p id="blindBadgeAr" class="text-2xl font-black">تعمية ثنائية</p>
+            <p id="blindBadgeEn" class="text-sm font-extrabold opacity-70 mt-1">(Double-blind)</p>
+            <p id="blindBadgeDesc" class="text-[11px] font-bold mt-3 leading-relaxed opacity-80">طرفان معمّيان: المشارك + الباحث/المعالج — لا يعرفان التخصيص العلاجي</p>
+          </div>
+          <p class="text-[10px] font-bold text-slate-400 text-center mt-3 leading-relaxed">تُنمذج المسمى تلقائياً بناءً على الأطراف المحددة: مفتوحة / أحادية / ثنائية / ثلاثية / رباعية</p>
+        </div>
+      </div>
+
+      <!-- الخطوة 2 + 3: النطاق والآلية -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-6 shadow-card">
+          <h4 class="font-black text-slate-800 mb-1">الخطوة 2: نطاق التعمية (Blinding Scope)</h4>
+          <p class="text-[11px] font-bold text-slate-400 mb-4">تحديد ما سيتم إخفاؤه وتعميته</p>
+          <div class="flex flex-wrap gap-2">
+            <button class="chip scope-chip selected" onclick="this.classList.toggle('selected')">هوية المجموعة العلاجية</button>
+            <button class="chip scope-chip selected" onclick="this.classList.toggle('selected')">جانب المعالجة (يمين / يسار)</button>
+            <button class="chip scope-chip" onclick="this.classList.toggle('selected')">نوع التدخل / المعالجة</button>
+            <button class="chip scope-chip" onclick="this.classList.toggle('selected')">نوع المادة</button>
+            <button class="chip scope-chip" onclick="this.classList.toggle('selected')">الجرعة</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-card">
+          <h4 class="font-black text-slate-800 mb-1">الخطوة 3: آلية تنفيذ التعمية (Blinding Mechanism)</h4>
+          <p class="text-[11px] font-bold text-slate-400 mb-4">تحديد طريقة تطبيق التعمية وتأمين التخصيص</p>
+          <div class="flex flex-wrap gap-2">
+            <button class="chip mech-chip" onclick="pickChip(this,'.mech-chip')">عبوات متطابقة الشكل</button>
+            <button class="chip mech-chip selected" onclick="pickChip(this,'.mech-chip')">مغلفات مغلقة ومتسلسلة (SNOSE)</button>
+            <button class="chip mech-chip" onclick="pickChip(this,'.mech-chip')">أكواد عشوائية</button>
+            <button class="chip mech-chip" onclick="pickChip(this,'.mech-chip')">نظام توزيع إلكتروني</button>
+            <button class="chip mech-chip" onclick="pickChip(this,'.mech-chip')">طرف ثالث مستقل</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- الخطوة 4: كسر التعمية الطارئ -->
+      <div class="bg-white rounded-2xl p-6 shadow-card border-r-4 border-red-400">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"><i class="fa-solid fa-triangle-exclamation"></i></span>
+          <div><h4 class="font-black text-slate-800">الخطوة 4: كسر التعمية الطارئ (Emergency Unblinding)</h4><p class="text-[11px] font-bold text-slate-400">بروتوكول الحالات الاضطرارية الموثق</p></div>
+          <div class="mr-auto flex items-center gap-2">
+            <span class="text-[11px] font-black text-slate-400">لا يُسمح</span>
+            <div id="toggleUnblind" class="switch" onclick="toggleUnblind()"></div>
+            <span class="text-[11px] font-black text-red-500">يُسمح اضطرارياً</span>
+          </div>
+        </div>
+        <div id="unblindOptions" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div>
+            <p class="text-xs font-extrabold text-slate-600 mb-3">من يملك صلاحية كسر التعمية؟</p>
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-red-200 transition cursor-pointer text-xs font-extrabold text-slate-600"><input type="checkbox" checked class="accent-red-500 w-4 h-4"> الباحث الرئيسي (PI)</label>
+              <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-red-200 transition cursor-pointer text-xs font-extrabold text-slate-600"><input type="checkbox" class="accent-red-500 w-4 h-4"> مدير الدراسة</label>
+              <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-red-200 transition cursor-pointer text-xs font-extrabold text-slate-600"><input type="checkbox" class="accent-red-500 w-4 h-4"> لجنة مراقبة السلامة (DSMB)</label>
+              <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-slate-100 hover:border-red-200 transition cursor-pointer text-xs font-extrabold text-slate-600"><input type="checkbox" class="accent-red-500 w-4 h-4"> مسؤول مستقل</label>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-extrabold text-slate-600 mb-3">الأسباب المعتمدة لكسر التعمية</p>
+            <div class="flex flex-wrap gap-2 mb-4">
+              <button class="chip selected !border-red-200 !text-red-500" onclick="this.classList.toggle('selected')">حدث ضار خطير (SAE)</button>
+              <button class="chip selected !border-red-200 !text-red-500" onclick="this.classList.toggle('selected')">طارئ طبي</button>
+              <button class="chip !border-red-200 !text-red-500" onclick="this.classList.toggle('selected')">قرار لجنة الأخلاقيات</button>
+              <button class="chip !border-red-200 !text-red-500" onclick="this.classList.toggle('selected')">أخرى</button>
+            </div>
+            <div class="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-100">
+              <i class="fa-solid fa-shield-halved text-red-400 mt-0.5"></i>
+              <p class="text-[11px] font-bold text-red-600 leading-relaxed"><b>التسجيل الآلي التلقائي:</b> يقوم النظام بتسجيل أي محاولة أو عملية كسر تعمية فوراً في سجل التدقيق (Audit Trail) متضمناً: التاريخ والوقت، المستخدم، السبب، والمريض المعني.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- الخطوة 5: توليد بروتوكول التعمية -->
+      <div class="bg-white rounded-2xl p-6 shadow-card">
+        <div class="flex flex-wrap items-center gap-4 mb-4">
+          <span class="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-file-lines"></i></span>
+          <div class="flex-1"><h4 class="font-black text-slate-800">الخطوة 5: توليد بروتوكول التعمية تلقائياً</h4><p class="text-[11px] font-bold text-slate-400">صياغة أكاديمية بأسلوب CONSORT جاهزة للإدراج المباشر في قسم المنهجية</p></div>
+          <button onclick="generateProtocol()" class="lockable bg-gradient-to-l from-brand-600 to-brand-700 hover:from-brand-700 text-white rounded-xl px-6 py-3 text-sm font-extrabold transition shadow-lg shadow-brand-600/25 flex items-center gap-2">
+            <i class="fa-solid fa-robot"></i> توليد الفقرة النهائية للبروتوكول
+          </button>
+        </div>
+        <div id="protocolOutput" class="hidden">
+          <div class="flex items-center gap-2 mb-3">
+            <button class="tab-btn active" id="tabAr" onclick="switchProtocolTab('ar')">الصياغة العربية</button>
+            <button class="tab-btn" id="tabEn" onclick="switchProtocolTab('en')">English Version</button>
+          </div>
+          <div class="paper rounded-2xl p-6 relative overflow-hidden">
+            <i class="fa-solid fa-quote-right absolute top-4 left-4 text-4xl text-brand-100"></i>
+            <p id="protocolAr" class="text-[13px] font-bold text-slate-700 leading-loose text-justify">
+              صُممت هذه الدراسة كتجربة سريرية عشوائية محكومة <b>ثنائية التعمية (Double-blind)</b>، حيث تم إخفاء التخصيص العلاجي عن كلٍّ من المشارك والباحث/المعالج. جرى توليد تسلسل التوزيع العشوائي باستخدام خوارزمية العشوائية البسيطة بنسبة تخصيص 1:1 بين المجموعتين التجريبية والضابطة، مع تأمين إخفاء التسلسل (Allocation Concealment) عبر مغلفات مغلقة ومتسلسلة (SNOSE). واقتصر الاطلاع على رموز التوزيع على طرف ثالث مستقل، مع تسجيل أي حالة كسر تعمية اضطرارية في سجل التدقيق الإلكتروني وفق أسباب معتمدة مسبقاً، وذلك التزاماً بإرشادات CONSORT ومعايير الممارسات السريرية الجيدة (ICH-GCP).
+            </p>
+            <p id="protocolEn" class="hidden text-[13px] font-bold text-slate-700 leading-loose text-justify" dir="ltr">
+              This study was designed as a <b>double-blind</b> randomized controlled trial in which treatment allocation was concealed from both the participant and the treating investigator. The allocation sequence was generated using a simple randomization algorithm with a 1:1 allocation ratio between the experimental and control groups, while allocation concealment was ensured through sequentially numbered opaque sealed envelopes (SNOSE). Access to allocation codes was restricted to an independent third party, and any emergency unblinding event was automatically recorded in the electronic audit trail with pre-approved justification criteria, in accordance with CONSORT guidelines and ICH-GCP standards.
+            </p>
+          </div>
+          <button onclick="toast('تم إدراج الصياغة مباشرة في قسم المنهجية للدراسة','success')" class="lockable mt-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-6 py-2.5 text-xs font-extrabold transition flex items-center gap-2"><i class="fa-solid fa-file-import"></i> إدراج مباشر في قسم المنهجية</button>
+        </div>
+      </div>
+
+      <div class="flex justify-between">
+        <button onclick="wizardGo(1)" class="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-xl px-6 py-3 font-extrabold text-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-right"></i> السابق</button>
+        <button onclick="wizardGo(3)" class="bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-8 py-3 font-extrabold text-sm transition shadow-lg shadow-brand-600/25 flex items-center gap-2">التالي: التحقق والحفظ <i class="fa-solid fa-arrow-left"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ الخطوة 3: التحقق الذكي والحفظ ============ -->
+  <div id="wizStep3" class="wiz-panel hidden">
+    <div class="bg-white rounded-2xl p-8 shadow-card max-w-3xl mx-auto">
+      <div class="text-center mb-6">
+        <span class="w-16 h-16 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center text-2xl mx-auto mb-3"><i class="fa-solid fa-clipboard-check"></i></span>
+        <h4 class="font-black text-slate-800 text-lg">الخطوة 6: التحقق الذكي والحفظ (Smart Verification &amp; Save)</h4>
+        <p class="text-[11px] font-bold text-slate-400">يراجع الذكاء الاصطناعي الإعدادات للتحقق من الامتثال لمعايير الممارسات السريرية الجيدة (ICH-GCP)</p>
+      </div>
+      <div class="space-y-3 mb-6">
+        <div class="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-100"><i class="fa-solid fa-circle-check text-green-500 text-lg"></i><p class="text-xs font-extrabold text-slate-600 flex-1">الامتثال الكامل لمعايير الممارسات السريرية الجيدة (ICH-GCP)</p><span class="text-[10px] font-black text-green-500">مطابق</span></div>
+        <div class="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-100"><i class="fa-solid fa-circle-check text-green-500 text-lg"></i><p class="text-xs font-extrabold text-slate-600 flex-1">عدم وجود تعارضات منهجية في الإعدادات المدخلة</p><span class="text-[10px] font-black text-green-500">مطابق</span></div>
+        <div class="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-100"><i class="fa-solid fa-circle-check text-green-500 text-lg"></i><p class="text-xs font-extrabold text-slate-600 flex-1">توافق خوارزمية العشوائية مع نسبة التوزيع المحددة</p><span class="text-[10px] font-black text-green-500">مطابق</span></div>
+        <div class="flex items-center gap-3 p-4 rounded-2xl bg-green-50 border border-green-100"><i class="fa-solid fa-circle-check text-green-500 text-lg"></i><p class="text-xs font-extrabold text-slate-600 flex-1">اكتمال إعدادات التعمية ونطاقها وآلية تنفيذها وبروتوكول الكسر الطارئ</p><span class="text-[10px] font-black text-green-500">مطابق</span></div>
+        <div class="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-100"><i class="fa-solid fa-lightbulb text-amber-500 text-lg"></i><p class="text-xs font-extrabold text-slate-600 flex-1">توصية تحسين: يُقترح تفعيل «المحلل الإحصائي» كطرف معمّى للارتقاء إلى التعمية الثلاثية</p><span class="text-[10px] font-black text-amber-500">اختياري</span></div>
+      </div>
+      <button onclick="finalSave()" class="lockable w-full bg-gradient-to-l from-brand-600 to-brand-700 hover:from-brand-700 text-white rounded-2xl py-4 font-black transition shadow-xl shadow-brand-600/25 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-floppy-disk"></i> الحفظ النهائي للإعدادات على جميع أجزاء الدراسة وقاعدة بياناتها
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     الصفحة 4: دليل العينات والتحقق (Samples & Eligibility)
+============================================================ -->
+<section id="page-samples" class="page space-y-6">
+
+  <!-- شريط الأدوات -->
+  <div class="flex flex-wrap items-center gap-4">
+    <div class="bg-white rounded-2xl shadow-card px-5 py-3 flex items-center gap-3">
+      <i class="fa-solid fa-vials text-brand-500"></i>
+      <p class="text-xs font-extrabold text-slate-600">حجم العينة المطلوب: <b id="sampleSizeNum2" class="text-brand-600 text-sm">40</b> عينة</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-card px-5 py-3 flex items-center gap-3">
+      <i class="fa-solid fa-user-check text-green-500"></i>
+      <p class="text-xs font-extrabold text-slate-600">المسجل حالياً: <b id="registeredNum2" class="text-slate-800 text-sm">0</b> عينة</p>
+    </div>
+    <button onclick="openEligibility()" class="lockable mr-auto bg-gradient-to-l from-brand-600 to-brand-700 hover:from-brand-700 text-white rounded-2xl px-6 py-3.5 font-extrabold text-sm transition shadow-lg shadow-brand-600/25 flex items-center gap-2">
+      <i class="fa-solid fa-plus"></i> تسجيل عينة جديدة
+    </button>
+  </div>
+
+  <!-- مفتاح الألوان -->
+  <div class="bg-white rounded-2xl shadow-card px-5 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <p class="text-[11px] font-black text-slate-400">مفتاح الحالات المنهجية:</p>
+    <span class="badge b-active"><span class="dot"></span>نشطة (Active)</span>
+    <span class="badge b-completed"><span class="dot"></span>مكتملة (Completed)</span>
+    <span class="badge b-withdrawn"><span class="dot"></span>منسحبة (Withdrawn)</span>
+    <span class="badge b-lost"><span class="dot"></span>مفقودة (Lost to Follow-up)</span>
+    <span class="badge b-excluded"><span class="dot"></span>مستبعدة (Excluded)</span>
+  </div>
+
+  <!-- جدول المرضى -->
+  <div class="bg-white rounded-2xl shadow-card overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <h4 class="font-black text-slate-700">سجل المرضى والعينات</h4>
+      <p class="text-[10px] font-bold text-slate-400">يظهر اسم الباحث المساعد بجانب كل عينة أدخلها لضمان الشفافية</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-slate-50 text-[11px] font-black text-slate-400">
+            <th class="px-6 py-3.5 text-right">كود العينة</th>
+            <th class="px-4 py-3.5 text-right">المريض</th>
+            <th class="px-4 py-3.5 text-right">المجموعة العلاجية</th>
+            <th class="px-4 py-3.5 text-right">الحالة المنهجية</th>
+            <th class="px-4 py-3.5 text-right">آخر زيارة</th>
+            <th class="px-4 py-3.5 text-right">الزيارة القادمة</th>
+            <th class="px-4 py-3.5 text-center">إجراءات العينة</th>
+          </tr>
+        </thead>
+        <tbody id="patientsTable" class="divide-y divide-slate-100"><!-- يُبنى ديناميكياً --></tbody>
+      </table>
+    </div>
+    <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center gap-2 text-[10px] font-bold text-slate-400">
+      <i class="fa-solid fa-lock text-slate-300"></i>
+      عند نهاية المعالجة يمكن للباحث قفل العينة لمنع التعديل والتلاعب، مع حفظ سجلها التاريخي دون حذف عند الاستبعاد اللاحق (Excluded).
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     الصفحة 5: استعراض الاستمارة (Form Specs View)
+============================================================ -->
+<section id="page-form" class="page space-y-6">
+
+  <!-- شريط أدوات الاستمارة -->
+  <div class="flex flex-wrap items-center gap-3 bg-white rounded-2xl shadow-card px-5 py-3.5">
+    <div class="flex items-center gap-2 ml-2">
+      <i class="fa-solid fa-file-medical text-brand-500 text-lg"></i>
+      <p class="text-sm font-black text-slate-700">استمارة الفحص السريري — معاينة الهوية البصرية والمواصفات</p>
+    </div>
+    <button onclick="exportFormPDF()" class="lockable bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-5 py-2.5 text-xs font-extrabold transition flex items-center gap-2"><i class="fa-solid fa-file-pdf"></i> تصدير الاستمارة PDF</button>
+    <button onclick="toast('تم إرسال الاستمارة للطابعة بنجاح','success')" class="lockable bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl px-5 py-2.5 text-xs font-extrabold transition flex items-center gap-2"><i class="fa-solid fa-print"></i> طباعة</button>
+    <label class="mr-auto flex items-center gap-2 text-xs font-extrabold text-slate-500 cursor-pointer">
+      <div id="toggleWm" class="switch on !w-11 !h-6" style="--x:20px" onclick="toggleWatermark()"></div> إظهار العلامة المائية
+    </label>
+  </div>
+
+  <!-- ورقة الاستمارة -->
+  <div class="a4-sheet p-10">
+    <!-- العلامة المائية -->
+    <div id="watermark" class="absolute inset-0 pointer-events-none select-none overflow-hidden" style="opacity:.045">
+      <div class="absolute inset-[-45%] flex flex-wrap items-center justify-center gap-x-14 gap-y-10 -rotate-[28deg]" id="wmInner"></div>
+    </div>
+
+    <div class="relative">
+      <!-- الترويسة الرسمية -->
+      <div class="flex items-center gap-6 pb-5 border-b-2 border-slate-800">
+        <div class="w-20 h-20 rounded-2xl bg-brand-50 border-2 border-brand-200 flex items-center justify-center text-brand-600 text-3xl shrink-0"><i class="fa-solid fa-university"></i></div>
+        <div class="flex-1 text-center">
+          <h3 class="font-black text-lg text-slate-800">استمارة الفحص السريري للتقويم</h3>
+          <p class="text-xs font-bold text-slate-500 mt-1">دراسة فعالية التقويم ذاتي التسريع مقارنة بالتقويم التقليدي — تجربة سريرية عشوائية محكومة</p>
+          <p class="text-[10px] font-bold text-slate-400 mt-0.5">جامعة الملك سعود — كلية طب الأسنان — قسم تقويم الأسنان</p>
+        </div>
+        <div class="text-[10px] font-extrabold text-slate-500 space-y-1.5 shrink-0">
+          <p class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">رقم الموافقة الأخلاقية: <b class="text-slate-700" id="formEthics">KSU-REC-2026-114</b></p>
+          <p class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">رقم التسجيل السريري: <b class="text-slate-700" id="formTrial">NCT-05874211</b></p>
+        </div>
+      </div>
+
+      <!-- صف الباحث والمشرف -->
+      <div class="flex flex-wrap items-center gap-x-8 gap-y-2 py-3.5 border-b border-slate-200 text-[11px] font-extrabold text-slate-600">
+        <p><i class="fa-solid fa-user-doctor text-brand-500 ml-1.5"></i>الباحث الرئيسي: د. أحمد الحربي</p>
+        <p><i class="fa-solid fa-user-tie text-brand-500 ml-1.5"></i>المشرف الأكاديمي: د. سارة القحطاني</p>
+        <p><i class="fa-regular fa-calendar text-brand-500 ml-1.5"></i>تاريخ الفحص: 17 / 07 / 2026</p>
+        <p class="mr-auto bg-brand-50 text-brand-700 rounded-full px-3 py-1">الاستمارة الرئيسية — الزيارة الثالثة</p>
+      </div>
+
+      <!-- بيانات المريض -->
+      <div class="grid grid-cols-4 gap-3 py-4 text-[11px] font-extrabold">
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-0.5">كود العينة</p>PT-001</div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-0.5">كود التعمية العشوائي</p>RND-4821 <span class="text-[8px] text-slate-300">(المجموعة الحقيقية مخفية)</span></div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-0.5">عمر المريض</p>21 سنة</div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-0.5">الجنس</p>أنثى</div>
+      </div>
+
+      <!-- حقول الفحص: صح/خطأ + قوائم + تحقق ذكي -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+        <div class="rounded-2xl border-2 border-slate-100 p-4">
+          <p class="text-xs font-black text-slate-700 mb-3"><i class="fa-solid fa-square-check text-brand-500 ml-1"></i>الفحص السريري داخل الفم (✓ / ✗)</p>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between text-xs font-extrabold text-slate-600"><span>صحة اللثة والغشاء المخاطي</span><span class="flex gap-1.5"><button class="w-8 h-8 rounded-lg bg-green-500 text-white text-xs shadow" onclick="toast('تم تسجيل: سليم ✓','success')">✓</button><button class="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 text-xs hover:bg-red-100 hover:text-red-500 transition" onclick="toast('تم تسجيل: غير سليم ✗ مع فتح حقل ملاحظات','info')">✗</button></span></div>
+            <div class="flex items-center justify-between text-xs font-extrabold text-slate-600"><span>مستوى النظافة الفموية</span><span class="flex gap-1.5"><button class="w-8 h-8 rounded-lg bg-green-500 text-white text-xs shadow" onclick="toast('تم تسجيل: جيد ✓','success')">✓</button><button class="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 text-xs hover:bg-red-100 hover:text-red-500 transition" onclick="toast('تم تسجيل: يحتاج تحسين ✗','info')">✗</button></span></div>
+            <div class="flex items-center justify-between text-xs font-extrabold text-slate-600"><span>سلامة جهاز التقويم</span><span class="flex gap-1.5"><button class="w-8 h-8 rounded-lg bg-green-500 text-white text-xs shadow" onclick="toast('تم تسجيل: سليم ✓','success')">✓</button><button class="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 text-xs hover:bg-red-100 hover:text-red-500 transition" onclick="toast('تم تسجيل: انكسار/انفكاك ✗','info')">✗</button></span></div>
+          </div>
+        </div>
+        <div class="rounded-2xl border-2 border-slate-100 p-4">
+          <p class="text-xs font-black text-slate-700 mb-3"><i class="fa-solid fa-list-check text-brand-500 ml-1"></i>قوائم منسدلة وحقول رقمية بتحقق فوري (Smart Validation)</p>
+          <div class="space-y-3">
+            <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">تصنيف سوء الإطباق (Angle Classification)</p>
+              <select class="cursor-pointer"><option>الدرجة الثانية — Division 1</option><option>الدرجة الثانية — Division 2</option><option>الدرجة الأولى</option><option>الدرجة الثالثة</option></select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="field-box" id="piBox"><p class="text-[9px] text-slate-400 mb-1">مؤشر اللويحة السنية % (0–100)</p><input id="piInput" type="number" value="18" oninput="smartValidate(this,0,100,'piBox')"></div>
+              <div class="field-box" id="pdBox"><p class="text-[9px] text-slate-400 mb-1">عمق الجيب اللثوي ملم (0–12)</p><input id="pdInput" type="number" value="2" oninput="smartValidate(this,0,12,'pdBox')"></div>
+            </div>
+            <p id="validationMsg" class="hidden text-[10px] font-extrabold text-red-500 items-center gap-1.5"><i class="fa-solid fa-circle-exclamation"></i><span>قيمة خارج النطاق الطبيعي — يمنع النظام حفظ أي مدخلات خاطئة وينبّه الباحث فوراً.</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ملاحظات -->
+      <div class="field-box mb-4"><p class="text-[9px] text-slate-400 mb-1">ملاحظات نصية للزيارة الحالية</p><textarea rows="2" placeholder="اكتب الملاحظات السريرية هنا...">استجابة ممتازة للمعالجة، تحرك سنّي ملحوظ في الربع العلوي الأيمن.</textarea></div>
+
+      <!-- مرفقات الصور -->
+      <div class="mb-5">
+        <p class="text-xs font-black text-slate-700 mb-3"><i class="fa-solid fa-camera text-brand-500 ml-1"></i>مرفقات الصور والأسطح (داخل الفم وخارجه بأنواع الأشعة المختلفة)</p>
+        <div class="grid grid-cols-4 gap-3">
+          <div class="rounded-xl overflow-hidden border border-slate-200"><div class="h-20 bg-gradient-to-br from-rose-200 via-rose-300 to-rose-400 flex items-center justify-center text-white/80 text-2xl"><i class="fa-solid fa-teeth-open"></i></div><p class="text-[9px] font-extrabold text-slate-500 text-center py-1.5 bg-slate-50">صور داخل الفم</p></div>
+          <div class="rounded-xl overflow-hidden border border-slate-200"><div class="h-20 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 flex items-center justify-center text-cyan-300/70 text-2xl"><i class="fa-solid fa-x-ray"></i></div><p class="text-[9px] font-extrabold text-slate-500 text-center py-1.5 bg-slate-50">أشعة بانورامية</p></div>
+          <div class="rounded-xl overflow-hidden border border-slate-200"><div class="h-20 bg-gradient-to-br from-indigo-800 via-indigo-900 to-slate-900 flex items-center justify-center text-indigo-300/70 text-2xl"><i class="fa-solid fa-head-side-virus"></i></div><p class="text-[9px] font-extrabold text-slate-500 text-center py-1.5 bg-slate-50">سيفالومتريك جانبي</p></div>
+          <div class="rounded-xl overflow-hidden border border-slate-200"><div class="h-20 bg-gradient-to-br from-sky-200 via-sky-300 to-sky-400 flex items-center justify-center text-white/80 text-2xl"><i class="fa-solid fa-face-smile"></i></div><p class="text-[9px] font-extrabold text-slate-500 text-center py-1.5 bg-slate-50">صور خارجية للوجه</p></div>
+        </div>
+      </div>
+
+      <!-- بطاقة WebCeph -->
+      <div class="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-white p-5 mb-5">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center"><i class="fa-solid fa-brain"></i></span>
+          <div class="flex-1"><h4 class="font-black text-slate-800 text-sm">التحليل السيفالومتريك المدمج (WebCeph Integration)</h4><p class="text-[10px] font-bold text-slate-400">يظهر خيار التحليل عبر WebCeph عند رفع أشعة سيفالومتريك — تُكشف الصورة هندسياً مع جدول قيم كامل وإمكانية حفظها مباشرة بملف الدراسة</p></div>
+          <button id="cephBtn" onclick="analyzeCeph()" class="lockable bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 text-xs font-extrabold transition shadow-lg shadow-indigo-600/25 flex items-center gap-2 shrink-0"><i class="fa-solid fa-wand-magic-sparkles"></i> تحليل عبر WebCeph</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- صورة الأشعة -->
+          <div id="cephFrame" class="relative rounded-2xl overflow-hidden bg-[#0b1220] border border-indigo-900/40">
+            <div class="scanline"></div>
+            <svg class="ceph-svg w-full" viewBox="0 0 320 270" id="cephSvg">
+              <!-- محيط الجمجمة الجانبية (تخطيط تقديري) -->
+              <path d="M78 218 C64 178 68 132 94 102 C116 76 150 60 186 62 C222 64 250 86 258 118 C262 134 258 146 264 156 C268 164 266 174 258 178 L242 184 C234 187 231 194 232 202 L234 214 C235 222 229 228 221 228 L132 228 C106 228 86 226 78 218 Z" fill="none" stroke="#38bdf8" stroke-width="1.6" opacity=".85"/>
+              <!-- الفك السفلي -->
+              <path d="M120 228 C128 244 150 252 176 252 C204 252 226 242 234 226" fill="none" stroke="#7dd3fc" stroke-width="1.4" opacity=".7"/>
+              <!-- الأسنان -->
+              <path d="M206 196 L262 190 M208 210 L258 206" stroke="#e2e8f0" stroke-width="1.2" opacity=".65"/>
+              <path d="M214 196 L214 212 M226 195 L226 211 M238 193 L238 209 M250 192 L250 207" stroke="#cbd5e1" stroke-width=".9" opacity=".5"/>
+              <!-- خطوط القياس (تظهر بعد التحليل) -->
+              <line class="trace-line" x1="168" y1="112" x2="186" y2="74" stroke="#2dd4bf" stroke-width="1.6"/>
+              <line class="trace-line" x1="186" y1="74" x2="236" y2="182" stroke="#f472b6" stroke-width="1.6"/>
+              <line class="trace-line" x1="186" y1="74" x2="230" y2="204" stroke="#fbbf24" stroke-width="1.6"/>
+              <!-- نقاط القياس -->
+              <circle class="landmark" cx="168" cy="112" r="4" fill="#2dd4bf"/><text class="landmark" x="154" y="108" fill="#2dd4bf" font-size="10" font-weight="bold">S</text>
+              <circle class="landmark" cx="186" cy="74" r="4" fill="#2dd4bf"/><text class="landmark" x="190" y="68" fill="#2dd4bf" font-size="10" font-weight="bold">N</text>
+              <circle class="landmark" cx="236" cy="182" r="4" fill="#f472b6"/><text class="landmark" x="242" y="180" fill="#f472b6" font-size="10" font-weight="bold">A</text>
+              <circle class="landmark" cx="230" cy="204" r="4" fill="#fbbf24"/><text class="landmark" x="236" y="206" fill="#fbbf24" font-size="10" font-weight="bold">B</text>
+            </svg>
+            <div class="absolute bottom-2 right-3 text-[9px] font-bold text-cyan-200/50">Lateral Cephalometric — PT-001 / Visit 3</div>
+          </div>
+          <!-- جدول القيم -->
+          <div>
+            <div id="cephPlaceholder" class="h-full min-h-[180px] rounded-2xl border-2 border-dashed border-indigo-200 flex flex-col items-center justify-center text-center p-6">
+              <i class="fa-solid fa-table-list text-3xl text-indigo-200 mb-3"></i>
+              <p class="text-xs font-extrabold text-slate-400">جدول قيم المقاييس السيفالومترية</p>
+              <p class="text-[10px] font-bold text-slate-300 mt-1">اضغط «تحليل عبر WebCeph» لعرض النتائج المعالجة</p>
+            </div>
+            <div id="cephTable" class="hidden">
+              <table class="w-full text-xs">
+                <thead><tr class="bg-indigo-600 text-white"><th class="px-3 py-2 rounded-r-lg text-right font-extrabold">القياس</th><th class="px-3 py-2 text-right font-extrabold">القيمة</th><th class="px-3 py-2 rounded-l-lg text-right font-extrabold">المرجع</th></tr></thead>
+                <tbody class="divide-y divide-slate-100 font-extrabold text-slate-600">
+                  <tr class="bg-white"><td class="px-3 py-2">SNA</td><td class="px-3 py-2 text-indigo-600">82.4°</td><td class="px-3 py-2 text-slate-400">82 ± 2°</td></tr>
+                  <tr class="bg-slate-50"><td class="px-3 py-2">SNB</td><td class="px-3 py-2 text-indigo-600">79.6°</td><td class="px-3 py-2 text-slate-400">80 ± 2°</td></tr>
+                  <tr class="bg-white"><td class="px-3 py-2">ANB</td><td class="px-3 py-2 text-indigo-600">2.8°</td><td class="px-3 py-2 text-slate-400">2 ± 1°</td></tr>
+                  <tr class="bg-slate-50"><td class="px-3 py-2">FMA</td><td class="px-3 py-2 text-indigo-600">25.9°</td><td class="px-3 py-2 text-slate-400">25 ± 3°</td></tr>
+                  <tr class="bg-white"><td class="px-3 py-2">U1-SN</td><td class="px-3 py-2 text-indigo-600">104.5°</td><td class="px-3 py-2 text-slate-400">103 ± 4°</td></tr>
+                  <tr class="bg-slate-50"><td class="px-3 py-2">IMPA</td><td class="px-3 py-2 text-indigo-600">94.2°</td><td class="px-3 py-2 text-slate-400">90 ± 5°</td></tr>
+                </tbody>
+              </table>
+              <button onclick="toast('تم حفظ القيم السيفالومترية مباشرة في ملف الدراسة','success')" class="lockable mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-xs font-extrabold transition flex items-center justify-center gap-2"><i class="fa-solid fa-floppy-disk"></i> حفظ القيم في ملف الدراسة</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- بطاقة STL ثلاثية الأبعاد -->
+      <div class="rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 text-white mb-6">
+        <div class="flex items-center gap-3 px-5 py-4 border-b border-white/10">
+          <span class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center"><i class="fa-solid fa-cube"></i></span>
+          <div class="flex-1"><h4 class="font-black text-sm">قياس ملفات STL ثلاثية الأبعاد (3D STL Viewer)</h4><p class="text-[10px] font-bold text-slate-400">نافذة تفاعلية لفحص واستكشاف الفك المفرد أو الفكين معاً بحالة الإطباق (Occlusion)</p></div>
+          <span class="text-[9px] font-extrabold text-emerald-300 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-3 py-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>مستعرض نشط</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-5">
+          <!-- نافذة العرض -->
+          <div class="md:col-span-3 relative h-72 viewport3d overflow-hidden">
+            <div class="grid-floor"></div>
+            <!-- زوايا تقنية -->
+            <div class="vp-corner top-3 right-3 border-t-2 border-r-2"></div>
+            <div class="vp-corner top-3 left-3 border-t-2 border-l-2"></div>
+            <div class="vp-corner bottom-3 right-3 border-b-2 border-r-2"></div>
+            <div class="vp-corner bottom-3 left-3 border-b-2 border-l-2"></div>
+            <!-- المجسم -->
+            <div class="absolute inset-0 flex items-center justify-center pt-4">
+              <div class="jaws" id="jawsModel">
+                <div class="arch upper"></div>
+                <div class="arch lower"></div>
+              </div>
+            </div>
+            <!-- شريط أدوات العرض -->
+            <div class="absolute top-3 right-1/2 translate-x-1/2 flex gap-1.5 bg-black/30 backdrop-blur rounded-xl p-1.5">
+              <button class="w-8 h-8 rounded-lg hover:bg-white/10 text-cyan-200 text-xs transition" title="تدوير"><i class="fa-solid fa-rotate"></i></button>
+              <button class="w-8 h-8 rounded-lg hover:bg-white/10 text-cyan-200 text-xs transition" title="تحريك"><i class="fa-solid fa-up-down-left-right"></i></button>
+              <button class="w-8 h-8 rounded-lg hover:bg-white/10 text-cyan-200 text-xs transition" title="تكبير"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+              <button class="w-8 h-8 rounded-lg hover:bg-white/10 text-cyan-200 text-xs transition" title="إعادة ضبط"><i class="fa-solid fa-arrows-to-dot"></i></button>
+            </div>
+            <div class="absolute bottom-3 left-3 text-[9px] font-bold text-cyan-200/50 flex items-center gap-2"><span class="text-red-400">X</span><span class="text-green-400">Y</span><span class="text-sky-400">Z</span> Upper_Lower_Arch.stl — 4.2 MB</div>
+          </div>
+          <!-- أدوات القياس -->
+          <div class="md:col-span-2 border-r-0 md:border-r border-t md:border-t-0 border-white/10 p-5 flex flex-col gap-2.5">
+            <p class="text-[11px] font-black text-slate-400 mb-1">أدوات الفحص والقياس الآلي:</p>
+            <button onclick="jawsMode('single')" class="lockable bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 rounded-xl px-4 py-2.5 text-xs font-extrabold text-slate-200 transition flex items-center gap-2.5"><i class="fa-solid fa-teeth text-cyan-300"></i> استكشاف الفك المفرد</button>
+            <button onclick="jawsMode('occlusion')" class="lockable bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 rounded-xl px-4 py-2.5 text-xs font-extrabold text-slate-200 transition flex items-center gap-2.5"><i class="fa-solid fa-teeth-open text-pink-300"></i> الفكان معاً — حالة الإطباق (Occlusion)</button>
+            <button onclick="stlMeasure('width')" class="lockable bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 rounded-xl px-4 py-2.5 text-xs font-extrabold text-slate-200 transition flex items-center gap-2.5"><i class="fa-solid fa-ruler-horizontal text-amber-300"></i> قياس عرض الأسنان</button>
+            <button onclick="stlMeasure('gap')" class="lockable bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 rounded-xl px-4 py-2.5 text-xs font-extrabold text-slate-200 transition flex items-center gap-2.5"><i class="fa-solid fa-arrows-left-right text-emerald-300"></i> قياس المسافات البينية</button>
+            <!-- شاشة القراءات -->
+            <div class="mt-auto bg-black/40 rounded-xl p-3.5 border border-white/10">
+              <p class="text-[9px] font-black text-cyan-300/70 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-wave-square"></i> القياسات السريرية المحسوبة تلقائياً:</p>
+              <div id="stlReadout" class="flex flex-wrap gap-1.5">
+                <span class="text-[10px] font-bold text-slate-400">اختر أداة قياس لعرض القيم هنا...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- التذييل -->
+      <div class="border-t-2 border-slate-800 pt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] font-bold text-slate-400">
+        <p><i class="fa-solid fa-headset text-brand-500 ml-1"></i>التواصل والدعم الفني للمنصة: support@orthoclinical.sa</p>
+        <p><i class="fa-solid fa-phone text-brand-500 ml-1"></i>9200-XXXXX</p>
+        <p class="mr-auto">صفحة 1 من 2 — وثيقة رسمية مولّدة آلياً عبر منصة OrthoClinical © 2026</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     الصفحة 6: التقويم والزيارات (Calendar & Visits)
+============================================================ -->
+<section id="page-calendar" class="page space-y-6">
+
+  <div class="flex flex-wrap items-center gap-4 bg-white rounded-2xl shadow-card px-5 py-4">
+    <div class="flex items-center gap-3">
+      <button class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition" onclick="toast('عرض الأسبوع السابق','info')"><i class="fa-solid fa-chevron-right"></i></button>
+      <div><h4 class="font-black text-slate-800 text-sm">الأسبوع الحالي</h4><p class="text-[11px] font-bold text-slate-400">13 — 19 يوليو 2026</p></div>
+      <button class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition" onclick="toast('عرض الأسبوع التالي','info')"><i class="fa-solid fa-chevron-left"></i></button>
+    </div>
+    <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><i class="fa-solid fa-bell text-brand-400"></i>يُرسل النظام تذكيراً تلقائياً للباحث قبل موعد زيارة المريض بيومين</p>
+    <button onclick="openSchedule()" class="lockable mr-auto bg-brand-600 hover:bg-brand-700 text-white rounded-xl px-5 py-2.5 text-xs font-extrabold transition shadow-lg shadow-brand-600/25 flex items-center gap-2"><i class="fa-solid fa-calendar-plus"></i> إضافة موعد جديد</button>
+  </div>
+
+  <!-- شبكة الأسبوع -->
+  <div class="bg-white rounded-2xl shadow-card overflow-hidden">
+    <div class="grid grid-cols-7 divide-x divide-x-reverse divide-slate-100" id="calendarHeader"><!-- رؤوس الأيام --></div>
+    <div class="grid grid-cols-7 divide-x divide-x-reverse divide-slate-100 min-h-[380px]" id="calendarBody"><!-- المواعيد --></div>
+  </div>
+
+  <p class="text-[11px] font-bold text-slate-400 text-center">يتيح التقويم المدمج الاطلاع على كافة مواعيد المرضى موزعة بشكل أسبوعي مع إمكانية تعديل أو حذف الموعد أو العرض فقط</p>
+</section>
+
+<!-- ============================================================
+     الصفحة 7: الصلاحيات والمشرفون (Collaboration Panel)
+============================================================ -->
+<section id="page-collab" class="page space-y-6">
+
+  <div class="rounded-2xl bg-gradient-to-l from-slate-900 to-teal-950 text-white p-6 shadow-card flex items-center gap-4">
+    <span class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-xl"><i class="fa-solid fa-shield-halved"></i></span>
+    <div><h4 class="font-black">أدوار التعاون وضبط الصلاحيات بناءً على تعمية وقفل الدراسة</h4><p class="text-[11px] font-bold text-slate-300">جدران حماية مفعلة وصلاحيات صارمة ومؤتمتة بالكامل لحماية حياد التجربة السريرية</p></div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <!-- إدارة الباحث المساعد -->
+    <div class="bg-white rounded-2xl p-6 shadow-card space-y-4">
+      <div class="flex items-center gap-3">
+        <span class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"><i class="fa-solid fa-user-plus"></i></span>
+        <div><h4 class="font-black text-slate-800 text-sm">إدارة الباحث المساعد (Assistant Researcher)</h4><p class="text-[10px] font-bold text-slate-400">يرسل الباحث الرئيسي طلب دعوة ويحدد الصلاحيات مسبقاً</p></div>
+      </div>
+      <input id="assistantEmail" type="email" placeholder="البريد الإلكتروني للباحث المساعد" class="w-full border-2 border-slate-200 focus:border-brand-500 rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition bg-slate-50 focus:bg-white">
+      <div class="grid grid-cols-3 gap-2.5">
+        <div class="pick-card perm-card relative !p-3 text-center" onclick="pickChipCard(this,'.perm-card')"><span class="pick-check !absolute !top-2 !left-2"><i class="fa-solid fa-check"></i></span><i class="fa-solid fa-eye text-slate-400 mb-1.5"></i><p class="text-[10px] font-extrabold text-slate-600">قراءة فقط</p></div>
+        <div class="pick-card perm-card relative !p-3 text-center" onclick="pickChipCard(this,'.perm-card')"><span class="pick-check !absolute !top-2 !left-2"><i class="fa-solid fa-check"></i></span><i class="fa-solid fa-pen-to-square text-slate-400 mb-1.5"></i><p class="text-[10px] font-extrabold text-slate-600">تحرير كامل</p></div>
+        <div class="pick-card perm-card selected relative !p-3 text-center" onclick="pickChipCard(this,'.perm-card')"><span class="pick-check !absolute !top-2 !left-2"><i class="fa-solid fa-check"></i></span><i class="fa-solid fa-vial-circle-check text-slate-400 mb-1.5"></i><p class="text-[10px] font-extrabold text-slate-600">إضافة عينات فقط</p></div>
+      </div>
+      <p class="text-[10px] font-bold text-slate-400 leading-relaxed bg-slate-50 rounded-xl p-3"><i class="fa-solid fa-circle-info text-brand-400 ml-1"></i>«إضافة عينات فقط»: يستطيع إضافة عينات جديدة دون إمكانية تعديل العينات التاريخية المدخلة من الباحث الرئيسي أو باحث آخر.</p>
+      <button onclick="inviteAssistant()" class="lockable w-full bg-sky-600 hover:bg-sky-700 text-white rounded-xl py-3 text-sm font-extrabold transition shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2"><i class="fa-solid fa-paper-plane"></i> إرسال طلب الدعوة</button>
+      <!-- قائمة الفريق -->
+      <div class="pt-2 space-y-2" id="teamList">
+        <p class="text-[11px] font-black text-slate-400">فريق العمل الحالي:</p>
+        <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60">
+          <div class="w-9 h-9 rounded-lg bg-brand-600 text-white flex items-center justify-center text-xs font-black">أ ح</div>
+          <div class="flex-1"><p class="text-xs font-extrabold text-slate-700">د. أحمد الحربي</p><p class="text-[9px] font-bold text-slate-400">باحث رئيسي (PI)</p></div>
+          <span class="text-[9px] font-extrabold text-brand-600 bg-brand-50 rounded-full px-2.5 py-1">كامل الصلاحيات</span>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60">
+          <div class="w-9 h-9 rounded-lg bg-sky-500 text-white flex items-center justify-center text-xs font-black">ل ع</div>
+          <div class="flex-1"><p class="text-xs font-extrabold text-slate-700">د. لينا العمري</p><p class="text-[9px] font-bold text-slate-400">باحث مساعد</p></div>
+          <span class="text-[9px] font-extrabold text-sky-600 bg-sky-50 rounded-full px-2.5 py-1">إضافة عينات فقط</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <!-- ربط المشرف الأكاديمي -->
+      <div class="bg-white rounded-2xl p-6 shadow-card space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"><i class="fa-solid fa-user-tie"></i></span>
+          <div><h4 class="font-black text-slate-800 text-sm">تقديم طلب إشراف أكاديمي (Academic Supervision)</h4><p class="text-[10px] font-bold text-slate-400">إدخال الرمز الخاص بالمشرف (Supervisor ID) لإرسال دعوة</p></div>
+        </div>
+        <div class="flex gap-2">
+          <input id="supervisorId" type="text" value="SUP-KSU-4471" class="flex-1 border-2 border-slate-200 focus:border-brand-500 rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition bg-slate-50 focus:bg-white" placeholder="SUP-XXXX-0000">
+          <button onclick="linkSupervisor()" class="lockable bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-6 text-xs font-extrabold transition shadow-lg shadow-violet-600/25 flex items-center gap-2"><i class="fa-solid fa-link"></i> ربط</button>
+        </div>
+        <!-- بطاقة المشرف المرتبط -->
+        <div id="supervisorCard" class="rounded-2xl border-2 border-violet-100 bg-violet-50/50 p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 text-white flex items-center justify-center font-black text-xs">س ق</div>
+            <div class="flex-1"><p class="text-sm font-extrabold text-slate-700">د. سارة القحطاني</p><p class="text-[10px] font-bold text-slate-400">أستاذ مشارك — قسم تقويم الأسنان — جامعة الملك سعود</p></div>
+            <span class="text-[9px] font-extrabold text-green-600 bg-green-50 border border-green-100 rounded-full px-2.5 py-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>مرتبط — تظهر له كل البيانات</span>
+          </div>
+          <p class="text-[10px] font-bold text-slate-400 leading-relaxed mt-3"><i class="fa-solid fa-comments text-violet-400 ml-1"></i>قناة المحادثة المباشرة مؤرشفة بالكامل داخل النظام كمرجع قانوني أكاديمي غير قابل للتعديل أو الحذف.</p>
+          <!-- محادثة مصغرة -->
+          <div class="mt-3 bg-white rounded-xl border border-violet-100 p-3 space-y-2">
+            <p class="text-[10px] font-bold text-slate-500 bg-slate-50 rounded-lg rounded-tr-none p-2 max-w-[85%]"><b class="text-violet-600">د. سارة:</b> راجعت بيانات العينات هذا الأسبوع — التوزيع متوازن، استمروا.</p>
+            <p class="text-[10px] font-bold text-slate-500 bg-violet-50 rounded-lg rounded-tl-none p-2 max-w-[85%] mr-auto"><b class="text-brand-600">أنا:</b> شكراً دكتورة، سأرفع تقرير المتابعة نهاية الشهر.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- التقييم الخارجي وقفل الدراسة -->
+      <div class="bg-white rounded-2xl p-6 shadow-card border-2 border-red-100 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"><i class="fa-solid fa-lock"></i></span>
+          <div><h4 class="font-black text-slate-800 text-sm">إرسال العينات للمقيّم الخارجي (External Evaluation Portal)</h4><p class="text-[10px] font-bold text-slate-400">قاعدة تقنية صارمة تطبقها المنصة</p></div>
+        </div>
+        <ul class="space-y-2 text-[11px] font-bold text-slate-500">
+          <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-red-400 mt-0.5"></i>لا يمكن تفعيل الإرسال إلا بعد إغلاق وقفل عينات الدراسة كافة بشكل كامل — لمنع إرسال دراسة ناقصة.</li>
+          <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-red-400 mt-0.5"></i>منع تعديل البيانات أثناء عملية التقييم الفعلي، وتجميد صلاحية «إضافة عينات جديدة» لدى الباحث المساعد مؤقتاً.</li>
+          <li class="flex items-start gap-2"><i class="fa-solid fa-circle-check text-red-400 mt-0.5"></i>يتسلم الباحث والمشرف تقرير التقييم النهائي تلقائياً عند الانتهاء.</li>
+        </ul>
+        <button id="lockBtn" onclick="confirmLock()" class="lockable-off w-full bg-gradient-to-l from-red-600 to-rose-600 hover:from-red-700 text-white rounded-xl py-3.5 font-black text-sm transition shadow-xl shadow-red-600/25 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-lock"></i> قفل الدراسة وإرسالها للتقييم الخارجي
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+    </div><!-- /حاوية الصفحات -->
+  </main>
+</div><!-- /هيكل التطبيق -->
+
+<!-- ============================================================
+     النوافذ المنبثقة (Modals)
+============================================================ -->
+
+<!-- 1) نافذة التحقق من الأهلية + تسجيل عينة -->
+<div id="eligibilityModal" class="modal">
+  <div class="backdrop" onclick="closeModal('eligibilityModal')"></div>
+  <div class="panel bg-white rounded-3xl shadow-2xl w-full max-w-lg p-7">
+    <!-- سؤال الأهلية -->
+    <div id="eligQuestion">
+      <div class="text-center mb-6">
+        <span class="w-16 h-16 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center text-2xl mx-auto mb-3"><i class="fa-solid fa-clipboard-question"></i></span>
+        <h4 class="font-black text-slate-800 text-lg">التحقق من الأهلية (Eligibility &amp; Screening)</h4>
+        <p class="text-sm font-bold text-slate-500 mt-2 leading-relaxed">هل تنطبق على المشارك معايير الاشتمال والاستبعاد الخاصة بالدراسة؟</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="eligibilityAnswer(false)" class="border-2 border-red-200 hover:bg-red-50 text-red-500 rounded-2xl py-4 font-black transition flex items-center justify-center gap-2"><i class="fa-solid fa-xmark"></i> لا</button>
+        <button onclick="eligibilityAnswer(true)" class="bg-brand-600 hover:bg-brand-700 text-white rounded-2xl py-4 font-black transition shadow-lg shadow-brand-600/25 flex items-center justify-center gap-2"><i class="fa-solid fa-check"></i> نعم</button>
+      </div>
+    </div>
+
+    <!-- فشل الفرز -->
+    <div id="eligFail" class="hidden text-center">
+      <span class="w-20 h-20 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-user-xmark"></i></span>
+      <h4 class="font-black text-red-600 text-lg mb-2">فشل الفرز (Screening Failure)</h4>
+      <p class="text-sm font-bold text-slate-500 leading-relaxed mb-6">تم إيقاف عملية التسجيل فوراً وتنبيه الباحث بعدم أهلية العينة للمشاركة — لم يتم حجز سجل مريض لها في الدراسة.</p>
+      <button onclick="closeModal('eligibilityModal')" class="bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-8 py-3 font-extrabold text-sm transition">إغلاق</button>
+    </div>
+
+    <!-- قبول مبدئي: نموذج التسجيل -->
+    <div id="eligForm" class="hidden">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-11 h-11 rounded-xl bg-green-100 text-green-600 flex items-center justify-center"><i class="fa-solid fa-user-check"></i></span>
+        <div><h4 class="font-black text-slate-800">قبول مبدئي — إدخال بيانات العينة</h4><p class="text-[10px] font-bold text-slate-400">سيتم حفظ البيانات ومتابعة إجراءات أخذ العينة لتصبح الحالة «نشطة (Active)»</p></div>
+      </div>
+      <div class="space-y-3.5">
+        <div class="grid grid-cols-3 gap-3">
+          <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">كود العينة (تلقائي)</p><b id="newSampleCode" class="text-brand-600">PT-008</b></div>
+          <div class="field-box col-span-2"><p class="text-[9px] text-slate-400 mb-1">اسم المريض</p><input id="newPatientName" type="text" placeholder="الاسم الثلاثي"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">العمر</p><input id="newPatientAge" type="number" placeholder="مثال: 23"></div>
+          <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">الجنس</p><select id="newPatientGender"><option>أنثى</option><option>ذكر</option></select></div>
+        </div>
+        <!-- تخصيص تلقائي (دراسة جديدة) -->
+        <div id="autoAllocBox" class="rounded-2xl border-2 border-brand-100 bg-brand-50/60 p-4">
+          <p class="text-[11px] font-extrabold text-brand-700 flex items-center gap-2"><i class="fa-solid fa-shuffle"></i>تخصيص آلي صامت</p>
+          <p class="text-[10px] font-bold text-slate-500 mt-1 leading-relaxed">سيقوم النظام تلقائياً بتفعيل خوارزمية التوزيع العشوائي المحددة مسبقاً فور تأكيد حفظ بيانات العينة، وتخصيصها للمجموعة مع حفظ قيمة مشفرة في حقل (allocated_group).</p>
+          <div id="allocResult" class="hidden mt-3 flex items-center gap-3 bg-white rounded-xl p-3 border border-brand-100">
+            <i class="fa-solid fa-circle-check text-green-500 text-lg"></i>
+            <p class="text-[11px] font-extrabold text-slate-600">تم التخصيص: <b id="allocGroupText" class="text-brand-600">المجموعة التجريبية</b> — كود التعمية <b id="allocCodeText" class="text-slate-800">RND-0000</b></p>
+          </div>
+        </div>
+        <!-- إدخال يدوي (دراسة حالية) -->
+        <div id="manualAllocBox" class="hidden rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-4">
+          <p class="text-[11px] font-extrabold text-amber-700 flex items-center gap-2"><i class="fa-solid fa-hand"></i>إدخال يدوي — العشوائية التلقائية معطلة (Existing Study)</p>
+          <div class="flex gap-2 mt-3">
+            <div class="field-box flex-1 !bg-white"><p class="text-[9px] text-slate-400 mb-1">المجموعة العلاجية (كما وردت ورقياً)</p>
+              <select id="manualGroup"><option value="A">المجموعة التجريبية</option><option value="B">المجموعة الضابطة</option></select>
+            </div>
+            <button onclick="ocrReadGroup(this)" class="lockable self-end bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-4 py-3 text-[11px] font-extrabold transition flex items-center gap-1.5"><i class="fa-solid fa-camera"></i> قراءة عبر OCR</button>
+          </div>
+          <p class="text-[10px] font-bold text-slate-400 mt-2 leading-relaxed">يستورد النظام قيمة المجموعة ويقرأها آلياً من واقع استمارات الفحص الورقية التاريخية — مع تشفير الحقول الحساسة أثناء OCR وعدم كشفها للباحث المعمّى.</p>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal('eligibilityModal')" class="flex-1 border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-xl py-3 font-extrabold text-sm transition">إلغاء</button>
+        <button onclick="saveNewSample(this)" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-3 font-extrabold text-sm transition shadow-lg shadow-brand-600/25">تأكيد حفظ البيانات</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2) نافذة إضافة زيارة -->
+<div id="visitModal" class="modal">
+  <div class="backdrop" onclick="closeModal('visitModal')"></div>
+  <div class="panel bg-white rounded-3xl shadow-2xl w-full max-w-md p-7">
+    <div class="flex items-center gap-3 mb-5">
+      <span class="w-11 h-11 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-notes-medical"></i></span>
+      <div><h4 class="font-black text-slate-800">إضافة زيارة</h4><p class="text-[10px] font-bold text-slate-400">المريض: <b id="visitPatientName" class="text-brand-600">—</b></p></div>
+    </div>
+    <div class="space-y-3.5">
+      <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">ملاحظات الزيارة الحالية</p><textarea rows="3" placeholder="اكتب الملاحظات السريرية لهذه الزيارة..."></textarea></div>
+      <div class="dropzone p-4 text-center" onclick="attachFile(this)">
+        <i class="fa-solid fa-paperclip text-slate-300 text-lg"></i>
+        <p class="text-[11px] font-extrabold text-slate-500 mt-1">إرفاق ملفات أو صور جديدة</p>
+        <div class="attachZone flex flex-wrap gap-1.5 justify-center mt-2"></div>
+      </div>
+      <p class="text-[10px] font-bold text-slate-400 leading-relaxed"><i class="fa-solid fa-lock text-slate-300 ml-1"></i>تُحفظ في الاستمارة التراكمية للمريض — ويمكن قفل العينة عند نهاية المعالجة لمنع التعديل والتلاعب.</p>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal('visitModal')" class="flex-1 border-2 border-slate-200 text-slate-500 rounded-xl py-3 font-extrabold text-sm transition hover:border-slate-300">إلغاء</button>
+      <button onclick="saveVisit()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white rounded-xl py-3 font-extrabold text-sm transition shadow-lg shadow-brand-600/25">حفظ الزيارة</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3) نافذة تحديد موعد -->
+<div id="scheduleModal" class="modal">
+  <div class="backdrop" onclick="closeModal('scheduleModal')"></div>
+  <div class="panel bg-white rounded-3xl shadow-2xl w-full max-w-md p-7">
+    <div class="flex items-center gap-3 mb-5">
+      <span class="w-11 h-11 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"><i class="fa-solid fa-calendar-plus"></i></span>
+      <div><h4 class="font-black text-slate-800">تحديد موعد</h4><p class="text-[10px] font-bold text-slate-400">يفتح التقويم التفاعلي تلقائياً لتسجيل الموعد الجديد</p></div>
+    </div>
+    <div class="space-y-3.5">
+      <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">المريض</p><select id="apptPatient"></select></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">التاريخ</p><input id="apptDate" type="date" value="2026-07-21"></div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">الوقت</p><select id="apptTime"><option>09:00 ص</option><option>10:00 ص</option><option>11:30 ص</option><option selected>12:00 م</option><option>01:00 م</option><option>03:00 م</option></select></div>
+      </div>
+      <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">نوع الموعد</p>
+        <select id="apptType"><option>متابعة دورية</option><option>شد وتنشيط</option><option>تركيب جهاز</option><option>أخذ قياسات</option><option>فك الجهاز</option></select>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="closeModal('scheduleModal')" class="flex-1 border-2 border-slate-200 text-slate-500 rounded-xl py-3 font-extrabold text-sm transition hover:border-slate-300">إلغاء</button>
+      <button onclick="saveAppointment()" class="flex-1 bg-sky-600 hover:bg-sky-700 text-white rounded-xl py-3 font-extrabold text-sm transition shadow-lg shadow-sky-600/25">تسجيل الموعد</button>
+    </div>
+  </div>
+</div>
+
+<!-- 4) نافذة مسار طلب الانسحاب المنهجي (4 خطوات) -->
+<div id="withdrawModal" class="modal">
+  <div class="backdrop" onclick="closeModal('withdrawModal')"></div>
+  <div class="panel bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-7">
+    <div class="flex items-center gap-3 mb-5">
+      <span class="w-11 h-11 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
+      <div class="flex-1"><h4 class="font-black text-slate-800">بدء طلب الانسحاب (Clinical Withdrawal Workflow)</h4><p class="text-[10px] font-bold text-slate-400">المريض: <b id="wdPatientName" class="text-red-500">—</b> — نافذة متسلسلة عبر خطوات مفصلة</p></div>
+      <button onclick="closeModal('withdrawModal')" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- شريط الخطوات -->
+    <div class="flex items-center mb-6">
+      <div class="wd-step active flex flex-col items-center gap-1" data-wd="1"><div class="step-dot !w-9 !h-9 !text-xs">1</div><span class="text-[9px] font-extrabold text-slate-400">السبب</span></div>
+      <div class="step-line wd-line"></div>
+      <div class="wd-step flex flex-col items-center gap-1" data-wd="2"><div class="step-dot !w-9 !h-9 !text-xs">2</div><span class="text-[9px] font-extrabold text-slate-400">التوثيق</span></div>
+      <div class="step-line wd-line"></div>
+      <div class="wd-step flex flex-col items-center gap-1" data-wd="3"><div class="step-dot !w-9 !h-9 !text-xs">3</div><span class="text-[9px] font-extrabold text-slate-400">التأثير</span></div>
+      <div class="step-line wd-line"></div>
+      <div class="wd-step flex flex-col items-center gap-1" data-wd="4"><div class="step-dot !w-9 !h-9 !text-xs">4</div><span class="text-[9px] font-extrabold text-slate-400">المراجعة</span></div>
+    </div>
+
+    <!-- الخطوة 1: سبب الانسحاب -->
+    <div id="wdPanel1" class="wd-panel">
+      <p class="text-xs font-extrabold text-slate-600 mb-3">الخطوة 1: تحديد سبب الانسحاب من القائمة المنسدلة</p>
+      <div class="field-box mb-3">
+        <select id="wdReason" onchange="document.getElementById('wdOtherBox').classList.toggle('hidden', this.value!=='other')">
+          <option value="">— اختر السبب —</option>
+          <option>انسحاب المشارك برغبته</option>
+          <option>فقدان المتابعة (Lost to Follow-up)</option>
+          <option>عدم الالتزام بالزيارات</option>
+          <option>مخالفة البروتوكول</option>
+          <option>ظهور حدث ضار (AE)</option>
+          <option>ظهور حدث ضار خطير (SAE)</option>
+          <option>عدم استيفاء معايير الإدراج</option>
+          <option>استبعاد بقرار الباحث</option>
+          <option>الوفاة</option>
+          <option value="other">سبب آخر...</option>
+        </select>
+      </div>
+      <div id="wdOtherBox" class="hidden field-box"><p class="text-[9px] text-slate-400 mb-1">تفصيل السبب الآخر (مربع نصي للتفاصيل)</p><textarea id="wdOtherText" rows="2" placeholder="اكتب تفاصيل السبب..."></textarea></div>
+    </div>
+
+    <!-- الخطوة 2: توثيق الانسحاب -->
+    <div id="wdPanel2" class="wd-panel hidden space-y-3">
+      <p class="text-xs font-extrabold text-slate-600 mb-1">الخطوة 2: توثيق الانسحاب</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">تاريخ الانسحاب</p><input id="wdDate" type="date" value="2026-07-17"></div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">آخر زيارة مكتملة</p><select id="wdLastVisit"><option>الزيارة الأولى</option><option selected>الزيارة الثانية</option><option>الزيارة الثالثة</option><option>الزيارة الرابعة</option></select></div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">المرحلة الزمنية</p><select id="wdPhase"><option>مرحلة التركيب</option><option selected>مرحلة التنشيط والمتابعة</option><option>مرحلة التثبيت</option></select></div>
+        <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">متخذ القرار</p><select id="wdDecision"><option>المشارك</option><option>الباحث</option><option>الطبيب</option><option>لجنة الأخلاقيات</option></select></div>
+      </div>
+      <div class="field-box"><p class="text-[9px] text-slate-400 mb-1">ملاحظات الباحث</p><textarea id="wdNotes" rows="2" placeholder="أي ملاحظات إضافية حول ظروف الانسحاب..."></textarea></div>
+    </div>
+
+    <!-- الخطوة 3: تأثير الانسحاب -->
+    <div id="wdPanel3" class="wd-panel hidden">
+      <p class="text-xs font-extrabold text-slate-600 mb-3">الخطوة 3: تأثير الانسحاب على الدراسة — الإجابة بنعم / لا</p>
+      <div class="space-y-2.5" id="wdImpactQuestions">
+        <div class="flex items-center justify-between p-3.5 rounded-xl border-2 border-slate-100"><p class="text-xs font-extrabold text-slate-600">إيقاف العلاج فقط؟</p><div class="flex gap-1.5"><button class="yn-btn" data-v="yes" onclick="pickYN(this)">نعم</button><button class="yn-btn selected" data-v="no" onclick="pickYN(this)">لا</button></div></div>
+        <div class="flex items-center justify-between p-3.5 rounded-xl border-2 border-slate-100"><p class="text-xs font-extrabold text-slate-600">الاستمرار في المتابعة؟</p><div class="flex gap-1.5"><button class="yn-btn" data-v="yes" onclick="pickYN(this)">نعم</button><button class="yn-btn selected" data-v="no" onclick="pickYN(this)">لا</button></div></div>
+        <div class="flex items-center justify-between p-3.5 rounded-xl border-2 border-slate-100"><p class="text-xs font-extrabold text-slate-600">الانسحاب الكامل من الدراسة؟</p><div class="flex gap-1.5"><button class="yn-btn selected" data-v="yes" onclick="pickYN(this)">نعم</button><button class="yn-btn" data-v="no" onclick="pickYN(this)">لا</button></div></div>
+        <div class="flex items-center justify-between p-3.5 rounded-xl border-2 border-slate-100"><p class="text-xs font-extrabold text-slate-600">السماح باستخدام البيانات السابقة؟</p><div class="flex gap-1.5"><button class="yn-btn selected" data-v="yes" onclick="pickYN(this)">نعم</button><button class="yn-btn" data-v="no" onclick="pickYN(this)">لا</button></div></div>
+        <div class="flex items-center justify-between p-3.5 rounded-xl border-2 border-brand-200 bg-brand-50/50"><p class="text-xs font-extrabold text-brand-700">هل سيتم استبدال العينة؟</p><div class="flex gap-1.5"><button class="yn-btn" data-v="yes" onclick="pickReplace(this,true)">نعم</button><button class="yn-btn selected" data-v="no" onclick="pickReplace(this,false)">لا</button></div></div>
+      </div>
+      <div id="replaceNotice" class="hidden mt-3 flex items-start gap-2.5 p-3.5 rounded-xl bg-green-50 border border-green-200">
+        <i class="fa-solid fa-circle-plus text-green-500 mt-0.5"></i>
+        <p class="text-[11px] font-extrabold text-green-600 leading-relaxed">سيقوم النظام تلقائياً بزيادة حجم العينة المطلوب للدراسة بمقدار (+1 عينة إضافية) لتعويض العينة المنسحبة.</p>
+      </div>
+    </div>
+
+    <!-- الخطوة 4: المراجعة -->
+    <div id="wdPanel4" class="wd-panel hidden">
+      <p class="text-xs font-extrabold text-slate-600 mb-3">الخطوة 4: مراجعة الطلب — ملخص كامل قبل الإرسال</p>
+      <div id="wdSummary" class="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2 text-[11px] font-bold text-slate-600 mb-4"></div>
+      <div class="dropzone p-3.5 text-center mb-4" onclick="attachFile(this)">
+        <p class="text-[11px] font-extrabold text-slate-500"><i class="fa-solid fa-cloud-arrow-up ml-1"></i>رفع المستندات الداعمة (نموذج الانسحاب، خطاب المشارك، تقرير طبي، مستند لجنة الأخلاقيات)</p>
+        <div class="attachZone flex flex-wrap gap-1.5 justify-center mt-2"></div>
+      </div>
+      <div class="flex items-start gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-100">
+        <i class="fa-solid fa-user-tie text-blue-400 mt-0.5"></i>
+        <p class="text-[10px] font-bold text-blue-600 leading-relaxed">يوجد مشرف أكاديمي مرتبط — سيُرسَل الطلب للمشرف للاعتماد (اعتماد الانسحاب أو إعادة الطلب للمراجعة مع كتابة الملاحظات)، ثم يُنفَّذ الانسحاب الفوري ويُوثَّق في سجل التدقيق (Audit Trail).</p>
+      </div>
+    </div>
+
+    <!-- أزرار التنقل -->
+    <div class="flex gap-3 mt-6">
+      <button id="wdBackBtn" onclick="wdNav(-1)" class="hidden border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-xl px-6 py-3 font-extrabold text-sm transition flex items-center gap-2"><i class="fa-solid fa-arrow-right"></i> السابق</button>
+      <button id="wdNextBtn" onclick="wdNav(1)" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white rounded-xl py-3 font-extrabold text-sm transition">التالي <i class="fa-solid fa-arrow-left"></i></button>
+      <button id="wdSubmitBtn" onclick="executeWithdrawal()" class="hidden flex-1 bg-gradient-to-l from-red-600 to-rose-600 hover:from-red-700 text-white rounded-xl py-3 font-black text-sm transition shadow-lg shadow-red-600/25 flex items-center justify-center gap-2"><i class="fa-solid fa-paper-plane"></i> إرسال للمشرف واعتماد الانسحاب</button>
+    </div>
+  </div>
+</div>
+
+<!-- 5) نافذة تأكيد قفل الدراسة -->
+<div id="lockModal" class="modal">
+  <div class="backdrop" onclick="closeModal('lockModal')"></div>
+  <div class="panel bg-white rounded-3xl shadow-2xl w-full max-w-md p-7 text-center">
+    <span class="w-20 h-20 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-3xl mx-auto mb-4"><i class="fa-solid fa-lock"></i></span>
+    <h4 class="font-black text-slate-800 text-lg mb-2">تأكيد قفل الدراسة للتقييم الخارجي</h4>
+    <p class="text-sm font-bold text-slate-500 leading-relaxed mb-6">سيتم قفل عينات الدراسة كافة بشكل كامل وتجميد صلاحيات الإضافة والتعديل لجميع أعضاء الفريق فور إرسالها للمقيّم الخارجي — هل أنت متأكد؟</p>
+    <div class="flex gap-3">
+      <button onclick="closeModal('lockModal')" class="flex-1 border-2 border-slate-200 text-slate-500 rounded-xl py-3 font-extrabold text-sm transition hover:border-slate-300">تراجع</button>
+      <button onclick="toggleLock(true); closeModal('lockModal')" class="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl py-3 font-black text-sm transition shadow-lg shadow-red-600/25">تأكيد القفل والإرسال</button>
+    </div>
+  </div>
+</div>
+
+<!-- 6) نافذة التحميل الذكي (AI Overlay) -->
+<div id="aiOverlay">
+  <div class="bg-slate-900/90 border border-white/10 rounded-3xl p-10 w-full max-w-md text-center shadow-2xl">
+    <div class="spinner-ring mx-auto mb-6"></div>
+    <p class="text-white font-black text-lg mb-1">المساعد الذكي يعمل الآن (AI Scanning)</p>
+    <p id="aiStepText" class="ai-step-text text-brand-300 text-sm font-extrabold h-6">جاري فحص المقترح المرفوع...</p>
+    <div class="progress-track mt-5 !bg-white/10"><div id="aiProgress" class="progress-fill" style="width:5%"></div></div>
+  </div>
+</div>
+
+<!-- قائمة إجراءات المريض (⋮) -->
+<div id="rowMenu" class="hidden bg-white rounded-2xl shadow-2xl border border-slate-100 p-2">
+  <button class="menu-item" onclick="menuAction('visit')"><i class="fa-solid fa-notes-medical text-brand-500"></i>إضافة زيارة</button>
+  <button class="menu-item" onclick="menuAction('pdf')"><i class="fa-solid fa-file-pdf text-red-400"></i>تصدير الاستمارة (PDF)</button>
+  <button class="menu-item" onclick="menuAction('schedule')"><i class="fa-solid fa-calendar-plus text-sky-500"></i>تحديد موعد</button>
+  <div class="my-1.5 border-t border-slate-100"></div>
+  <button class="menu-item !text-red-500 hover:!bg-red-50" onclick="menuAction('withdraw')"><i class="fa-solid fa-arrow-right-from-bracket"></i>بدء طلب الانسحاب</button>
+</div>
+
+<!-- حاوية التنبيهات -->
+<div id="toastWrap"></div>
+
+<style>
+/* أزرار نعم/لا لمسار الانسحاب */
+.yn-btn { padding:.32rem 1.15rem; border-radius:.7rem; font-size:.75rem; font-weight:800; border:1.5px solid #e2e8f0; color:#94a3b8; background:#fff; transition:.18s; cursor:pointer; }
+.yn-btn:hover { border-color:#99f6e4; }
+.yn-btn.selected { background:#0f766e; border-color:#0f766e; color:#fff; box-shadow:0 4px 12px -4px rgba(15,118,110,.5); }
+</style>
+
+<script>
+/* ============================================================
+   منطق النموذج التفاعلي (Prototype Logic — محاكاة أمامية فقط)
+============================================================ */
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+/* ---------- الحالة العامة ---------- */
+const state = { studyPath:'new', studyCreated:false, sampleSize:40, locked:false };
+const setupToggles = { random:true, blind:true, external:false };
+
+/* بيانات العينات الأولية */
+let patients = [
+  {code:'PT-001', name:'سارة العتيبي',  age:21, gender:'أنثى', group:'A', status:'active',    last:'05/07/2026', next:'19/07/2026', by:'د. أحمد الحربي'},
+  {code:'PT-002', name:'محمد الدوسري',  age:24, gender:'ذكر',  group:'B', status:'active',    last:'06/07/2026', next:'20/07/2026', by:'د. لينا العمري (مساعد)'},
+  {code:'PT-003', name:'نورة الشمري',   age:19, gender:'أنثى', group:'A', status:'completed', last:'28/06/2026', next:'—',          by:'د. أحمد الحربي'},
+  {code:'PT-004', name:'خالد المطيري',  age:27, gender:'ذكر',  group:'B', status:'withdrawn', last:'15/05/2026', next:'—',          by:'د. لينا العمري (مساعد)'},
+  {code:'PT-005', name:'ريم القحطاني',  age:22, gender:'أنثى', group:'A', status:'lost',      last:'02/04/2026', next:'—',          by:'د. أحمد الحربي'},
+  {code:'PT-006', name:'فهد العنزي',    age:25, gender:'ذكر',  group:'B', status:'excluded',  last:'10/03/2026', next:'—',          by:'د. لينا العمري (مساعد)'},
+  {code:'PT-007', name:'لمى الزهراني',  age:20, gender:'أنثى', group:'A', status:'active',    last:'08/07/2026', next:'22/07/2026', by:'د. أحمد الحربي'},
+];
+
+/* مواعيد التقويم الأولية */
+let appointments = [
+  {day:0, time:'11:00 ص', patient:'محمد الدوسري', type:'متابعة دورية'},
+  {day:2, time:'11:30 ص', patient:'لمى الزهراني',  type:'شد وتنشيط'},
+  {day:3, time:'09:30 ص', patient:'محمد الدوسري', type:'أخذ قياسات'},
+  {day:4, time:'01:00 م', patient:'لمى الزهراني',  type:'متابعة دورية'},
+  {day:6, time:'10:00 ص', patient:'سارة العتيبي',  type:'متابعة دورية'},
+];
+const TYPE_COLORS = {'متابعة دورية':'teal','شد وتنشيط':'amber','أخذ قياسات':'sky','تركيب جهاز':'violet','فك الجهاز':'emerald'};
+
+/* الحالات المنهجية وألوانها (وفق مواصفات الوثيقة) */
+const STATUS = {
+  active:    {ar:'نشطة',    en:'Active',           cls:'b-active'},
+  completed: {ar:'مكتملة',  en:'Completed',        cls:'b-completed'},
+  withdrawn: {ar:'منسحبة',  en:'Withdrawn',        cls:'b-withdrawn'},
+  lost:      {ar:'مفقودة',  en:'Lost to Follow-up',cls:'b-lost'},
+  excluded:  {ar:'مستبعدة', en:'Excluded',         cls:'b-excluded'},
+};
+
+/* مستويات التعمية المستنتجة تلقائياً */
+const BLIND_LEVELS = [
+  {ar:'دراسة مفتوحة',   en:'(Open / No Blinding)', cls:'blind-open',      icon:'fa-eye',            desc:'لم يتم تحديد أي طرف معمّى — جميع الأطراف يعرفون التخصيص العلاجي'},
+  {ar:'تعمية أحادية',   en:'(Single-blind)',       cls:'blind-single',    icon:'fa-eye-low-vision', desc:''},
+  {ar:'تعمية ثنائية',   en:'(Double-blind)',       cls:'blind-double',    icon:'fa-eye-low-vision', desc:''},
+  {ar:'تعمية ثلاثية',   en:'(Triple-blind)',       cls:'blind-triple',    icon:'fa-user-shield',    desc:''},
+  {ar:'تعمية رباعية',   en:'(Quadruple-blind)',    cls:'blind-quadruple', icon:'fa-user-secret',    desc:''},
+];
+const PARTY_NAMES = {participant:'المشارك', researcher:'الباحث/المعالج', assessor:'مقيّم النتائج', analyst:'المحلل الإحصائي'};
+
+/* ---------- التنقل بين الصفحات ---------- */
+const PAGES = {
+  dashboard:  ['لوحة التحكم الرئيسية',        'نظرة شاملة على أداء الدراسة وحالة العينات (PI Dashboard)'],
+  setup:      ['تأسيس وإطلاق الدراسة',         'تهيئة الدراسة ورفع المقترح وتحديد الخيارات المنهجية (Study Initialization)'],
+  methodology:['معالج المنهجية السريرية',      'ضبط إعدادات العشوائية والتعمية قبل بدء تسجيل العينات (Methodology Wizard)'],
+  samples:    ['دليل العينات والتحقق',         'تسجيل العينات والتحقق من الأهلية وإدارة الحالات (Samples & Eligibility)'],
+  form:       ['استعراض الاستمارة',            'الهوية البصرية والمواصفات التقنية لاستمارة الفحص (Form Design & Specs)'],
+  calendar:   ['التقويم والزيارات',            'جدولة المواعيد والخط الزمني للمرضى (Calendar & Visits)'],
+  collab:     ['الصلاحيات والمشرفون',          'إدارة التعاون وقفل الدراسة للتقييم الخارجي (Collaboration Panel)'],
+};
+function go(page){
+  $$('.page').forEach(p => p.classList.remove('active'));
+  $('#page-'+page).classList.add('active');
+  $$('#sideNav .nav-item').forEach(n => n.classList.toggle('active', n.dataset.page===page));
+  $('#pageTitle').textContent    = PAGES[page][0];
+  $('#pageSubtitle').textContent = PAGES[page][1];
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ---------- التنبيهات العائمة ---------- */
+const TOAST_ICONS = {success:'fa-circle-check text-green-400', info:'fa-circle-info text-sky-400', warn:'fa-triangle-exclamation text-amber-400', error:'fa-lock text-red-400'};
+function toast(msg, type='success'){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<i class="fa-solid ${TOAST_ICONS[type]} mt-0.5 shrink-0"></i><p class="leading-relaxed">${msg}</p>`;
+  $('#toastWrap').appendChild(t);
+  setTimeout(()=>{ t.classList.add('hide'); setTimeout(()=>t.remove(), 320); }, 4600);
+}
+
+/* ---------- النوافذ المنبثقة ---------- */
+function openModal(id){ $('#'+id).classList.add('open'); }
+function closeModal(id){ $('#'+id).classList.remove('open'); }
+document.addEventListener('keydown', e => { if(e.key==='Escape'){ $$('.modal.open').forEach(m=>m.classList.remove('open')); $('#rowMenu').classList.add('hidden'); }});
+
+/* ---------- نافذة التحميل الذكي ---------- */
+function runAI(steps, cb){
+  const ov=$('#aiOverlay'), txt=$('#aiStepText'), bar=$('#aiProgress');
+  ov.classList.add('open'); bar.style.width='6%';
+  let i=0; txt.textContent=steps[0];
+  const iv=setInterval(()=>{
+    i++;
+    if(i<steps.length){
+      txt.classList.remove('ai-step-text'); void txt.offsetWidth; txt.classList.add('ai-step-text');
+      txt.textContent=steps[i]; bar.style.width=(6+(i/steps.length)*86)+'%';
+    } else { clearInterval(iv); bar.style.width='100%'; setTimeout(()=>{ ov.classList.remove('open'); cb && cb(); }, 500); }
+  }, 1150);
+}
+
+/* ---------- اختيار مسار الدراسة ---------- */
+function selectPath(path){
+  state.studyPath = path;
+  $('#pathCardNew').classList.toggle('selected', path==='new');
+  $('#pathCardExisting').classList.toggle('selected', path==='existing');
+  $('#pathBannerText').textContent = path==='new' ? 'دراسة جديدة (New Study)' : 'دراسة حالية (Current Existing Study)';
+  const rt = $('#toggleRandom');
+  if(path==='existing'){
+    rt.classList.add('disabled'); rt.classList.remove('on'); setupToggles.random=false;
+    $('#randHint').textContent = 'معطلة في مسار الدراسة الحالية — المرضى موزعون مسبقاً على أرض الواقع';
+    toast('تم اختيار مسار «دراسة حالية»: عُطّلت العشوائية التلقائية تلقائياً وتُفعِّل المنصة الاستيراد عبر (OCR) والإدخال اليدوي للمجموعات', 'info');
+  } else {
+    rt.classList.remove('disabled'); rt.classList.add('on'); setupToggles.random=true;
+    $('#randHint').textContent = 'تخصيص العينات للمجموعات آلياً وفق خوارزمية محكومة';
+    toast('تم اختيار مسار «دراسة جديدة»: سيُفعَّل معالج العشوائية والتعمية تلقائياً', 'info');
+  }
+  syncMethodology();
+  go('setup');
+}
+
+/* ---------- مفاتيح تأسيس الدراسة ---------- */
+function toggleSwitch(key){
+  if(key==='random' && state.studyPath==='existing'){ toast('العشوائية التلقائية معطلة في مسار الدراسة الحالية (Existing Study)','warn'); return; }
+  setupToggles[key] = !setupToggles[key];
+  $('#toggle'+({random:'Random',blind:'Blind',external:'External'})[key]).classList.toggle('on', setupToggles[key]);
+  syncMethodology();
+}
+function syncMethodology(){
+  const randOn = setupToggles.random && state.studyPath!=='existing';
+  $('#randContent').classList.toggle('hidden', !randOn);
+  $('#randDisabled').classList.toggle('hidden', randOn);
+  if(!randOn){
+    $('#randDisabledText').textContent = state.studyPath==='existing'
+      ? 'لأن المرضى تم توزيعهم مسبقاً على أرض الواقع في مسار «دراسة حالية» — سيظهر حقل المجموعة العلاجية كإدخال يدوي مباشر للباحث عند تسجيل العينات، أو تُقرأ قيمته آلياً من واقع استمارات الفحص الورقية التاريخية عبر نظام (OCR).'
+      : 'لم يتم تفعيل خيار العشوائية أثناء تأسيس الدراسة — يمكنك تفعيله من شاشة «تأسيس الدراسة».';
+  }
+  $('#blindContent').classList.toggle('hidden', !setupToggles.blind);
+  $('#blindDisabled').classList.toggle('hidden', setupToggles.blind);
+}
+
+/* ---------- رفع وهمي ---------- */
+function fakeUpload(kind){
+  if(kind==='proposal'){ $('#proposalEmpty').classList.add('hidden'); const d=$('#proposalDone'); d.classList.remove('hidden'); d.classList.add('flex'); toast('تم رفع ملف المقترح بنجاح — جاهز للفحص الذكي','success'); }
+  if(kind==='logo'){ $('#logoText').innerHTML='university-logo.png — تم الرفع <i class="fa-solid fa-circle-check text-green-500"></i>'; toast('تم رفع شعار الجامعة — سيظهر في ترويسة الاستمارة','success'); }
+}
+
+/* ---------- إنشاء الدراسة + الفحص الذكي ---------- */
+function createStudy(){
+  if(!$('#studyTitle').value.trim()){ toast('يرجى إدخال عنوان الدراسة أولاً','warn'); return; }
+  runAI(['جاري فحص المقترح المرفوع (Proposal Scanning)...','استخراج المجموعات العلاجية وحجم العينة المطلوب لكل مجموعة...','بناء الهيكل المقترح للدراسة وتجهيزه لمراجعة الباحث...'], ()=>{
+    $('#aiResultPanel').classList.remove('hidden');
+    $('#aiResultPanel').scrollIntoView({behavior:'smooth', block:'center'});
+    toast('اكتمل الفحص الذكي — راجع الهيكل المستخرج ثم اعتمده نهائياً','success');
+  });
+}
+function approveStructure(){
+  state.studyCreated = true;
+  $('#formEthics').textContent = $('#ethicsNo').value || '—';
+  $('#formTrial').textContent  = $('#trialNo').value  || '—';
+  toast('تم الاعتماد النهائي — حُفظت التحديثات في قاعدة البيانات عند الاعتماد','success');
+  go('methodology');
+}
+
+/* ---------- معالج المنهجية ---------- */
+function wizardGo(n){
+  [1,2,3].forEach(i=>{
+    $('#wizStep'+i).classList.toggle('hidden', i!==n);
+    const item=document.querySelector(`.step-item[data-step="${i}"]`);
+    item.classList.toggle('active', i===n); item.classList.toggle('done', i<n);
+  });
+  $('#line1').classList.toggle('done', n>1);
+  $('#line2').classList.toggle('done', n>2);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function pickAlg(el, alg){
+  $$('.rand-alg').forEach(c=>c.classList.remove('selected')); el.classList.add('selected');
+  $('#blockSizeRow').classList.toggle('hidden', alg!=='block');
+  $('#strataRow').classList.toggle('hidden', alg!=='stratified');
+}
+function pickChip(el, group){ $$(group).forEach(c=>c.classList.remove('selected')); el.classList.add('selected'); }
+function pickChipCard(el, group){ $$(group).forEach(c=>c.classList.remove('selected')); el.classList.add('selected'); }
+function pickConceal(el){ $$('.conceal-card').forEach(c=>c.classList.remove('selected')); el.classList.add('selected'); }
+function pickParty(el){ el.classList.toggle('selected'); updateBlindInference(); }
+function updateBlindInference(){
+  const selected=[...document.querySelectorAll('.party-card.selected')].map(c=>PARTY_NAMES[c.dataset.party]);
+  const n=selected.length, L=BLIND_LEVELS[n];
+  const badge=$('#blindBadge');
+  badge.className='blind-badge rounded-3xl p-6 text-center flex-1 flex flex-col items-center justify-center transition-all '+L.cls;
+  $('#blindBadgeAr').textContent=L.ar; $('#blindBadgeEn').textContent=L.en;
+  $('#blindBadgeIcon').className='fa-solid '+L.icon+' text-4xl mb-3';
+  $('#blindBadgeDesc').textContent = n===0 ? L.desc : `الأطراف المعمّاة (${n}): ${selected.join(' + ')} — لا يعرفون التخصيص العلاجي`;
+}
+function toggleUnblind(){
+  const t=$('#toggleUnblind'); t.classList.toggle('on');
+  $('#unblindOptions').classList.toggle('hidden', !t.classList.contains('on'));
+}
+function generateProtocol(){
+  runAI(['تحليل إعدادات التعمية والعشوائية المحددة...','صياغة المحتوى المنهجي بأسلوب CONSORT الأكاديمي (عربي / إنجليزي)...'], ()=>{
+    $('#protocolOutput').classList.remove('hidden');
+    toast('تم توليد بروتوكول التعمية تلقائياً بصياغة أكاديمية','success');
+  });
+}
+function switchProtocolTab(lang){
+  $('#protocolAr').classList.toggle('hidden', lang!=='ar');
+  $('#protocolEn').classList.toggle('hidden', lang!=='en');
+  $('#tabAr').classList.toggle('active', lang==='ar');
+  $('#tabEn').classList.toggle('active', lang==='en');
+}
+function finalSave(){
+  runAI(['التحقق من الامتثال لمعايير الممارسات السريرية الجيدة (ICH-GCP)...','الحفظ النهائي للإعدادات على جميع أجزاء الدراسة وقاعدة بياناتها...'], ()=>{
+    toast('تم الحفظ النهائي بنجاح — الإعدادات معتمدة ومطابقة لمعايير ICH-GCP','success');
+  });
+}
+
+/* ---------- جدول المرضى والإحصائيات ---------- */
+function renderPatients(){
+  $('#patientsTable').innerHTML = patients.map(p=>{
+    const s=STATUS[p.status];
+    return `<tr class="hover:bg-slate-50/70 transition">
+      <td class="px-6 py-4 font-black text-slate-400 text-xs">${p.code}</td>
+      <td class="px-4 py-4"><p class="font-extrabold text-slate-700 text-[13px]">${p.name}</p><p class="text-[9px] font-bold text-slate-400 mt-0.5">أُدخلت بواسطة: ${p.by} — ${p.age} سنة / ${p.gender}</p></td>
+      <td class="px-4 py-4">${p.group==='A'
+        ? '<span class="text-[10px] font-extrabold text-brand-600 bg-brand-50 rounded-full px-2.5 py-1">تجريبية (A)</span>'
+        : '<span class="text-[10px] font-extrabold text-slate-500 bg-slate-100 rounded-full px-2.5 py-1">ضابطة (B)</span>'}</td>
+      <td class="px-4 py-4"><span class="badge ${s.cls}"><span class="dot"></span>${s.ar} (${s.en})</span></td>
+      <td class="px-4 py-4 text-xs font-bold text-slate-500">${p.last}</td>
+      <td class="px-4 py-4 text-xs font-bold ${p.next==='—'?'text-slate-300':'text-slate-500'}">${p.next}</td>
+      <td class="px-4 py-4 text-center"><button class="lockable w-9 h-9 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition" onclick="openRowMenu(event,'${p.code}')"><i class="fa-solid fa-ellipsis-vertical"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+function renderStats(){
+  const c = s => patients.filter(p=>p.status===s).length;
+  const total = patients.length;
+  $('#statActive').textContent=c('active'); $('#statCompleted').textContent=c('completed');
+  $('#statWithdrawn').textContent=c('withdrawn'); $('#statLost').textContent=c('lost'); $('#statExcluded').textContent=c('excluded');
+  $('#registeredNum').textContent=total; $('#registeredNum2').textContent=total;
+  $('#sampleSizeNum').textContent=state.sampleSize; $('#sampleSizeNum2').textContent=state.sampleSize;
+  $('#sampleProgress').style.width=Math.min(100,(total/state.sampleSize)*100).toFixed(1)+'%';
+  $('#withdrawRate').textContent= total ? (c('withdrawn')/total*100).toFixed(1) : '0.0';
+  const gA=patients.filter(p=>p.group==='A').length, gB=total-gA;
+  $('#groupANum').textContent=gA; $('#groupBNum').textContent=gB;
+  $('#groupABar').style.width=(total?gA/total*100:0)+'%'; $('#groupBBar').style.width=(total?gB/total*100:0)+'%';
+  /* مخطط CONSORT المبسط */
+  $('#consortScreened').textContent=total+6; $('#consortRandomized').textContent=total;
+  $('#consortFollow').textContent=c('active')+c('lost'); $('#consortAnalysis').textContent=c('completed')+c('withdrawn');
+  $('#consortNotes').innerHTML = `
+    <span class="bg-slate-100 rounded-full px-3 py-1">لم يستوفِ الأهلية: 6</span>
+    <span class="bg-blue-50 text-blue-500 rounded-full px-3 py-1">منسحب: ${c('withdrawn')}</span>
+    <span class="bg-purple-50 text-purple-500 rounded-full px-3 py-1">فقدان متابعة: ${c('lost')}</span>
+    <span class="bg-red-50 text-red-500 rounded-full px-3 py-1">مستبعد لاحقاً: ${c('excluded')}</span>`;
+}
+
+/* ---------- قائمة إجراءات المريض (⋮) ---------- */
+let menuPatient=null;
+function openRowMenu(ev, code){
+  ev.stopPropagation(); menuPatient=code;
+  const menu=$('#rowMenu'); menu.classList.remove('hidden');
+  const r=ev.currentTarget.getBoundingClientRect();
+  menu.style.top=(r.bottom+6)+'px';
+  menu.style.left=Math.max(8, r.left-190)+'px';
+}
+document.addEventListener('click', ()=> $('#rowMenu').classList.add('hidden'));
+function menuAction(action){
+  const p=patients.find(x=>x.code===menuPatient); if(!p) return;
+  if(action==='visit'){ $('#visitPatientName').textContent=p.name+' ('+p.code+')'; openModal('visitModal'); }
+  if(action==='pdf'){ simulatePdf(p); }
+  if(action==='schedule'){ openSchedule(p); }
+  if(action==='withdraw'){ openWithdrawal(p); }
+}
+function simulatePdf(p){
+  toast('جاري استخراج تقرير رقمي منظم لاستمارة '+p.code+' بجميع بياناتها...','info');
+  setTimeout(()=> toast('تم تصدير الاستمارة (PDF) بنجاح — متوافقة مع شروط الهوية البصرية: شعار الجامعة، العلامة المائية للمنصة، معلومات الباحث، وتذييل المنصة','success'), 1700);
+}
+function exportFormPDF(){
+  toast('جاري تجهيز التقرير الرقمي المنظم للاستمارة كاملة...','info');
+  setTimeout(()=> toast('تم تصدير الاستمارة (PDF) بجميع بياناتها ومرفقاتها وتحليلاتها','success'), 1700);
+}
+
+/* ---------- التحقق من الأهلية وتسجيل عينة ---------- */
+function openEligibility(){
+  $('#eligQuestion').classList.remove('hidden'); $('#eligFail').classList.add('hidden'); $('#eligForm').classList.add('hidden');
+  $('#newSampleCode').textContent='PT-'+String(patients.length+1).padStart(3,'0');
+  const existing = state.studyPath==='existing';
+  $('#autoAllocBox').classList.toggle('hidden', existing);
+  $('#manualAllocBox').classList.toggle('hidden', !existing);
+  $('#allocResult').classList.add('hidden'); $('#allocResult').classList.remove('flex');
+  openModal('eligibilityModal');
+}
+function eligibilityAnswer(ok){
+  $('#eligQuestion').classList.add('hidden');
+  if(ok){ $('#eligForm').classList.remove('hidden'); } else { $('#eligFail').classList.remove('hidden'); }
+}
+function ocrReadGroup(btn){
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> جاري القراءة...';
+  setTimeout(()=>{
+    btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-camera"></i> قراءة عبر OCR';
+    $('#manualGroup').value = Math.random()>0.5 ? 'A' : 'B';
+    toast('تمت قراءة المجموعة العلاجية آلياً من الاستمارة الورقية التاريخية عبر (OCR) — مع تشفير الحقول الحساسة وعدم كشفها للباحث المعمّى','info');
+  }, 1500);
+}
+function saveNewSample(btn){
+  const name=$('#newPatientName').value.trim();
+  if(!name){ toast('يرجى إدخال اسم المريض','warn'); return; }
+  const age=$('#newPatientAge').value || '—', gender=$('#newPatientGender').value;
+  const addPatient = group => {
+    patients.push({code:$('#newSampleCode').textContent, name, age, gender, group, status:'active', last:'17/07/2026', next:'—', by:'د. أحمد الحربي'});
+    renderPatients(); renderStats();
+    closeModal('eligibilityModal');
+    $('#newPatientName').value=''; $('#newPatientAge').value='';
+    toast('تم حفظ البيانات ومتابعة إجراءات أخذ العينة — الحالة الآن: نشطة (Active)','success');
+  };
+  if(state.studyPath==='existing'){ addPatient($('#manualGroup').value); return; }
+  /* مسار الدراسة الجديدة: تخصيص آلي صامت */
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> تفعيل خوارزمية العشوائية...';
+  setTimeout(()=>{
+    const group = Math.random()>0.5 ? 'A' : 'B';
+    $('#allocGroupText').textContent = group==='A' ? 'المجموعة التجريبية' : 'المجموعة الضابطة';
+    $('#allocCodeText').textContent  = 'RND-'+Math.floor(1000+Math.random()*9000);
+    const res=$('#allocResult'); res.classList.remove('hidden'); res.classList.add('flex');
+    btn.disabled=false; btn.innerHTML='تأكيد حفظ البيانات';
+    setTimeout(()=> addPatient(group), 1100);
+  }, 1300);
+}
+
+/* ---------- الزيارات والمواعيد ---------- */
+function saveVisit(){
+  const p=patients.find(x=>$('#visitPatientName').textContent.includes(x.code));
+  if(p){ p.last='17/07/2026'; renderPatients(); }
+  closeModal('visitModal');
+  toast('تمت إضافة الزيارة وحفظها في الاستمارة التراكمية للمريض','success');
+}
+function openSchedule(p){
+  const sel=$('#apptPatient');
+  sel.innerHTML = patients.filter(x=>x.status==='active').map(x=>`<option ${p&&x.code===p.code?'selected':''}>${x.name}</option>`).join('');
+  openModal('scheduleModal');
+}
+function saveAppointment(){
+  const d=new Date($('#apptDate').value||'2026-07-21');
+  let idx=d.getDate()-13; idx=Math.max(0,Math.min(6,idx));
+  appointments.push({day:idx, time:$('#apptTime').value, patient:$('#apptPatient').value, type:$('#apptType').value});
+  renderCalendar(); closeModal('scheduleModal');
+  toast('تم تسجيل الموعد الجديد — وسيصلك تذكير تلقائي قبل الموعد بيومين','success');
+  go('calendar');
+}
+
+/* ---------- مسار الانسحاب المنهجي ---------- */
+let wd={step:1, code:null, replace:false};
+function openWithdrawal(p){
+  if(['withdrawn','excluded'].includes(p.status)){ toast('لا يمكن بدء طلب انسحاب لعينة «'+STATUS[p.status].ar+'» مسبقاً','warn'); return; }
+  wd={step:1, code:p.code, replace:false};
+  $('#wdPatientName').textContent=p.name+' ('+p.code+')';
+  $('#wdReason').value=''; $('#wdOtherBox').classList.add('hidden'); $('#replaceNotice').classList.add('hidden');
+  wdShow();
+  openModal('withdrawModal');
+}
+function wdShow(){
+  [1,2,3,4].forEach(i=>{
+    $('#wdPanel'+i).classList.toggle('hidden', i!==wd.step);
+    const d=document.querySelector(`.wd-step[data-wd="${i}"]`);
+    d.classList.toggle('active', i===wd.step); d.classList.toggle('done', i<wd.step);
+  });
+  $$('.wd-line').forEach((l,i)=> l.classList.toggle('done', i < wd.step-1));
+  $('#wdBackBtn').classList.toggle('hidden', wd.step===1);
+  $('#wdNextBtn').classList.toggle('hidden', wd.step===4);
+  $('#wdSubmitBtn').classList.toggle('hidden', wd.step!==4);
+  if(wd.step===4) buildWdSummary();
+}
+function wdNav(dir){
+  if(dir===1 && wd.step===1 && !$('#wdReason').value){ toast('يرجى تحديد سبب الانسحاب من القائمة أولاً','warn'); return; }
+  wd.step=Math.min(4,Math.max(1,wd.step+dir)); wdShow();
+}
+function pickYN(btn){
+  [...btn.parentElement.children].forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function pickReplace(btn, val){
+  pickYN(btn); wd.replace=val;
+  $('#replaceNotice').classList.toggle('hidden', !val);
+}
+function buildWdSummary(){
+  const reason=$('#wdReason').value==='other' ? ($('#wdOtherText').value||'سبب آخر') : $('#wdReason').value;
+  const yn=idx=>document.querySelectorAll('#wdImpactQuestions > div')[idx].querySelector('.yn-btn.selected').dataset.v==='yes'?'نعم':'لا';
+  $('#wdSummary').innerHTML=`
+    <p><b class="text-slate-800">سبب الانسحاب:</b> ${reason}</p>
+    <p><b class="text-slate-800">تاريخ الانسحاب:</b> ${$('#wdDate').value} — <b class="text-slate-800">آخر زيارة مكتملة:</b> ${$('#wdLastVisit').value}</p>
+    <p><b class="text-slate-800">المرحلة الزمنية:</b> ${$('#wdPhase').value} — <b class="text-slate-800">متخذ القرار:</b> ${$('#wdDecision').value}</p>
+    <p><b class="text-slate-800">إيقاف العلاج فقط:</b> ${yn(0)} — <b class="text-slate-800">الاستمرار بالمتابعة:</b> ${yn(1)} — <b class="text-slate-800">انسحاب كامل:</b> ${yn(2)}</p>
+    <p><b class="text-slate-800">استخدام البيانات السابقة:</b> ${yn(3)} — <b class="text-slate-800">استبدال العينة:</b> ${wd.replace?'نعم (+1 لحجم العينة)':'لا'}</p>
+    ${$('#wdNotes').value ? `<p><b class="text-slate-800">ملاحظات الباحث:</b> ${$('#wdNotes').value}</p>` : ''}`;
+}
+function executeWithdrawal(){
+  const p=patients.find(x=>x.code===wd.code); if(!p) return;
+  p.status='withdrawn'; p.next='—';
+  if(wd.replace) state.sampleSize++;
+  renderPatients(); renderStats();
+  closeModal('withdrawModal');
+  toast('تم اعتماد المشرف وتنفيذ الانسحاب الفوري: تحوّلت حالة '+p.name+' إلى «منسحبة» (أزرق)، وأُلغيت جميع الزيارات والتنبيهات المستقبلية، مع الاحتفاظ التاريخي الآمن بالبيانات والصور وملفات STL وتوثيق العملية في سجل التدقيق (Audit Trail)','success');
+  if(wd.replace) setTimeout(()=> toast('تمت زيادة حجم العينة المطلوب للدراسة تلقائياً بمقدار (+1) — الحجم الجديد: '+state.sampleSize+' عينة','info'), 1000);
+}
+
+/* ---------- التحقق الفوري الذكي في الاستمارة ---------- */
+function smartValidate(input, min, max, boxId){
+  const v=parseFloat(input.value), box=$('#'+boxId), msg=$('#validationMsg');
+  const bad = input.value!=='' && (isNaN(v)||v<min||v>max);
+  box.classList.toggle('invalid', bad); input.classList.toggle('invalid', bad);
+  msg.classList.toggle('hidden', !bad); msg.classList.toggle('flex', bad);
+}
+
+/* ---------- محاكاة WebCeph ---------- */
+function analyzeCeph(){
+  const frame=$('#cephFrame'), btn=$('#cephBtn');
+  frame.classList.add('scanning'); btn.disabled=true;
+  btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> جاري التحليل عبر WebCeph...';
+  setTimeout(()=>{
+    frame.classList.remove('scanning');
+    $('#cephSvg').classList.add('analyzed');
+    $('#cephPlaceholder').classList.add('hidden'); $('#cephTable').classList.remove('hidden');
+    btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-rotate"></i> إعادة التحليل';
+    toast('اكتمل الكشف الهندسي للصورة — عُرضت معالجة القياس مع جدول القيم الكامل','success');
+  }, 2300);
+}
+
+/* ---------- محاكاة STL ثلاثي الأبعاد ---------- */
+function jawsMode(m){
+  const j=$('#jawsModel'); j.classList.remove('single','occluded');
+  if(m==='single') j.classList.add('single');
+  if(m==='occlusion') j.classList.add('occluded');
+  toast(m==='single' ? 'وضع استكشاف الفك المفرد — تم عزل الفك العلوي للفحص' : 'عرض الفكين معاً بحالة الإطباق (Occlusion)','info');
+}
+function stlMeasure(kind){
+  const out=$('#stlReadout');
+  if(kind==='width'){
+    out.innerHTML=`<span class="text-[10px] font-extrabold text-cyan-200 bg-cyan-400/10 border border-cyan-400/30 rounded-full px-2.5 py-1">العرض بين الأرحاء العلوية: 46.2 مم</span>
+    <span class="text-[10px] font-extrabold text-cyan-200 bg-cyan-400/10 border border-cyan-400/30 rounded-full px-2.5 py-1">العرض بين الأنياب: 33.8 مم</span>`;
+  } else {
+    out.innerHTML=`<span class="text-[10px] font-extrabold text-emerald-200 bg-emerald-400/10 border border-emerald-400/30 rounded-full px-2.5 py-1">البروز الأفقي (Overjet): 3.1 مم</span>
+    <span class="text-[10px] font-extrabold text-emerald-200 bg-emerald-400/10 border border-emerald-400/30 rounded-full px-2.5 py-1">الانطباق الرأسي (Overbite): 1.8 مم</span>
+    <span class="text-[10px] font-extrabold text-emerald-200 bg-emerald-400/10 border border-emerald-400/30 rounded-full px-2.5 py-1">المسافة البينية U1–L1: 2.3 مم</span>`;
+  }
+  toast('تم تحديد وحساب القياسات السريرية تلقائياً من ملف STL','success');
+}
+
+/* ---------- التقويم ---------- */
+const DAYS=['الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت','الأحد'];
+function renderCalendar(){
+  const todayIdx=4; /* الجمعة 17 يوليو */
+  $('#calendarHeader').innerHTML = DAYS.map((d,i)=>`
+    <div class="px-3 py-3.5 text-center ${i===todayIdx?'bg-brand-50':''}">
+      <p class="text-[11px] font-extrabold ${i===todayIdx?'text-brand-600':'text-slate-400'}">${d}</p>
+      <p class="text-xl font-black ${i===todayIdx?'text-brand-700':'text-slate-700'}">${13+i}</p>
+      ${i===todayIdx?'<span class="text-[8px] font-black text-white bg-brand-500 rounded-full px-2 py-0.5">اليوم</span>':''}
+    </div>`).join('');
+  $('#calendarBody').innerHTML = DAYS.map((d,i)=>{
+    const chips=appointments.filter(a=>a.day===i).map(a=>{
+      const c=TYPE_COLORS[a.type]||'slate';
+      return `<div class="cal-chip bg-${c}-50 text-${c}-700 border-${c}-400" onclick="toast('موعد: ${a.patient} — ${a.type} (${a.time})','info')">
+        <p class="font-black">${a.time}</p><p>${a.patient}</p><p class="opacity-70">${a.type}</p></div>`;
+    }).join('');
+    return `<div class="p-2 space-y-2 ${i===todayIdx?'bg-brand-50/40':''}">${chips || '<p class="text-[10px] font-bold text-slate-200 text-center pt-6">لا مواعيد</p>'}</div>`;
+  }).join('');
+}
+
+/* ---------- التعاون والصلاحيات ---------- */
+function inviteAssistant(){
+  const email=$('#assistantEmail').value.trim();
+  if(!email || !email.includes('@')){ toast('يرجى إدخال بريد إلكتروني صحيح للباحث المساعد','warn'); return; }
+  const perm=document.querySelector('.perm-card.selected p').textContent;
+  const initials=email.slice(0,1).toUpperCase();
+  $('#teamList').insertAdjacentHTML('beforeend', `
+    <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/60" style="animation:pageIn .4s ease both">
+      <div class="w-9 h-9 rounded-lg bg-slate-500 text-white flex items-center justify-center text-xs font-black">${initials}</div>
+      <div class="flex-1"><p class="text-xs font-extrabold text-slate-700">${email}</p><p class="text-[9px] font-bold text-slate-400">باحث مساعد — بانتظار قبول الدعوة</p></div>
+      <span class="text-[9px] font-extrabold text-amber-600 bg-amber-50 rounded-full px-2.5 py-1">${perm}</span>
+    </div>`);
+  $('#assistantEmail').value='';
+  toast('أُرسل طلب الدعوة بنجاح مع تحديد الصلاحيات مسبقاً: '+perm,'success');
+}
+function linkSupervisor(){
+  if(!$('#supervisorId').value.trim()){ toast('يرجى إدخال الرمز الخاص بالمشرف (Supervisor ID)','warn'); return; }
+  runAI(['جاري التحقق من رمز المشرف وإرسال دعوة الإشراف...','استلام قبول المشرف — تجهيز قناة المحادثة المؤرشفة كمرجع قانوني...'], ()=>{
+    $('#supervisorCard').classList.remove('hidden');
+    toast('تم ربط المشرف الأكاديمي — تظهر له بيانات الدراسة والباحث والعينات كافة','success');
+  });
+}
+
+/* ---------- قفل الدراسة للتقييم الخارجي ---------- */
+function confirmLock(){ openModal('lockModal'); }
+function toggleLock(on){
+  state.locked=on;
+  document.body.classList.toggle('locked', on);
+  if(on) toast('تم قفل الدراسة وإرسالها للمقيّم الخارجي — جميع صلاحيات الإضافة والتعديل مجمدة الآن لحماية حياد التجربة','warn');
+  else   toast('تم إلغاء القفل (وضع تجريبي) — عادت جميع الصلاحيات للعمل','info');
+}
+/* اعتراض أي محاولة إضافة/تعديل أثناء القفل */
+document.addEventListener('click', e=>{
+  if(state.locked){
+    const t=e.target.closest('.lockable');
+    if(t){ e.preventDefault(); e.stopPropagation(); toast('الدراسة مقفلة حالياً وتحت التقييم الخارجي — لا يمكن الإضافة أو التعديل','error'); }
+  }
+}, true);
+
+/* ---------- مرفقات وهمية ---------- */
+const ATTACH_NAMES=['clinical-photo-01.jpg','xray-panorama.dcm','stl-upper-arch.stl','consent-signed.pdf'];
+let attachIdx=0;
+function attachFile(el){
+  const zone=el.querySelector('.attachZone'); if(!zone) return;
+  const n=ATTACH_NAMES[attachIdx++ % ATTACH_NAMES.length];
+  zone.insertAdjacentHTML('beforeend', `<span class="text-[9px] font-extrabold text-brand-600 bg-brand-50 border border-brand-100 rounded-full px-2.5 py-1 inline-flex items-center gap-1.5"><i class="fa-solid fa-paperclip"></i>${n}<i class="fa-solid fa-check text-green-500"></i></span>`);
+}
+
+/* ---------- العلامة المائية ---------- */
+function toggleWatermark(){
+  const t=$('#toggleWm'); t.classList.toggle('on');
+  $('#watermark').style.display = t.classList.contains('on') ? 'block' : 'none';
+}
+
+/* ---------- التهيئة ---------- */
+window.addEventListener('DOMContentLoaded', ()=>{
+  /* ملء العلامة المائية */
+  let wm=''; for(let i=0;i<48;i++) wm+='<span class="wm-span">OrthoClinical • منصة الأبحاث السريرية</span>';
+  $('#wmInner').innerHTML=wm;
+  renderPatients(); renderStats(); renderCalendar();
+  updateBlindInference(); syncMethodology();
+});
+</script>
+
+</body>
+</html>
