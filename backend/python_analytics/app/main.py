@@ -1,7 +1,9 @@
 import io
 import json
+import math
 import os
 import tempfile
+
 from typing import Any
 from pathlib import Path
 
@@ -16,12 +18,74 @@ import scipy
 import scipy.stats as stats
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from statsmodels.duration.survfunc import SurvfuncRight
 
+from dotenv import load_dotenv
+
+# Automatically load environment configuration from backend/.env if present
+env_file = Path(__file__).parent.parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(dotenv_path=env_file)
+else:
+    load_dotenv()
+
+from .clinical_validation import validate_clinical_parameters
+from .knowledge_catalog import (
+    STUDY_TYPE_LABELS,
+    VALID_STUDY_TYPES,
+    get_catalog_summary,
+    get_references_for_study_type,
+    is_valid_study_type,
+)
+from .privacy import PHI_AUDIT_LOGS, redact_phi, redact_phi_with_audit
+from .prompt_library import build_system_prompt
+from .rag_engine import rag_engine
+from .sample_size_engine import calculate_sample_size
+
 
 app = FastAPI(title="ClinResearch Analytics Service", version="1.0.0")
+
+
+def compute_cohens_d(g1: np.ndarray, g2: np.ndarray) -> float | None:
+    n1, n2 = len(g1), len(g2)
+    if n1 < 2 or n2 < 2:
+        return None
+    s1, s2 = float(np.std(g1, ddof=1)), float(np.std(g2, ddof=1))
+    s_pooled = math.sqrt(((n1 - 1) * s1**2 + (n2 - 1) * s2**2) / (n1 + n2 - 2))
+    return float((np.mean(g1) - np.mean(g2)) / s_pooled) if s_pooled > 0 else 0.0
+
+
+def compute_normality_shapiro(data: np.ndarray) -> dict[str, Any] | None:
+    if len(data) < 3:
+        return None
+    try:
+        stat, p_val = stats.shapiro(data[:5000])
+        return {"statistic": float(stat), "pValue": float(p_val), "isNormal": bool(p_val > 0.05)}
+    except Exception:
+        return None
+
+
+def compute_levene_test(groups: list[np.ndarray]) -> dict[str, Any] | None:
+    if len(groups) < 2 or any(len(g) < 2 for g in groups):
+        return None
+    try:
+        stat, p_val = stats.levene(*groups)
+        return {"statistic": float(stat), "pValue": float(p_val), "equalVariance": bool(p_val > 0.05)}
+    except Exception:
+        return None
+
+
+def compute_mean_ci(g1: np.ndarray, g2: np.ndarray, confidence: float = 0.95) -> dict[str, float] | None:
+    n1, n2 = len(g1), len(g2)
+    if n1 < 2 or n2 < 2:
+        return None
+    diff = float(np.mean(g1) - np.mean(g2))
+    se = float(math.sqrt(np.var(g1, ddof=1) / n1 + np.var(g2, ddof=1) / n2))
+    margin = float(stats.norm.ppf(1.0 - (1.0 - confidence) / 2.0) * se)
+    return {"meanDifference": diff, "ciLower": diff - margin, "ciUpper": diff + margin}
+
 
 
 def configure_tesseract_path() -> str | None:
@@ -48,6 +112,7 @@ class AssistantRequest(BaseModel):
     mode: str = Field(default="researcher_response")
     prompt: str = Field(default="")
     protocol_text: str | None = None
+    study_type: str | None = None
     dataset_profile: dict[str, Any] | None = None
     statistical_result: dict[str, Any] | None = None
     study_context: dict[str, Any] | None = None
@@ -318,12 +383,17 @@ def run_independent_t_test(dataframe: pd.DataFrame, config: dict[str, Any]) -> d
     ensure_categorical_columns(dataframe, [group_column], "Independent t-test")
     ensure_numeric_columns(dataframe, [value_column], "Independent t-test")
 
-    groups = [group.dropna().astype(float) for _name, group in dataframe.groupby(group_column)[value_column]]
+    groups = [group.dropna().astype(float).to_numpy() for _name, group in dataframe.groupby(group_column)[value_column]]
     labels = dataframe[group_column].dropna().unique().tolist()
     if len(groups) != 2:
         raise HTTPException(status_code=400, detail="Independent t-test requires exactly two groups.")
 
     statistic, p_value = stats.ttest_ind(groups[0], groups[1], equal_var=config.get("equal_var", False), nan_policy="omit")
+    cohens_d = compute_cohens_d(groups[0], groups[1])
+    normality = {str(labels[0]): compute_normality_shapiro(groups[0]), str(labels[1]): compute_normality_shapiro(groups[1])}
+    levene_test = compute_levene_test(groups)
+    ci_95 = compute_mean_ci(groups[0], groups[1])
+
     figure = go.Figure()
     for label, values in zip(labels, groups):
         figure.add_trace(go.Box(y=values, name=str(label)))
@@ -332,6 +402,11 @@ def run_independent_t_test(dataframe: pd.DataFrame, config: dict[str, Any]) -> d
         "analysis": "independent_t_test",
         "statistic": to_jsonable(statistic),
         "pValue": to_jsonable(p_value),
+        "effectSize": to_jsonable(cohens_d),
+        "effectSizeLabel": "Cohen's d",
+        "confidenceInterval": to_jsonable(ci_95),
+        "normalityCheck": to_jsonable(normality),
+        "varianceHomogeneityCheck": to_jsonable(levene_test),
         "groupLabels": labels,
         "groupMeans": to_jsonable({str(label): float(np.mean(values)) for label, values in zip(labels, groups)}),
         "figure": build_plotly_response(figure),
@@ -344,18 +419,31 @@ def run_paired_t_test(dataframe: pd.DataFrame, config: dict[str, Any]) -> dict[s
     validate_columns(dataframe, [x_column, y_column])
     ensure_numeric_columns(dataframe, [x_column, y_column], "Paired t-test")
     subset = dataframe[[x_column, y_column]].dropna().astype(float)
-    statistic, p_value = stats.ttest_rel(subset[x_column], subset[y_column], nan_policy="omit")
+    g1 = subset[x_column].to_numpy()
+    g2 = subset[y_column].to_numpy()
+
+    statistic, p_value = stats.ttest_rel(g1, g2, nan_policy="omit")
+    diff = g1 - g2
+    cohens_d = float(np.mean(diff) / np.std(diff, ddof=1)) if np.std(diff, ddof=1) > 0 else 0.0
+    normality = {x_column: compute_normality_shapiro(g1), y_column: compute_normality_shapiro(g2), "differences": compute_normality_shapiro(diff)}
+    ci_95 = compute_mean_ci(g1, g2)
+
     figure = go.Figure()
-    figure.add_trace(go.Box(y=subset[x_column], name=x_column))
-    figure.add_trace(go.Box(y=subset[y_column], name=y_column))
+    figure.add_trace(go.Box(y=g1, name=x_column))
+    figure.add_trace(go.Box(y=g2, name=y_column))
     return {
         "analysis": "paired_t_test",
         "statistic": to_jsonable(statistic),
         "pValue": to_jsonable(p_value),
+        "effectSize": to_jsonable(cohens_d),
+        "effectSizeLabel": "Cohen's d (paired)",
+        "confidenceInterval": to_jsonable(ci_95),
+        "normalityCheck": to_jsonable(normality),
         "sampleSize": int(len(subset)),
-        "means": to_jsonable({x_column: subset[x_column].mean(), y_column: subset[y_column].mean()}),
+        "means": to_jsonable({x_column: float(np.mean(g1)), y_column: float(np.mean(g2))}),
         "figure": build_plotly_response(figure),
     }
+
 
 
 def run_chi_square(dataframe: pd.DataFrame, config: dict[str, Any]) -> dict[str, Any]:
@@ -704,54 +792,157 @@ def build_fallback_assistant_response(request: AssistantRequest) -> dict[str, An
         if request.prompt:
             sections.append(f"ملخص الطلب: {request.prompt[:300]}")
 
+    audit_prompt_info = redact_phi_with_audit(request.prompt)
     return {
         "answer": "\n".join(sections),
         "usedLLM": False,
         "model": "fallback-deterministic",
+        "privacyAudit": audit_prompt_info,
         "extractedStudyElements": extracted,
     }
 
 
 def try_openai_response(request: AssistantRequest) -> dict[str, Any] | None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    enable_mock = (
+        os.getenv("ENABLE_MOCK_LLM", "").strip().lower() in {"true", "1", "yes"}
+        or api_key == "test-mock-key"
+    )
+
+    if enable_mock:
+        resolved_study_type = request.study_type
+        if not resolved_study_type and request.study_context:
+            study_meta = request.study_context.get("study_metadata") or {}
+            if isinstance(study_meta, dict):
+                resolved_study_type = study_meta.get("studyType")
+
+        knowledge_context = get_knowledge_context(request)
+        if not knowledge_context and request.prompt:
+            knowledge_context = rag_engine.query(
+                question=request.prompt,
+                study_type=resolved_study_type,
+            )
+
+        citations_str = ""
+        if isinstance(knowledge_context, dict) and knowledge_context.get("citations"):
+            citations_list = [
+                f"- 📄 `{c.get('source_file')}` ({c.get('section', 'General')}) — صفحة {c.get('page', 1)}"
+                for c in knowledge_context["citations"][:3]
+            ]
+            citations_str = "\n\n📚 **المراجع العلمية المستخرجة محلياً (RAG Knowledge Engine):**\n" + "\n".join(citations_list)
+
+        prompt_txt = request.prompt or "استفسار سريري"
+        mock_answer = (
+            f"### 🤖 مساعد البحث السريري والمنهجي\n\n"
+            f"بناءً على تحليل الاستفسار: **\"{prompt_txt}\"** ضمن تصميم الدراسة (**{resolved_study_type or 'General Clinical Study'}**):\n\n"
+            f"1. **التصميم المنهجي**: تم التأكد من مطابقة المعطيات مع المبادئ المعرفية والإحصائية المعتمدة.\n"
+            f"2. **حجم العينة والقوة الإحصائية**: يُنصح بتطبيق اختبارات القوة الإحصائية لحساب العينة بحيث تكون القوة الإحصائية (Power $\\ge 80\\%$) عند مستوى معنوية ($\\alpha = 0.05$).\n"
+            f"3. **التوصية التنفيذية**: يمكنك استخدام أدوات الحساب المباشرة والتحقق السريري (Clinical Validation) المتاحة بالمنصة لاستخراج التقرير كاملاً."
+            f"{citations_str}"
+        )
+
+        audit_prompt_info = redact_phi_with_audit(request.prompt)
+        return {
+            "answer": mock_answer,
+            "usedLLM": True,
+            "model": "mock-ai-test-engine",
+            "studyType": resolved_study_type,
+            "privacyAudit": audit_prompt_info,
+            "extractedStudyElements": extract_study_elements(request.protocol_text or request.prompt)
+            if request.mode in {"protocol_understanding", "study_elements"}
+            else None,
+        }
+
+    if not api_key and not base_url:
         return None
 
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=api_key)
-        model = os.getenv("OPENAI_MODEL", "gpt-5.5")
-        system_prompt = (
-            "You are a clinical research AI copilot. Use the provided statistical outputs as the source of truth. "
-            "Use study_context.knowledge_context as the authoritative evidence layer when it is present. "
-            "If citations are available, ground the answer in them and mention the source file or page inline. "
-            "Do not invent p-values, references, citations, or numeric inference. Explain, structure, and draft research content safely."
+        client_kwargs: dict[str, Any] = {}
+        if api_key:
+            client_kwargs["api_key"] = api_key
+        else:
+            client_kwargs["api_key"] = "dummy-key-for-local-llm"
+
+        if base_url:
+            client_kwargs["base_url"] = base_url
+
+        client = OpenAI(**client_kwargs)
+        model = os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o")
+
+        resolved_study_type = request.study_type
+        if not resolved_study_type and request.study_context:
+            study_meta = request.study_context.get("study_metadata") or {}
+            if isinstance(study_meta, dict):
+                resolved_study_type = study_meta.get("studyType")
+
+        knowledge_context = get_knowledge_context(request)
+        if not knowledge_context and request.prompt:
+            knowledge_context = rag_engine.query(
+                question=request.prompt,
+                study_type=resolved_study_type,
+            )
+
+        audit_prompt_info = redact_phi_with_audit(request.prompt)
+        audit_protocol_info = redact_phi_with_audit(request.protocol_text or "") if request.protocol_text else None
+
+        sanitized_prompt = audit_prompt_info["sanitized_text"]
+        sanitized_protocol = audit_protocol_info["sanitized_text"] if audit_protocol_info else None
+
+        system_prompt = build_system_prompt(
+            study_type=resolved_study_type,
+            mode=request.mode,
+            knowledge_context=knowledge_context,
         )
         user_payload = {
             "mode": request.mode,
-            "prompt": request.prompt,
-            "protocol_text": request.protocol_text,
+            "prompt": sanitized_prompt,
+            "study_type": resolved_study_type,
+            "protocol_text": sanitized_protocol,
             "dataset_profile": request.dataset_profile,
             "statistical_result": request.statistical_result,
             "study_context": request.study_context,
         }
-        response = client.responses.create(
+        response = client.chat.completions.create(
             model=model,
-            input=[
+            messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
             ],
+            temperature=0.2,
         )
+        answer_text = response.choices[0].message.content or ""
         return {
-            "answer": response.output_text,
+            "answer": answer_text,
             "usedLLM": True,
             "model": model,
+            "studyType": resolved_study_type,
+            "privacyAudit": audit_prompt_info,
             "extractedStudyElements": extract_study_elements(request.protocol_text or request.prompt)
             if request.mode in {"protocol_understanding", "study_elements"}
             else None,
         }
-    except Exception:
+    except Exception as e:
+        err_str = str(e)
+        print(f"LLM API Error: {err_str}")
+        if "402" in err_str or "Insufficient Balance" in err_str:
+            fallback = build_fallback_assistant_response(request)
+            fallback["answer"] = (
+                f"⚠️ تنبيه من مزود AI ({model}): تم الاتصال بـ API بنجاح ولكن الحساب بحاجة لشحن رصيد (Error 402: Insufficient Balance).\n\n"
+                + fallback["answer"]
+            )
+            fallback["error"] = "Insufficient Balance (402)"
+            return fallback
+        elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "Quota" in err_str:
+            fallback = build_fallback_assistant_response(request)
+            fallback["answer"] = (
+                f"⚠️ تنبيه من مزود AI ({model}): تم الاتصال بمفتاح Gemini API بنجاح ولكن حصة الحساب (Quota) محددة بـ 0 طلبات (Error 429: Quota Exceeded).\n\n"
+                + fallback["answer"]
+            )
+            fallback["error"] = "Quota Exceeded (429)"
+            return fallback
         return None
 
 
@@ -768,6 +959,13 @@ def preprocess_image_for_ocr(file_bytes: bytes) -> np.ndarray:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    enable_mock = (
+        os.getenv("ENABLE_MOCK_LLM", "").strip().lower() in {"true", "1", "yes"}
+        or api_key == "test-mock-key"
+    )
+
     return {
         "status": "ok",
         "service": "clinresearch-python-analytics",
@@ -779,10 +977,37 @@ def health() -> dict[str, Any]:
             "pyreadstat": pyreadstat.__version__,
             "opencv": cv2.__version__,
         },
-        "openaiConfigured": bool(os.getenv("OPENAI_API_KEY")),
-        "openaiModel": os.getenv("OPENAI_MODEL", "gpt-5.5"),
+        "openaiConfigured": bool(api_key or base_url or enable_mock),
+        "openaiModel": os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o"),
+        "llmBaseUrl": base_url or "https://api.openai.com/v1",
+        "mockLLMEnabled": enable_mock,
         "tesseractConfigured": bool(configured_tesseract_cmd),
         "tesseractCommand": configured_tesseract_cmd,
+        "knowledgeCatalog": get_catalog_summary(),
+    }
+
+
+@app.get("/knowledge/study-types")
+def list_study_types() -> dict[str, Any]:
+    return {
+        "validStudyTypes": VALID_STUDY_TYPES,
+        "studyTypeLabels": STUDY_TYPE_LABELS,
+        "summary": get_catalog_summary(),
+    }
+
+
+@app.get("/knowledge/references")
+def list_knowledge_references(study_type: str = Query(default="rct")) -> dict[str, Any]:
+    if not is_valid_study_type(study_type):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid study_type '{study_type}'. Must be one of: {', '.join(VALID_STUDY_TYPES)}",
+        )
+    refs = get_references_for_study_type(study_type)
+    return {
+        "studyType": study_type.lower(),
+        "referenceCount": len(refs),
+        "references": refs,
     }
 
 
@@ -850,3 +1075,49 @@ async def assistant_chat(request: AssistantRequest) -> dict[str, Any]:
     if llm_response:
         return llm_response
     return build_fallback_assistant_response(request)
+
+
+class KnowledgeQueryBody(BaseModel):
+    question: str = Field(default="")
+    prompt: str | None = None
+    study_type: str | None = None
+    filter_source: str | None = None
+    limit: int = Field(default=5)
+
+
+@app.post("/api/v1/query")
+async def query_knowledge_base(body: KnowledgeQueryBody) -> dict[str, Any]:
+    q = body.question or body.prompt or ""
+    return rag_engine.query(
+        question=q,
+        study_type=body.study_type,
+        filter_source=body.filter_source,
+        limit=body.limit,
+    )
+
+
+@app.post("/api/v1/ingest")
+async def ingest_knowledge_document(
+    file: UploadFile = File(...),
+    document_type: str = Form(default="reference"),
+    study_type: str | None = Form(default=None),
+) -> dict[str, Any]:
+    file_bytes = await file.read()
+    text_content = file_bytes.decode("utf-8", errors="ignore")
+    return rag_engine.ingest_text(
+        filename=file.filename or "uploaded_doc.txt",
+        text=text_content,
+        document_type=document_type,
+        study_type=study_type,
+    )
+
+
+@app.post("/api/v1/calculate")
+async def calculate_sample_size_endpoint(body: dict[str, Any]) -> dict[str, Any]:
+    return calculate_sample_size(body)
+
+
+@app.post("/api/v1/validate")
+async def validate_clinical_parameters_endpoint(body: dict[str, Any]) -> dict[str, Any]:
+    return validate_clinical_parameters(body)
+

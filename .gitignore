@@ -50,6 +50,12 @@ var/
 wheels/
 *.egg-info/
 .installed.cfg
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
 pip-wheel-metadata/
 .venv
@@ -59,3 +65,6 @@ ENV/
 # Analytics
 analytics/node_modules/
 backend/node_modules/
+rag_index_db.json
+backend/python_analytics/data/
+*.db.json

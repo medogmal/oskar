@@ -2,9 +2,8 @@ import type { Request, Response } from 'express';
 
 const analyticsBaseUrl = (process.env.PYTHON_ANALYTICS_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
 const analyticsTimeoutMs = Number(process.env.PYTHON_ANALYTICS_TIMEOUT_MS ?? 120000);
-const knowledgeBaseUrl = (
-  process.env.KNOWLEDGE_ENGINE_URL ?? 'https://dental-research-knowledge-engine-backend-api-production.up.railway.app'
-).replace(/\/$/, '');
+const knowledgeBaseUrl = (process.env.KNOWLEDGE_ENGINE_URL ?? analyticsBaseUrl).replace(/\/$/, '');
+
 
 type MulterRequest = Request & {
   file?: Express.Multer.File;
@@ -585,3 +584,45 @@ export const validateKnowledgeClinicalParameters = async (req: Request, res: Res
     });
   }
 };
+
+export const getKnowledgeStudyTypes = async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${analyticsBaseUrl}/knowledge/study-types`, {
+      signal: AbortSignal.timeout(analyticsTimeoutMs),
+    });
+    if (!response.ok) {
+      const payload = await getErrorPayload(response);
+      return res.status(response.status).json(payload);
+    }
+    return res.json(await response.json());
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Knowledge study types unavailable',
+    });
+  }
+};
+
+export const getKnowledgeReferences = async (req: Request, res: Response) => {
+  try {
+    const rawStudyType = req.params.studyType || req.query.studyType;
+    const studyType = Array.isArray(rawStudyType)
+      ? String(rawStudyType[0])
+      : typeof rawStudyType === 'string'
+        ? rawStudyType
+        : 'rct';
+    const response = await fetch(`${analyticsBaseUrl}/knowledge/references?study_type=${encodeURIComponent(studyType)}`, {
+      signal: AbortSignal.timeout(analyticsTimeoutMs),
+    });
+
+    if (!response.ok) {
+      const payload = await getErrorPayload(response);
+      return res.status(response.status).json(payload);
+    }
+    return res.json(await response.json());
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Knowledge references unavailable',
+    });
+  }
+};
+

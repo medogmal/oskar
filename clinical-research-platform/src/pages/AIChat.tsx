@@ -6,6 +6,8 @@ import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components
 import { useAuth } from '../context/useAuth';
 import { saveAutofillSnapshot } from '../lib/aiAutofill';
 import { apiBaseUrl } from '../lib/auth';
+import { getStudyTypeInfo } from '../lib/studyTypes';
+
 
 type AnalyticsHealth = {
   status: string;
@@ -842,6 +844,7 @@ function AIChat() {
         body: JSON.stringify({
           mode,
           prompt,
+          study_type: selectedStudy?.studyType,
           protocol_text: prompt,
           useKnowledgeEngine,
           knowledgeFilterSource: knowledgeFilterSource || undefined,
@@ -850,6 +853,7 @@ function AIChat() {
           statistical_result: analysisResult,
           study_context: buildKnowledgeStudyContext(),
         }),
+
       });
 
       if (!response.ok) {
@@ -1176,16 +1180,34 @@ function AIChat() {
                 مساحة تقارير وتحليل موحدة لرفع الملفات، تشخيص البيانات، تشغيل التحليل الإحصائي، وإصدار مخرجات الذكاء الاصطناعي والتقارير النهائية.
               </p>
             </div>
-            <div className="grid min-w-[280px] gap-3">
-              <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-100">
-                {selectedStudy ? `${selectedStudy.studyType} • ${selectedStudy.status}` : 'Standalone analysis mode'}
-              </div>
-              {user ? (
+            <div className="grid min-w-[300px] gap-3">
+              {selectedStudy ? (
+                <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-teal-400"></span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-teal-200">
+                      مكتبة معرفية مربوطة: {getStudyTypeInfo(selectedStudy.studyType).shortLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm font-black text-white">
+                    {getStudyTypeInfo(selectedStudy.studyType).labelAr}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-300">
+                    {getStudyTypeInfo(selectedStudy.studyType).primaryGuideline}
+                  </p>
+                </div>
+              ) : (
                 <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-100">
+                  تحليل خارجي حر (غير مرتبط بدراسة)
+                </div>
+              )}
+              {user ? (
+                <div className="rounded-2xl bg-white/10 px-4 py-2.5 text-xs font-extrabold text-slate-200">
                   {user.fullName ?? t('dashboard.common.fallbackResearcher')}
                 </div>
               ) : null}
             </div>
+
           </div>
         </div>
 

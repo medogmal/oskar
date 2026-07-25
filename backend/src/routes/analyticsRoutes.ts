@@ -4,6 +4,8 @@ import {
   calculateKnowledgeSampleSize,
   getAnalyticsHealth,
   getKnowledgeHealth,
+  getKnowledgeReferences,
+  getKnowledgeStudyTypes,
   ingestKnowledgeDocument,
   profileDataset,
   queryKnowledgeBase,
@@ -26,6 +28,9 @@ const upload = multer({
 router.use(protect);
 router.get('/health', getAnalyticsHealth);
 router.get('/knowledge/health', getKnowledgeHealth);
+router.get('/knowledge/study-types', getKnowledgeStudyTypes);
+router.get('/knowledge/references', getKnowledgeReferences);
+router.get('/knowledge/references/:studyType', getKnowledgeReferences);
 router.post('/profile', upload.single('file'), profileDataset);
 router.post('/recommend', recommendAnalysis);
 router.post('/run', upload.single('file'), runAnalysis);
@@ -35,5 +40,6 @@ router.post('/knowledge/ingest', upload.single('file'), ingestKnowledgeDocument)
 router.post('/knowledge/query', queryKnowledgeBase);
 router.post('/knowledge/sample-size', calculateKnowledgeSampleSize);
 router.post('/knowledge/validate-clinical', validateKnowledgeClinicalParameters);
+
 
 export default router;
