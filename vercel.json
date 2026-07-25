@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd clinical-research-platform && npm ci",
+  "installCommand": "cd clinical-research-platform && npm install --no-audit --no-fund",
   "buildCommand": "cd clinical-research-platform && npm run build",
   "outputDirectory": "clinical-research-platform/dist",
   "rewrites": [
