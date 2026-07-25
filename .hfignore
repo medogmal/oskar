@@ -1,0 +1,16 @@
+.git/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/.env
+**/.env.*
+backend/dist/
+backend/data/
+backend/uploads/
+backend/python_analytics/data/
+clinical-research-platform/node_modules/
+clinical-research-platform/dist/
+clinical-research-platform/dev-dist/
+*.log
+*.pdf
