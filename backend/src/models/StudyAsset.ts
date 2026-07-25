@@ -1,4 +1,6 @@
 import { query } from '../db.js';
+import path from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 export type StudyFileCategory = 'protocol' | 'dataset' | 'image' | 'attachment' | 'report';
 
@@ -98,6 +100,31 @@ const mapStudyAnalysis = (row: StudyAnalysisRow): StudyAnalysisRecord => ({
   updatedAt: new Date(row.updated_at).toISOString(),
 });
 
+const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
+
+const isDatabaseUnavailable = (error: unknown) =>
+  localAuthFallbackEnabled() &&
+  error instanceof Error &&
+  /Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message);
+
+const localStudyFilesPath = path.resolve(process.cwd(), 'data', 'dev-study-files.json');
+const localStudyAnalysesPath = path.resolve(process.cwd(), 'data', 'dev-study-analyses.json');
+
+const readJsonArray = async <T>(filePath: string): Promise<T[]> => {
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8')) as T[];
+  } catch {
+    return [];
+  }
+};
+
+const writeJsonArray = async <T>(filePath: string, rows: T[]) => {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(rows, null, 2), 'utf8');
+};
+
+const createLocalId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
 export const createStudyFileRecord = async (input: {
   studyId: string;
   uploadedByUserId: string;
@@ -108,7 +135,8 @@ export const createStudyFileRecord = async (input: {
   sizeBytes: number;
   fileCategory: StudyFileCategory;
 }) => {
-  const result = await query<StudyFileRow>(
+  try {
+    const result = await query<StudyFileRow>(
     `
       INSERT INTO study_files (
         study_id, uploaded_by_user_id, original_name, stored_name, relative_path, mime_type, size_bytes, file_category
@@ -130,11 +158,34 @@ export const createStudyFileRecord = async (input: {
     ],
   );
 
-  return getStudyFileById(String(result.rows[0].id));
+    return getStudyFileById(String(result.rows[0].id));
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const now = new Date().toISOString();
+    const record: StudyFileRecord = {
+      id: createLocalId('dev_file'),
+      studyId: input.studyId,
+      originalName: input.originalName,
+      storedName: input.storedName,
+      relativePath: input.relativePath,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      fileCategory: input.fileCategory,
+      createdAt: now,
+    };
+    const files = await readJsonArray<StudyFileRecord>(localStudyFilesPath);
+    files.unshift(record);
+    await writeJsonArray(localStudyFilesPath, files);
+    return record;
+  }
 };
 
 export const getStudyFileById = async (fileId: string): Promise<StudyFileRecord | null> => {
-  const result = await query<StudyFileRow>(
+  try {
+    const result = await query<StudyFileRow>(
     `
       SELECT
         study_files.*,
@@ -147,12 +198,21 @@ export const getStudyFileById = async (fileId: string): Promise<StudyFileRecord 
     [fileId],
   );
 
-  const row = result.rows[0];
-  return row ? mapStudyFile(row) : null;
+    const row = result.rows[0];
+    return row ? mapStudyFile(row) : null;
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const files = await readJsonArray<StudyFileRecord>(localStudyFilesPath);
+    return files.find((file) => file.id === fileId) ?? null;
+  }
 };
 
 export const listStudyFiles = async (studyId: string): Promise<StudyFileRecord[]> => {
-  const result = await query<StudyFileRow>(
+  try {
+    const result = await query<StudyFileRow>(
     `
       SELECT
         study_files.*,
@@ -165,7 +225,15 @@ export const listStudyFiles = async (studyId: string): Promise<StudyFileRecord[]
     [studyId],
   );
 
-  return result.rows.map(mapStudyFile);
+    return result.rows.map(mapStudyFile);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const files = await readJsonArray<StudyFileRecord>(localStudyFilesPath);
+    return files.filter((file) => file.studyId === studyId);
+  }
 };
 
 export const createStudyAnalysisRecord = async (input: {
@@ -244,18 +312,27 @@ export const getStudyAnalysisById = async (analysisId: string): Promise<StudyAna
 };
 
 export const listStudyAnalyses = async (studyId: string): Promise<StudyAnalysisRecord[]> => {
-  const result = await query<StudyAnalysisRow>(
-    `
-      SELECT
-        study_analyses.*,
-        users.full_name AS created_by_name
-      FROM study_analyses
-      JOIN users ON users.id = study_analyses.created_by_user_id
-      WHERE study_analyses.study_id = $1
-      ORDER BY study_analyses.created_at DESC
-    `,
-    [studyId],
-  );
+  try {
+    const result = await query<StudyAnalysisRow>(
+      `
+        SELECT
+          study_analyses.*,
+          users.full_name AS created_by_name
+        FROM study_analyses
+        JOIN users ON users.id = study_analyses.created_by_user_id
+        WHERE study_analyses.study_id = $1
+        ORDER BY study_analyses.created_at DESC
+      `,
+      [studyId],
+    );
 
-  return result.rows.map(mapStudyAnalysis);
+    return result.rows.map(mapStudyAnalysis);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const analyses = await readJsonArray<StudyAnalysisRecord>(localStudyAnalysesPath);
+    return analyses.filter((analysis) => analysis.studyId === studyId);
+  }
 };
