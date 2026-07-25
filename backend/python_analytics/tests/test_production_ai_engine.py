@@ -148,4 +148,59 @@ def test_openai_mock_assistant_pathway():
             assert res["answer"] is not None and len(res["answer"]) > 0
 
 
+def test_placeholder_llm_key_is_not_configured():
+    """Verify documented placeholder API keys do not report a configured live LLM."""
+    from unittest.mock import patch
+    from app.main import AssistantRequest, get_llm_settings, try_openai_response
 
+    with patch.dict(
+        "os.environ",
+        {
+            "LLM_API_KEY": "",
+            "GEMINI_API_KEY": "",
+            "OPENAI_API_KEY": "YOUR_ROTATED_API_KEY_HERE",
+            "OPENAI_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "OPENAI_MODEL": "gemini-2.0-flash",
+            "ENABLE_MOCK_LLM": "false",
+        },
+        clear=False,
+    ):
+        settings = get_llm_settings()
+
+        assert settings["apiKeyPresent"] is True
+        assert settings["apiKeyLooksPlaceholder"] is True
+        assert settings["configured"] is False
+        assert try_openai_response(AssistantRequest(prompt="sample size for RCT", study_type="rct")) is None
+
+
+def test_assistant_chat_reports_placeholder_key_with_privacy_audit():
+    """Verify placeholder-key fallback still returns PHI audit metadata and a clear error."""
+    from unittest.mock import patch
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    with patch.dict(
+        "os.environ",
+        {
+            "LLM_API_KEY": "",
+            "GEMINI_API_KEY": "",
+            "OPENAI_API_KEY": "YOUR_ROTATED_API_KEY_HERE",
+            "OPENAI_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "OPENAI_MODEL": "gemini-2.0-flash",
+            "ENABLE_MOCK_LLM": "false",
+        },
+        clear=False,
+    ):
+        response = TestClient(app).post(
+            "/assistant/chat",
+            json={
+                "prompt": "Patient Name John Doe, Phone 555-123-4567, MRN#998877",
+                "study_type": "rct",
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["usedLLM"] is False
+        assert "placeholder" in body["error"]
+        assert body["privacyAudit"]["redactions_count"] >= 3

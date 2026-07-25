@@ -2,6 +2,7 @@ import io
 import json
 import math
 import os
+import re
 import tempfile
 
 from typing import Any
@@ -106,6 +107,58 @@ def configure_tesseract_path() -> str | None:
 
 
 configured_tesseract_cmd = configure_tesseract_path()
+
+
+def looks_like_placeholder_secret(value: str | None) -> bool:
+    """Return true for documented placeholder values, without logging the secret."""
+    if not value:
+        return False
+
+    normalized = re.sub(r"[\s'\"`]+", "", value).lower()
+    placeholder_markers = (
+        "your_",
+        "your-",
+        "yourapi",
+        "yourrotated",
+        "rotated_api_key",
+        "api_key_here",
+        "placeholder",
+        "changeme",
+        "change_this",
+        "example_key",
+    )
+    return any(marker in normalized for marker in placeholder_markers)
+
+
+def is_local_llm_base_url(base_url: str | None) -> bool:
+    if not base_url:
+        return False
+    normalized = base_url.strip().lower()
+    return normalized.startswith(("http://127.0.0.1", "http://localhost", "http://0.0.0.0"))
+
+
+def get_llm_settings() -> dict[str, Any]:
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    enable_mock = (
+        os.getenv("ENABLE_MOCK_LLM", "").strip().lower() in {"true", "1", "yes"}
+        or api_key == "test-mock-key"
+    )
+    api_key_is_placeholder = looks_like_placeholder_secret(api_key)
+    valid_api_key = bool(api_key) and not api_key_is_placeholder
+    local_base_url = is_local_llm_base_url(base_url)
+
+    return {
+        "apiKey": api_key,
+        "baseUrl": base_url,
+        "mockEnabled": enable_mock,
+        "apiKeyPresent": bool(api_key),
+        "apiKeyLooksPlaceholder": api_key_is_placeholder,
+        "validApiKey": valid_api_key,
+        "localBaseUrl": local_base_url,
+        "configured": bool(enable_mock or valid_api_key or (base_url and local_base_url)),
+        "model": os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o"),
+    }
 
 
 class AssistantRequest(BaseModel):
@@ -803,12 +856,10 @@ def build_fallback_assistant_response(request: AssistantRequest) -> dict[str, An
 
 
 def try_openai_response(request: AssistantRequest) -> dict[str, Any] | None:
-    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    enable_mock = (
-        os.getenv("ENABLE_MOCK_LLM", "").strip().lower() in {"true", "1", "yes"}
-        or api_key == "test-mock-key"
-    )
+    llm_settings = get_llm_settings()
+    api_key = llm_settings["apiKey"] if llm_settings["validApiKey"] else None
+    base_url = llm_settings["baseUrl"]
+    enable_mock = llm_settings["mockEnabled"]
 
     if enable_mock:
         resolved_study_type = request.study_type
@@ -854,7 +905,7 @@ def try_openai_response(request: AssistantRequest) -> dict[str, Any] | None:
             else None,
         }
 
-    if not api_key and not base_url:
+    if not llm_settings["configured"]:
         return None
 
     try:
@@ -870,7 +921,7 @@ def try_openai_response(request: AssistantRequest) -> dict[str, Any] | None:
             client_kwargs["base_url"] = base_url
 
         client = OpenAI(**client_kwargs)
-        model = os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o")
+        model = llm_settings["model"]
 
         resolved_study_type = request.study_type
         if not resolved_study_type and request.study_context:
@@ -959,12 +1010,7 @@ def preprocess_image_for_ocr(file_bytes: bytes) -> np.ndarray:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    enable_mock = (
-        os.getenv("ENABLE_MOCK_LLM", "").strip().lower() in {"true", "1", "yes"}
-        or api_key == "test-mock-key"
-    )
+    llm_settings = get_llm_settings()
 
     return {
         "status": "ok",
@@ -977,10 +1023,12 @@ def health() -> dict[str, Any]:
             "pyreadstat": pyreadstat.__version__,
             "opencv": cv2.__version__,
         },
-        "openaiConfigured": bool(api_key or base_url or enable_mock),
-        "openaiModel": os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o"),
-        "llmBaseUrl": base_url or "https://api.openai.com/v1",
-        "mockLLMEnabled": enable_mock,
+        "openaiConfigured": llm_settings["configured"],
+        "openaiModel": llm_settings["model"],
+        "llmBaseUrl": llm_settings["baseUrl"] or "https://api.openai.com/v1",
+        "llmKeyPresent": llm_settings["apiKeyPresent"],
+        "llmKeyLooksPlaceholder": llm_settings["apiKeyLooksPlaceholder"],
+        "mockLLMEnabled": llm_settings["mockEnabled"],
         "tesseractConfigured": bool(configured_tesseract_cmd),
         "tesseractCommand": configured_tesseract_cmd,
         "knowledgeCatalog": get_catalog_summary(),
@@ -1074,7 +1122,13 @@ async def assistant_chat(request: AssistantRequest) -> dict[str, Any]:
     llm_response = try_openai_response(request)
     if llm_response:
         return llm_response
-    return build_fallback_assistant_response(request)
+    fallback = build_fallback_assistant_response(request)
+    llm_settings = get_llm_settings()
+    if llm_settings["apiKeyLooksPlaceholder"]:
+        fallback["error"] = "LLM API key is a placeholder; provide a fresh valid key to enable live model responses."
+    elif not llm_settings["configured"]:
+        fallback["error"] = "LLM is not configured; provide a valid API key or local OpenAI-compatible base URL."
+    return fallback
 
 
 class KnowledgeQueryBody(BaseModel):

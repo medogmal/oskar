@@ -1,0 +1,11 @@
+{
+  "installCommand": "pnpm --dir clinical-research-platform install --frozen-lockfile",
+  "buildCommand": "pnpm --dir clinical-research-platform build",
+  "outputDirectory": "clinical-research-platform/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
