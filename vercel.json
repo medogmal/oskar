@@ -1,6 +1,6 @@
 {
-  "installCommand": "pnpm --dir clinical-research-platform install --frozen-lockfile",
-  "buildCommand": "pnpm --dir clinical-research-platform build",
+  "installCommand": "cd clinical-research-platform && npm ci",
+  "buildCommand": "cd clinical-research-platform && npm run build",
   "outputDirectory": "clinical-research-platform/dist",
   "rewrites": [
     {
