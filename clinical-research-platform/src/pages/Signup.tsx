@@ -260,7 +260,7 @@ function Signup() {
         errors?: Array<{ field?: string; message?: string }>;
       };
 
-      if (!response.ok) {
+      if (!response.ok || !data.token) {
         const validationMessage = data.errors?.map((item) => item.message).filter(Boolean).join(' ');
         throw new Error(validationMessage || data.message || t('signup.messages.genericError'));
       }

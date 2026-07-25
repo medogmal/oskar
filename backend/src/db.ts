@@ -9,6 +9,7 @@ const getConnectionConfig = (database: string): PoolConfig => ({
   user: process.env.PGUSER || 'postgres',
   password: process.env.PGPASSWORD || undefined,
   database,
+  connectionTimeoutMillis: Number(process.env.PGCONNECT_TIMEOUT_MS || 5000),
 });
 
 let pool: Pool | null = null;

@@ -30,11 +30,11 @@ const PORT = process.env.PORT || 5000;
 
 initializeDatabase()
   .then(() => {
-    console.log('✅ Connected to PostgreSQL');
+    console.log('Connected to PostgreSQL');
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`Server running on port ${PORT}`);
     });
   })
   .catch((error) => {
-    console.error('❌ PostgreSQL connection error:', error);
+    console.error('PostgreSQL connection error:', error);
   });
