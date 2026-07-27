@@ -1,0 +1,57 @@
+{
+  "tree_title": "ClinResearch AI - Variable Classification Tree",
+  "version": "1.0.0",
+  "root": {
+    "question": "Is the variable value numeric (quantitative) or qualitative (categorical/attribute)?",
+    "choices": {
+      "quantitative": {
+        "classification": "Numerical (Quantitative)",
+        "question": "Does the variable represent a measurement on a continuous scale with infinite possible fractional values (e.g., age, pocket depth) or a count of discrete whole integers (e.g., number of implants, teeth count)?",
+        "choices": {
+          "continuous": {
+            "classification": "Continuous Numerical",
+            "description": "Infinite real number values. Normal distribution test applicable.",
+            "examples": ["pocketDepthMm", "clinicalAttachmentLossMm", "patientAge", "systolicBpMmhg"],
+            "recommended_summary": "Mean ± Standard Deviation (if normal) or Median (IQR) (if skewed)."
+          },
+          "discrete": {
+            "classification": "Discrete Numerical",
+            "description": "Countable integer values. Usually skewed distribution.",
+            "examples": ["implantCount", "missingTeethCount", "visitNumber"],
+            "recommended_summary": "Median (IQR) or Mode."
+          }
+        }
+      },
+      "qualitative": {
+        "classification": "Categorical (Qualitative)",
+        "question": "Do the categories have a natural ranking/order (e.g. oral hygiene: poor/fair/good) or are they purely descriptive labels with no logical order (e.g., gender, smoking status, study group)?",
+        "choices": {
+          "ordinal": {
+            "classification": "Ordinal Categorical",
+            "description": "Ranked attributes. Non-parametric methods preferred.",
+            "examples": ["oralHygieneGrade", "painLevelVisualAnalogScale"],
+            "recommended_summary": "Frequency count (Percentage) or Median rank."
+          },
+          "nominal": {
+            "classification": "Nominal Categorical",
+            "question": "Are there exactly two categories (binary) or more than two?",
+            "choices": {
+              "binary": {
+                "classification": "Nominal Binary (Dichotomous)",
+                "description": "Two mutually exclusive states.",
+                "examples": ["smokingStatus", "gender", "hasRandomization", "meetsInclusionCriteria"],
+                "recommended_summary": "Proportions / Percentages."
+              },
+              "polytomous": {
+                "classification": "Nominal Polytomous (Multinomial)",
+                "description": "Three or more unordered classes.",
+                "examples": ["studyGroupAllocation", "treatmentSpecialty"],
+                "recommended_summary": "Frequency distribution (Percentages)."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

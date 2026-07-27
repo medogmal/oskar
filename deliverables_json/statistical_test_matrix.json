@@ -1,0 +1,78 @@
+{
+  "matrix_title": "ClinResearch AI - Statistical Test Selection Matrix",
+  "version": "1.0.0",
+  "matrix": [
+    {
+      "dependent_variable_type": "Continuous / Interval (e.g. pocketDepthMm)",
+      "groups_count": 2,
+      "relationship": "Independent (e.g. Test vs Control Group)",
+      "normality_assumption": "Normal (Parametric)",
+      "recommended_test": "Independent Two-Sample t-Test",
+      "parametric_conditions": "Normality (Shapiro-Wilk p > 0.05) & Homogeneity of Variance (Levene's p > 0.05)",
+      "non_parametric_fallback": "Mann-Whitney U Test (Wilcoxon Rank-Sum Test)",
+      "mathematical_formula": "t = (mean1 - mean2) / sqrt(s_p^2 * (1/n1 + 1/n2))",
+      "scientific_justification": "Used to compare the means of two independent groups when the data follows a normal distribution and has equal variances.",
+      "python_library_call": "scipy.stats.ttest_ind(group1, group2, equal_var=True)"
+    },
+    {
+      "dependent_variable_type": "Continuous / Interval (e.g. pocketDepthMm)",
+      "groups_count": 2,
+      "relationship": "Paired / Repeated Measures (e.g. Pre-op vs Post-op)",
+      "normality_assumption": "Normal (Parametric)",
+      "recommended_test": "Paired Samples t-Test",
+      "parametric_conditions": "Normality of difference scores (Shapiro-Wilk p > 0.05)",
+      "non_parametric_fallback": "Wilcoxon Signed-Rank Test",
+      "mathematical_formula": "t = mean_diff / (sd_diff / sqrt(n))",
+      "scientific_justification": "Used to compare means from the same subjects at two different time points or under matched conditions.",
+      "python_library_call": "scipy.stats.ttest_rel(pre_data, post_data)"
+    },
+    {
+      "dependent_variable_type": "Continuous / Interval (e.g. CAL gain)",
+      "groups_count": 3,
+      "relationship": "Independent (e.g. Group A vs B vs C)",
+      "normality_assumption": "Normal (Parametric)",
+      "recommended_test": "One-Way ANOVA",
+      "parametric_conditions": "Normality of residuals & Homogeneity of variance",
+      "non_parametric_fallback": "Kruskal-Wallis H Test",
+      "mathematical_formula": "F = MS_between / MS_within",
+      "scientific_justification": "Compares means of three or more independent groups. If significant, post-hoc tests (e.g. Tukey's HSD) are applied to locate differences.",
+      "python_library_call": "statsmodels.api.stats.anova_lm(model)"
+    },
+    {
+      "dependent_variable_type": "Continuous / Interval",
+      "groups_count": 3,
+      "relationship": "Paired / Repeated Measures (e.g. T0 vs T1 vs T2)",
+      "normality_assumption": "Normal (Parametric)",
+      "recommended_test": "Repeated Measures ANOVA",
+      "parametric_conditions": "Sphericity assumption (Mauchly's test p > 0.05) & Normality of residuals",
+      "non_parametric_fallback": "Friedman Test",
+      "mathematical_formula": "F = MS_time / MS_error",
+      "scientific_justification": "Compares the means of three or more matched/repeated measurements on the same subjects over time.",
+      "python_library_call": "statsmodels.stats.anova.AnovaRM(data, depvar, subject, within).fit()"
+    },
+    {
+      "dependent_variable_type": "Nominal / Categorical (e.g. smokingStatus)",
+      "groups_count": 2,
+      "relationship": "Independent",
+      "normality_assumption": "Not Applicable",
+      "recommended_test": "Pearson's Chi-Square Test of Independence",
+      "parametric_conditions": "Expected frequency in each cell of the contingency table is at least 5.",
+      "non_parametric_fallback": "Fisher's Exact Test (mandatory if any expected cell frequency is < 5)",
+      "mathematical_formula": "Chi2 = sum((O_i - E_i)^2 / E_i)",
+      "scientific_justification": "Evaluates the association or independence between two categorical variables.",
+      "python_library_call": "scipy.stats.chi2_contingency(table)"
+    },
+    {
+      "dependent_variable_type": "Time-to-Event / Censored (e.g. Implant survival)",
+      "groups_count": 2,
+      "relationship": "Independent",
+      "normality_assumption": "Not Applicable",
+      "recommended_test": "Log-Rank Test (Mantel-Cox)",
+      "parametric_conditions": "Proportional hazards assumption between groups.",
+      "non_parametric_fallback": "Breslow test (Wilcoxon test for survival)",
+      "mathematical_formula": "Chi2 = (sum(O_i - E_i))^2 / sum(Var_i)",
+      "scientific_justification": "Compares the survival distributions of two or more independent groups, accounting for right-censored data.",
+      "python_library_call": "statsmodels.duration.survfunc.SurvfuncRight"
+    }
+  ]
+}

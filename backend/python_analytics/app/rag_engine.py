@@ -265,20 +265,46 @@ class LocalRAGEngine:
                 used_fallback = True
                 attempts.append({"label": "filtered_source", "citationCount": 0, "useful": False})
 
-        # Calculate scores using simple TF-IDF / term overlap match
+        # Calculate scores using semantic-boosted TF-IDF and term-overlap match
         doc_count = max(1, len(candidate_docs))
         scores: list[tuple[float, KnowledgeDocument]] = []
+
+        # Simple semantic synonym catalog for clinical/statistical terms
+        synonyms: dict[str, list[str]] = {
+            "rct": ["randomized", "controlled", "trial", "randomisation", "randomization", "spirit", "consort"],
+            "prospective": ["cohort", "follow-up", "longitudinal", "strobe"],
+            "retrospective": ["cohort", "case-control", "historical", "ehr", "record", "strobe", "record"],
+            "cross_sectional": ["survey", "prevalence", "axis", "epidemiological"],
+            "in_vitro": ["laboratory", "mechanical", "bond", "shear", "composite", "cris", "iso"],
+            "sample_size": ["power", "alpha", "beta", "dropout", "population", "formula"],
+            "normality": ["shapiro", "wilk", "distribution", "parametric"],
+            "variance": ["levene", "homogeneity", "anova", "t-test"],
+            "blinding": ["masked", "double-blind", "single-blind", "concealment"],
+            "systematic_review": ["prisma", "prospero", "amstar", "cochrane", "review"],
+            "meta_analysis": ["prisma", "moose", "heterogeneity", "egger", "funnel", "pooling"],
+        }
 
         for doc in effective_docs:
             if not doc.tokens:
                 continue
             score = 0.0
             for qt in q_tokens:
+                # Direct term match (TF-IDF)
                 tf = doc.tokens.count(qt) / len(doc.tokens)
+                df = sum(1 for d in candidate_docs if qt in d.tokens)
+                idf = math.log((doc_count + 1) / (df + 1)) + 1.0
+                
                 if tf > 0:
-                    df = sum(1 for d in candidate_docs if qt in d.tokens)
-                    idf = math.log((doc_count + 1) / (df + 1)) + 1.0
                     score += tf * idf
+                
+                # Semantic boosting via synonym match
+                for key, syns in synonyms.items():
+                    if qt in syns or qt == key:
+                        # Check if document belongs to this category or contains the synonyms
+                        matches_syn = sum(1 for s in syns if s in doc.tokens)
+                        if matches_syn > 0:
+                            score += (matches_syn / len(doc.tokens)) * idf * 0.5
+
             if score > 0:
                 scores.append((score, doc))
 
@@ -291,10 +317,18 @@ class LocalRAGEngine:
                 score = 0.0
                 for qt in q_tokens:
                     tf = doc.tokens.count(qt) / len(doc.tokens)
+                    df = sum(1 for d in candidate_docs if qt in d.tokens)
+                    idf = math.log((doc_count + 1) / (df + 1)) + 1.0
+                    
                     if tf > 0:
-                        df = sum(1 for d in candidate_docs if qt in d.tokens)
-                        idf = math.log((doc_count + 1) / (df + 1)) + 1.0
                         score += tf * idf
+                        
+                    for key, syns in synonyms.items():
+                        if qt in syns or qt == key:
+                            matches_syn = sum(1 for s in syns if s in doc.tokens)
+                            if matches_syn > 0:
+                                score += (matches_syn / len(doc.tokens)) * idf * 0.5
+                                
                 if score > 0:
                     scores.append((score, doc))
 

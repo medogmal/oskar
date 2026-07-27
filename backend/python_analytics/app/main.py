@@ -35,7 +35,7 @@ if env_file.exists():
 else:
     load_dotenv()
 
-from .clinical_validation import validate_clinical_parameters
+from .clinical_validation import validate_clinical_parameters, validate_crf_template
 from .knowledge_catalog import (
     STUDY_TYPE_LABELS,
     VALID_STUDY_TYPES,
@@ -1596,8 +1596,27 @@ def build_crf_generation_result(request: AssistantRequest) -> dict[str, Any]:
     specialty = infer_dental_specialty(text, study_meta)
     extraction = build_proposal_extraction_layer(text, study_meta)
     validation = build_validation_layer(text, study_type, study_meta)
-    missing_information = [item["message"] for item in validation if item["status"] in {"missing", "warning"}]
     fields = build_crf_fields(text, study_type, specialty, study_meta)
+    
+    # Run Variable Conflict, Duplicate, and SAP Compatibility validation
+    crf_val = validate_crf_template(fields, study_type)
+    
+    for err in crf_val["errors"]:
+        validation.append({
+            "id": "crf_validation_error",
+            "status": "missing",
+            "severity": "critical",
+            "message": err
+        })
+    for warn in crf_val["warnings"]:
+        validation.append({
+            "id": "crf_validation_warning",
+            "status": "warning",
+            "severity": "warning",
+            "message": warn
+        })
+        
+    missing_information = [item["message"] for item in validation if item["status"] in {"missing", "warning"}]
     knowledge_context = get_knowledge_context(request)
     citations = knowledge_context.get("citations") if isinstance(knowledge_context.get("citations"), list) else []
     sample_size = extract_numeric_sample_size(text, study_meta)

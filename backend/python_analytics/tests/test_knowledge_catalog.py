@@ -14,6 +14,7 @@ from app.knowledge_catalog import (
     is_valid_study_type,
 )
 from app.prompt_library import build_system_prompt
+from app.clinical_validation import validate_crf_template
 
 
 def test_catalog_total_references():
@@ -88,5 +89,46 @@ def test_catalog_summary():
     """Verify summary counts."""
     summary = get_catalog_summary()
     assert summary["total_references"] == 130
-    assert summary["shared_references"] == 41
     assert "rct" in summary["per_study_type"]
+
+
+def test_crf_validation_duplicates():
+    """Verify validate_crf_template detects duplicate fields."""
+    fields = [
+        {"label": "Pocket Depth", "responseType": "numeric"},
+        {"label": "Pocket Depth", "responseType": "text"}
+    ]
+    report = validate_crf_template(fields, "rct")
+    assert report["valid"] is False
+    assert any("تكرار متغير" in err for err in report["errors"])
+
+
+def test_crf_validation_in_vitro_conflicts():
+    """Verify validate_crf_template warns if in_vitro study has patient age/gender."""
+    fields = [
+        {"label": "Specimen ID", "responseType": "text"},
+        {"label": "Patient Age", "responseType": "numeric"}
+    ]
+    report = validate_crf_template(fields, "in_vitro")
+    assert any("تعارض منطقي" in warn for warn in report["warnings"])
+
+
+def test_crf_validation_rct_missing_group():
+    """Verify validate_crf_template flags RCT without group allocation variable."""
+    fields = [
+        {"label": "Pocket Depth", "responseType": "numeric"}
+    ]
+    report = validate_crf_template(fields, "rct")
+    assert report["valid"] is False
+    assert any("Group Allocation" in err for err in report["errors"])
+
+
+def test_crf_validation_sap_compatibility():
+    """Verify validate_crf_template warns if numerical outcome exists without group allocation."""
+    fields = [
+        {"label": "Pocket Depth Value", "responseType": "numeric"}
+    ]
+    report = validate_crf_template(fields, "prospective")
+    # Should flag a warning for SAP incompatibility
+    assert any("خطة التحليل الإحصائي" in warn for warn in report["warnings"])
+

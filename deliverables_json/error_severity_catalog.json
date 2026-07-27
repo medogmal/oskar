@@ -1,0 +1,96 @@
+{
+  "catalog_title": "ClinResearch AI - Unified Error & Severity Catalog",
+  "version": "1.0.0",
+  "errors": [
+    {
+      "id": "ERR_METH_001",
+      "label": "Missing Primary Outcome",
+      "category": "Methodological (منهجية)",
+      "severity": "Critical",
+      "description": "The primary outcome measure is not explicitly defined in the research protocol. The study has no clear target for success or sample size justification.",
+      "correction_method": "Define exactly one primary outcome, specify its measurement method, unit of measurement, and assessment time-points.",
+      "reference_guideline": "SPIRIT 2013 (Item 12) & CONSORT 2010 (Item 6a)"
+    },
+    {
+      "id": "ERR_METH_002",
+      "label": "Undocumented Randomization",
+      "category": "Methodological (منهجية)",
+      "severity": "Critical",
+      "description": "The protocol states it is a Randomized Controlled Trial (RCT) but fails to specify the method of sequence generation or block sizes.",
+      "correction_method": "Specify sequence generation (e.g. computer random number generator, block size of 4 or 6, stratified by center).",
+      "reference_guideline": "CONSORT 2010 (Item 8a - Sequence Generation)"
+    },
+    {
+      "id": "ERR_METH_003",
+      "label": "Missing Blinding Specifications",
+      "category": "Methodological (منهجية)",
+      "severity": "High",
+      "description": "For an RCT, the protocol does not clarify who will be blinded (e.g. participant, operator, outcome assessor).",
+      "correction_method": "Clarify the blinding status of all key actors. If blinding is not possible (e.g. open surgery vs placebo), state why and how detection bias will be controlled.",
+      "reference_guideline": "SPIRIT 2013 (Item 17a - Blinding)"
+    },
+    {
+      "id": "ERR_STAT_001",
+      "label": "Incomplete Sample Size Parameter Set",
+      "category": "Statistical (إحصائية)",
+      "severity": "Critical",
+      "description": "The sample size calculation lacks one or more critical inputs: alpha, power, expected difference/effect size, or dropout rate.",
+      "correction_method": "Provide all inputs: alpha (usually 0.05), power (typically 0.80 or 0.90), effect size (with scientific citation or justification), and expected attrition.",
+      "reference_guideline": "Rosner Fundamentals of Biostatistics & Chow Sample Size Calculations"
+    },
+    {
+      "id": "ERR_STAT_002",
+      "label": "Unjustified Normality Assumption",
+      "category": "Statistical (إحصائية)",
+      "severity": "High",
+      "description": "Using parametric statistical tests (like t-test or ANOVA) on sample distributions without testing normality or addressing non-normality.",
+      "correction_method": "Verify distribution using Shapiro-Wilk or Kolmogorov-Smirnov test. If distributions violate normality, utilize non-parametric tests (e.g. Mann-Whitney U, Kruskal-Wallis).",
+      "reference_guideline": "Altman Practical Statistics for Medical Research (Normality Assumptions)"
+    },
+    {
+      "id": "ERR_STAT_003",
+      "label": "Unaddressed Confounding in Observational Study",
+      "category": "Statistical (إحصائية)",
+      "severity": "High",
+      "description": "Running unadjusted statistical tests on cohort or retrospective studies without controlling for baseline covariates.",
+      "correction_method": "Use propensity score matching (PSM), multivariable regression models, or stratified analysis to adjust for potential confounders.",
+      "reference_guideline": "STROBE Statement (Item 12 - Statistical Methods for Confounding)"
+    },
+    {
+      "id": "ERR_DATA_001",
+      "label": "Out of Range Clinical Value",
+      "category": "Data (بيانات)",
+      "severity": "High",
+      "description": "Clinical value entered for patient metrics exceeds physiological boundaries (e.g., patientAge = 150, pocketDepth = -1.0).",
+      "correction_method": "Re-measure and cross-check clinical input against the verified physiological guidelines catalog.",
+      "reference_guideline": "WHO Health Data Standards & Clinical Rules Catalog"
+    },
+    {
+      "id": "ERR_DATA_002",
+      "label": "Duplicate Patient ID in CRF",
+      "category": "Data (بيانات)",
+      "severity": "Critical",
+      "description": "An identifier code for a subject (e.g. PT-001) has been entered multiple times for the same visit point.",
+      "correction_method": "Assign unique codes for subjects or correct patient identifier entry mismatch.",
+      "reference_guideline": "CDISC SDTM Standards (Subject Identifiers)"
+    },
+    {
+      "id": "ERR_CLIN_001",
+      "label": "Extreme Periodontal Destruction Warning",
+      "category": "Clinical (سريرية)",
+      "severity": "Moderate",
+      "description": "Pocket depth exceeds 6.0 mm or Clinical Attachment Loss (CAL) exceeds 5.0 mm, indicating severe periodontitis.",
+      "correction_method": "Initiate advanced clinical intervention protocol (SRP or surgical root planing) and notify clinical principal investigator.",
+      "reference_guideline": "AAP/EFP 2017 Periodontal Classification Guidelines"
+    },
+    {
+      "id": "ERR_CLIN_002",
+      "label": "Procedural Hypertension Alert",
+      "category": "Clinical (سريرية)",
+      "severity": "Moderate",
+      "description": "Patient's systolic BP exceeds 140 mmHg or diastolic exceeds 90 mmHg prior to surgery / procedure.",
+      "correction_method": "Wait for 10 minutes and re-measure BP. Avoid high-epinephrine local anesthetics if pressure remains hypertensive.",
+      "reference_guideline": "AHA/ACC Clinical Hypertension Standards"
+    }
+  ]
+}
