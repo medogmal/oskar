@@ -1,0 +1,73 @@
+{
+  "study_design_classification_tree": {
+    "root": "Is clinical trial or observational?",
+    "nodes": {
+      "clinical_trial": {
+        "question": "Is randomization used?",
+        "yes": "RCT",
+        "no": "Non-Randomized Clinical Trial"
+      },
+      "observational": {
+        "question": "Is there a follow-up period?",
+        "yes": {
+          "question": "Is data collected forward in time?",
+          "yes": "Prospective Cohort Study",
+          "no": "Retrospective Study"
+        },
+        "no": "Cross-Sectional Study"
+      }
+    }
+  },
+  "sample_size_decision_tree": {
+    "independent_t_test": {
+      "formula": "n = 2 * ((z_alpha + z_beta) / d)^2",
+      "required_parameters": [
+        "alpha",
+        "power",
+        "effect_size",
+        "ratio"
+      ],
+      "description": "Used for comparing two independent group means."
+    },
+    "paired_t_test": {
+      "formula": "n = ((z_alpha + z_beta) / d)^2",
+      "required_parameters": [
+        "alpha",
+        "power",
+        "effect_size"
+      ],
+      "description": "Used for comparing matched pairs or pre/post test means."
+    },
+    "two_proportion_z_test": {
+      "formula": "n = (z_alpha * sqrt(2*p_bar*q_bar) + z_beta * sqrt(p1*q1 + p2*q2))^2 / diff^2",
+      "required_parameters": [
+        "alpha",
+        "power",
+        "p1",
+        "p2"
+      ],
+      "description": "Used for comparing two independent group proportions."
+    },
+    "anova": {
+      "formula": "n = ((z_alpha + z_beta) / f)^2 / (2 * k) + 2",
+      "required_parameters": [
+        "alpha",
+        "power",
+        "effect_size",
+        "k_groups"
+      ],
+      "description": "Used for comparing three or more independent group means."
+    },
+    "repeated_measures_anova": {
+      "formula": "n = ((z_alpha + z_beta) / f)^2 * (1 - corr) / k + 3",
+      "required_parameters": [
+        "alpha",
+        "power",
+        "effect_size",
+        "measures_count",
+        "correlation"
+      ],
+      "description": "Used for comparing means of same subjects measured repeatedly."
+    }
+  }
+}

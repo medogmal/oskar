@@ -1,0 +1,1486 @@
+{
+  "study_type_labels": {
+    "rct": {
+      "en": "Randomized Controlled Trial (RCT)",
+      "ar": "تجربة عشوائية مضبوطة (RCT)",
+      "short_en": "RCT"
+    },
+    "prospective": {
+      "en": "Prospective Study",
+      "ar": "دراسة استباقية (مستقبلية)",
+      "short_en": "Prospective"
+    },
+    "retrospective": {
+      "en": "Retrospective Study",
+      "ar": "دراسة استرجاعية",
+      "short_en": "Retrospective"
+    },
+    "cross_sectional": {
+      "en": "Cross-Sectional Study",
+      "ar": "دراسة مقطعية",
+      "short_en": "Cross-Sectional"
+    },
+    "in_vitro": {
+      "en": "In Vitro Study",
+      "ar": "دراسة مخبرية (In Vitro)",
+      "short_en": "In Vitro"
+    }
+  },
+  "valid_study_types": [
+    "rct",
+    "prospective",
+    "retrospective",
+    "cross_sectional",
+    "in_vitro"
+  ],
+  "references": [
+    {
+      "id": "SPIRIT_2013",
+      "title": "SPIRIT 2013 Statement",
+      "category": "protocol_design",
+      "subcategory": "تصميم البروتوكول",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Standard Protocol Items: Recommendations for Interventional Trials",
+      "description_ar": "بيان المعايير الموحدة لبنود البروتوكول"
+    },
+    {
+      "id": "SPIRIT_EXPLANATION",
+      "title": "SPIRIT Explanation & Elaboration",
+      "category": "protocol_design",
+      "subcategory": "تصميم البروتوكول",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Guidance document for the SPIRIT 2013 statement",
+      "description_ar": "وثيقة الشرح والتوضيح لبيان SPIRIT"
+    },
+    {
+      "id": "SPIRIT_CHECKLIST",
+      "title": "SPIRIT Checklist",
+      "category": "protocol_design",
+      "subcategory": "تصميم البروتوكول",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "SPIRIT 2013 protocol checklist",
+      "description_ar": "قائمة التحقق لبروتوكول SPIRIT"
+    },
+    {
+      "id": "SPIRIT_SCHEDULE",
+      "title": "SPIRIT Schedule of Enrolment Figure",
+      "category": "protocol_design",
+      "subcategory": "تصميم البروتوكول",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Template for scheduling study enrolment and interventions",
+      "description_ar": "نموذج جدول التسجيل والتدخلات"
+    },
+    {
+      "id": "CONSORT_2010",
+      "title": "CONSORT 2010 Statement",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Consolidated Standards of Reporting Trials",
+      "description_ar": "المعايير الموحدة لإعداد تقارير التجارب"
+    },
+    {
+      "id": "CONSORT_EXPLANATION",
+      "title": "CONSORT Explanation & Elaboration",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Detailed guidance for CONSORT items",
+      "description_ar": "التوضيح التفصيلي لبنود CONSORT"
+    },
+    {
+      "id": "CONSORT_CHECKLIST",
+      "title": "CONSORT Checklist",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "CONSORT 2010 reporting checklist",
+      "description_ar": "قائمة التحقق للإعداد وفق CONSORT"
+    },
+    {
+      "id": "CONSORT_FLOW",
+      "title": "CONSORT Flow Diagram",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Flow diagram template for participant flow",
+      "description_ar": "مخطط تدفق المشاركين"
+    },
+    {
+      "id": "CONSORT_HARMS",
+      "title": "CONSORT Harms Extension",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for reporting harms in RCTs",
+      "description_ar": "امتداد إعداد تقارير الأضرار"
+    },
+    {
+      "id": "CONSORT_ABSTRACTS",
+      "title": "CONSORT for Abstracts",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for conference abstracts",
+      "description_ar": "امتداد للملخصات المؤتمرية"
+    },
+    {
+      "id": "CONSORT_PRO",
+      "title": "CONSORT-PRO (Patient-Reported Outcomes)",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for patient-reported outcomes",
+      "description_ar": "امتداد النتائج المبلّغة من المرضى"
+    },
+    {
+      "id": "CONSORT_AI",
+      "title": "CONSORT-AI",
+      "category": "reporting",
+      "subcategory": "إعداد ونشر الدراسة",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for AI interventions in RCTs",
+      "description_ar": "امتداد تدخلات الذكاء الاصطناعي"
+    },
+    {
+      "id": "CONSORT_CLUSTER",
+      "title": "CONSORT Cluster Randomized Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for cluster-randomized trials",
+      "description_ar": "امتداد التجارب العنقودية العشوائية"
+    },
+    {
+      "id": "CONSORT_CROSSOVER",
+      "title": "CONSORT Cross-over Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for cross-over trial designs",
+      "description_ar": "امتداد التجارب التبادلية"
+    },
+    {
+      "id": "CONSORT_NONINFERIORITY",
+      "title": "CONSORT Non-Inferiority Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for non-inferiority and equivalence trials",
+      "description_ar": "امتداد تجارب عدم الأدنوية"
+    },
+    {
+      "id": "CONSORT_EQUIVALENCE",
+      "title": "CONSORT Equivalence Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for equivalence trials",
+      "description_ar": "امتداد تجارب التكافؤ"
+    },
+    {
+      "id": "CONSORT_PRAGMATIC",
+      "title": "CONSORT Pragmatic Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for pragmatic trial designs",
+      "description_ar": "امتداد التجارب البراغماتية"
+    },
+    {
+      "id": "CONSORT_ADAPTIVE",
+      "title": "CONSORT Adaptive Clinical Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for adaptive trial designs",
+      "description_ar": "امتداد التجارب التكيفية"
+    },
+    {
+      "id": "CONSORT_PILOT",
+      "title": "CONSORT Pilot Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for pilot and feasibility studies",
+      "description_ar": "امتداد التجارب التجريبية"
+    },
+    {
+      "id": "CONSORT_FEASIBILITY",
+      "title": "CONSORT Feasibility Trials",
+      "category": "reporting_extension",
+      "subcategory": "امتدادات CONSORT",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Extension for feasibility study designs",
+      "description_ar": "امتداد دراسات الجدوى"
+    },
+    {
+      "id": "ICH_E6R3",
+      "title": "ICH E6(R3)",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Good Clinical Practice guideline",
+      "description_ar": "إرشادات الممارسة السريرية الجيدة"
+    },
+    {
+      "id": "ICH_E8R1",
+      "title": "ICH E8(R1)",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "General Considerations for Clinical Studies",
+      "description_ar": "اعتبارات عامة للدراسات السريرية"
+    },
+    {
+      "id": "ICH_E9",
+      "title": "ICH E9",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Statistical Principles for Clinical Trials",
+      "description_ar": "المبادئ الإحصائية للتجارب السريرية"
+    },
+    {
+      "id": "ICH_E9R1",
+      "title": "ICH E9(R1)",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Estimands and Sensitivity Analysis",
+      "description_ar": "المقدّرات وتحليل الحساسية"
+    },
+    {
+      "id": "ICH_E3",
+      "title": "ICH E3",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Structure and Content of Clinical Study Reports",
+      "description_ar": "هيكل ومحتوى تقارير الدراسة السريرية"
+    },
+    {
+      "id": "ICH_E2A",
+      "title": "ICH E2A",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Clinical Safety Data Management",
+      "description_ar": "إدارة بيانات السلامة السريرية"
+    },
+    {
+      "id": "ICH_E2BR3",
+      "title": "ICH E2B(R3)",
+      "category": "clinical_practice",
+      "subcategory": "الممارسات السريرية",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Electronic Transmission of Safety Reports",
+      "description_ar": "النقل الإلكتروني لتقارير السلامة"
+    },
+    {
+      "id": "SAMPLE_SIZE_CLINICAL",
+      "title": "Sample Size Calculations in Clinical Research",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "prospective"
+      ],
+      "description_en": "Comprehensive guide to sample size determination",
+      "description_ar": "دليل شامل لحساب حجم العينة"
+    },
+    {
+      "id": "COHEN_POWER",
+      "title": "Statistical Power Analysis (Cohen)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "in_vitro"
+      ],
+      "description_en": "Cohen's power analysis for behavioral sciences",
+      "description_ar": "تحليل القوة الإحصائية لكوهين"
+    },
+    {
+      "id": "PRACTICAL_STATS_MED",
+      "title": "Practical Statistics for Medical Research",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "in_vitro"
+      ],
+      "description_en": "Altman's practical statistics for medical research",
+      "description_ar": "الإحصاء التطبيقي للبحوث الطبية"
+    },
+    {
+      "id": "FUNDAMENTALS_BIOSTATS",
+      "title": "Fundamentals of Biostatistics",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Rosner's biostatistics fundamentals",
+      "description_ar": "أساسيات الإحصاء الحيوي"
+    },
+    {
+      "id": "ITT_ANALYSIS",
+      "title": "Intention-to-Treat (ITT)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "prospective"
+      ],
+      "description_en": "Intention-to-treat analysis methodology",
+      "description_ar": "منهجية تحليل نية العلاج"
+    },
+    {
+      "id": "PER_PROTOCOL",
+      "title": "Per-Protocol Analysis",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "prospective"
+      ],
+      "description_en": "Per-protocol analysis methodology",
+      "description_ar": "منهجية التحليل وفق البروتوكول"
+    },
+    {
+      "id": "MICE_IMPUTATION",
+      "title": "Multiple Imputation (MICE)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct",
+        "prospective",
+        "retrospective"
+      ],
+      "description_en": "Multiple Imputation by Chained Equations",
+      "description_ar": "التعويض المتعدد بالمعادلات المتسلسلة"
+    },
+    {
+      "id": "EFFECT_SIZE_INTERP",
+      "title": "Effect Size Interpretation",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Guidelines for interpreting effect sizes",
+      "description_ar": "إرشادات تفسير حجم الأثر"
+    },
+    {
+      "id": "STAT_DECISION_TREE",
+      "title": "Statistical Decision Tree",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Decision tree for statistical test selection",
+      "description_ar": "شجرة قرار اختيار الاختبار الإحصائي"
+    },
+    {
+      "id": "ASSUMPTION_CHECKING",
+      "title": "Assumption Checking (Normality, Homogeneity, Independence)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Methods for checking statistical assumptions",
+      "description_ar": "طرق فحص الافتراضات الإحصائية"
+    },
+    {
+      "id": "ROB2",
+      "title": "RoB 2",
+      "category": "bias_assessment",
+      "subcategory": "تقييم التحيز",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Revised Cochrane risk-of-bias tool for randomized trials",
+      "description_ar": "أداة كوكرين المعدلة لتقييم خطر التحيز"
+    },
+    {
+      "id": "GRADE",
+      "title": "GRADE",
+      "category": "bias_assessment",
+      "subcategory": "تقييم التحيز",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Grading of Recommendations, Assessment, Development and Evaluations",
+      "description_ar": "نظام تصنيف الأدلة وقوة التوصيات"
+    },
+    {
+      "id": "COCHRANE_HANDBOOK",
+      "title": "Cochrane Handbook",
+      "category": "bias_assessment",
+      "subcategory": "تقييم التحيز",
+      "study_types": [
+        "rct"
+      ],
+      "description_en": "Cochrane Handbook for Systematic Reviews of Interventions",
+      "description_ar": "دليل كوكرين للمراجعات المنهجية"
+    },
+    {
+      "id": "STROBE_STATEMENT",
+      "title": "STROBE Statement",
+      "category": "reporting",
+      "subcategory": "تصميم الدراسة",
+      "study_types": [
+        "prospective",
+        "retrospective",
+        "cross_sectional"
+      ],
+      "description_en": "Strengthening the Reporting of Observational Studies in Epidemiology",
+      "description_ar": "تعزيز إعداد تقارير الدراسات الرصدية"
+    },
+    {
+      "id": "STROBE_EXPLANATION",
+      "title": "STROBE Explanation",
+      "category": "reporting",
+      "subcategory": "تصميم الدراسة",
+      "study_types": [
+        "prospective",
+        "retrospective",
+        "cross_sectional"
+      ],
+      "description_en": "STROBE explanation and elaboration",
+      "description_ar": "شرح وتوضيح STROBE"
+    },
+    {
+      "id": "STROBE_CHECKLIST",
+      "title": "STROBE Checklist",
+      "category": "reporting",
+      "subcategory": "تصميم الدراسة",
+      "study_types": [
+        "prospective",
+        "retrospective",
+        "cross_sectional"
+      ],
+      "description_en": "STROBE reporting checklist",
+      "description_ar": "قائمة التحقق لإعداد التقارير وفق STROBE"
+    },
+    {
+      "id": "NOS",
+      "title": "Newcastle-Ottawa Scale (NOS)",
+      "category": "quality_assessment",
+      "subcategory": "جودة الدراسة",
+      "study_types": [
+        "prospective",
+        "retrospective"
+      ],
+      "description_en": "Quality assessment scale for cohort and case-control studies",
+      "description_ar": "مقياس تقييم جودة الدراسات الرصدية"
+    },
+    {
+      "id": "ROBINS_E",
+      "title": "ROBINS-E",
+      "category": "quality_assessment",
+      "subcategory": "جودة الدراسة",
+      "study_types": [
+        "prospective",
+        "retrospective"
+      ],
+      "description_en": "Risk of Bias In Non-randomised Studies of Exposures",
+      "description_ar": "أداة تقييم خطر التحيز في الدراسات غير العشوائية"
+    },
+    {
+      "id": "KAPLAN_MEIER",
+      "title": "Kaplan-Meier Survival Analysis",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "prospective"
+      ],
+      "description_en": "Kaplan-Meier estimator for survival curves",
+      "description_ar": "تحليل البقاء بطريقة كابلان-ماير"
+    },
+    {
+      "id": "COX_MODEL",
+      "title": "Cox Proportional Hazards Model",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "prospective"
+      ],
+      "description_en": "Cox regression for survival data",
+      "description_ar": "نموذج كوكس للمخاطر النسبية"
+    },
+    {
+      "id": "LMM",
+      "title": "Linear Mixed Models (LMM)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "prospective"
+      ],
+      "description_en": "Linear mixed-effects models for longitudinal data",
+      "description_ar": "النماذج الخطية المختلطة"
+    },
+    {
+      "id": "GEE",
+      "title": "Generalized Estimating Equations (GEE)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "prospective"
+      ],
+      "description_en": "GEE for correlated data in longitudinal studies",
+      "description_ar": "معادلات التقدير المعممة"
+    },
+    {
+      "id": "RM_ANOVA_PROSP",
+      "title": "Repeated Measures ANOVA",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "prospective",
+        "in_vitro"
+      ],
+      "description_en": "ANOVA for repeated measurements",
+      "description_ar": "تحليل التباين للقياسات المتكررة"
+    },
+    {
+      "id": "MISSING_DATA_MGMT",
+      "title": "Missing Data Management",
+      "category": "data_management",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "prospective",
+        "retrospective"
+      ],
+      "description_en": "Methods for handling missing data",
+      "description_ar": "طرق التعامل مع البيانات المفقودة"
+    },
+    {
+      "id": "LONGITUDINAL_DATA",
+      "title": "Longitudinal Data Analysis",
+      "category": "data_management",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "prospective"
+      ],
+      "description_en": "Analysis methods for longitudinal studies",
+      "description_ar": "طرق تحليل البيانات الطولية"
+    },
+    {
+      "id": "RECORD",
+      "title": "RECORD Statement",
+      "category": "reporting",
+      "subcategory": "تصميم الدراسة",
+      "study_types": [
+        "retrospective"
+      ],
+      "description_en": "Reporting of studies Conducted using Observational Routinely-collected health Data",
+      "description_ar": "إعداد تقارير الدراسات المعتمدة على السجلات الصحية"
+    },
+    {
+      "id": "LOGISTIC_REG",
+      "title": "Logistic Regression",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "retrospective",
+        "cross_sectional"
+      ],
+      "description_en": "Logistic regression for binary outcomes",
+      "description_ar": "الانحدار اللوجستي للنتائج الثنائية"
+    },
+    {
+      "id": "MULTIPLE_REG",
+      "title": "Multiple Regression",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "retrospective"
+      ],
+      "description_en": "Multiple linear regression analysis",
+      "description_ar": "تحليل الانحدار الخطي المتعدد"
+    },
+    {
+      "id": "PSM",
+      "title": "Propensity Score Matching",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "retrospective"
+      ],
+      "description_en": "Propensity score methods for observational studies",
+      "description_ar": "مطابقة درجة الميل"
+    },
+    {
+      "id": "DATA_ABSTRACTION",
+      "title": "Data Abstraction Standards",
+      "category": "data_management",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "retrospective"
+      ],
+      "description_en": "Standards for abstracting data from records",
+      "description_ar": "معايير استخراج البيانات من السجلات"
+    },
+    {
+      "id": "DATA_QUALITY",
+      "title": "Data Quality Assessment",
+      "category": "data_management",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "retrospective"
+      ],
+      "description_en": "Methods for assessing data quality",
+      "description_ar": "طرق تقييم جودة البيانات"
+    },
+    {
+      "id": "AXIS_TOOL",
+      "title": "AXIS Tool",
+      "category": "quality_assessment",
+      "subcategory": "جودة الدراسة",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Appraisal tool for Cross-Sectional Studies",
+      "description_ar": "أداة تقييم الدراسات المقطعية"
+    },
+    {
+      "id": "JBI_CROSS",
+      "title": "JBI Checklist for Analytical Cross-Sectional Studies",
+      "category": "quality_assessment",
+      "subcategory": "جودة الدراسة",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "JBI critical appraisal checklist",
+      "description_ar": "قائمة JBI للتقييم النقدي"
+    },
+    {
+      "id": "COCHRAN_FORMULA",
+      "title": "Cochran Sample Size Formula",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Cochran's formula for survey sample size",
+      "description_ar": "معادلة كوكران لحجم العينة"
+    },
+    {
+      "id": "DESIGN_EFFECT",
+      "title": "Design Effect (Deff)",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Design effect adjustment for cluster sampling",
+      "description_ar": "تعديل تأثير التصميم"
+    },
+    {
+      "id": "SURVEY_WEIGHTS",
+      "title": "Survey Weights",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Survey weighting methodology",
+      "description_ar": "منهجية أوزان المسوح"
+    },
+    {
+      "id": "CHI_SQUARE_REF",
+      "title": "Chi-square",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Chi-square test for categorical data",
+      "description_ar": "اختبار كاي تربيع"
+    },
+    {
+      "id": "POISSON_REG",
+      "title": "Poisson Regression",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Poisson regression for count data",
+      "description_ar": "انحدار بواسون"
+    },
+    {
+      "id": "PREVALENCE_RATIO",
+      "title": "Prevalence Ratio Analysis",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Prevalence ratio analysis methods",
+      "description_ar": "تحليل نسبة الانتشار"
+    },
+    {
+      "id": "DMFT",
+      "title": "DMFT / dmft",
+      "category": "dental_index",
+      "subcategory": "مؤشرات المسوح الوبائية",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Decayed, Missing, Filled Teeth index",
+      "description_ar": "مؤشر الأسنان المسوسة والمفقودة والمحشوة"
+    },
+    {
+      "id": "CPI",
+      "title": "CPI / CPITN",
+      "category": "dental_index",
+      "subcategory": "مؤشرات المسوح الوبائية",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Community Periodontal Index",
+      "description_ar": "مؤشر اللثة المجتمعي"
+    },
+    {
+      "id": "DEANS_FLUOROSIS",
+      "title": "Dean's Fluorosis Index",
+      "category": "dental_index",
+      "subcategory": "مؤشرات المسوح الوبائية",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "Dean's index for dental fluorosis classification",
+      "description_ar": "مؤشر دين لتصنيف التسمم بالفلور"
+    },
+    {
+      "id": "WHO_ORAL_SURVEYS",
+      "title": "WHO Oral Health Surveys",
+      "category": "dental_index",
+      "subcategory": "مؤشرات المسوح الوبائية",
+      "study_types": [
+        "cross_sectional"
+      ],
+      "description_en": "WHO basic methods for oral health surveys",
+      "description_ar": "الطرق الأساسية لمسوح صحة الفم"
+    },
+    {
+      "id": "CRIS_GUIDELINES",
+      "title": "CRIS Guidelines",
+      "category": "reporting",
+      "subcategory": "تصميم الدراسة",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Checklist for Reporting In-vitro Studies",
+      "description_ar": "قائمة التحقق لإعداد تقارير الدراسات المخبرية"
+    },
+    {
+      "id": "ISO_4049",
+      "title": "ISO 4049",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Polymer-based restorative materials",
+      "description_ar": "مواد الترميم القائمة على البوليمر"
+    },
+    {
+      "id": "ISO_7405",
+      "title": "ISO 7405",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Preclinical evaluation of biocompatibility",
+      "description_ar": "تقييم التوافق الحيوي قبل السريري"
+    },
+    {
+      "id": "ISO_10993",
+      "title": "ISO 10993",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Biological evaluation of medical devices",
+      "description_ar": "التقييم الحيوي للأجهزة الطبية"
+    },
+    {
+      "id": "ISO_6876",
+      "title": "ISO 6876",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Root canal sealing materials",
+      "description_ar": "مواد إغلاق القنوات الجذرية"
+    },
+    {
+      "id": "ISO_9917",
+      "title": "ISO 9917",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Water-based dental cements",
+      "description_ar": "الإسمنتات السنية المائية"
+    },
+    {
+      "id": "ISO_3630",
+      "title": "ISO 3630",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Endodontic instruments",
+      "description_ar": "أدوات علاج الجذور"
+    },
+    {
+      "id": "ISO_22674",
+      "title": "ISO 22674",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Metallic materials for fixed and removable restorations",
+      "description_ar": "المواد المعدنية للتعويضات الثابتة والمتحركة"
+    },
+    {
+      "id": "ISO_11405",
+      "title": "ISO 11405 (Dental Adhesion Testing)",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Testing of adhesion to tooth structure",
+      "description_ar": "اختبار الالتصاق ببنية السن"
+    },
+    {
+      "id": "ISO_29022",
+      "title": "ISO 29022 (Micro-shear Bond Strength Testing)",
+      "category": "iso_standard",
+      "subcategory": "المواد السنية",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Adhesion test for micro-shear bond strength",
+      "description_ar": "اختبار قوة الربط بالقص المجهري"
+    },
+    {
+      "id": "ANOVA_REF",
+      "title": "ANOVA",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Analysis of Variance",
+      "description_ar": "تحليل التباين"
+    },
+    {
+      "id": "INDEP_TTEST",
+      "title": "Independent t-test",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Independent samples t-test",
+      "description_ar": "اختبار ت للعينات المستقلة"
+    },
+    {
+      "id": "PAIRED_TTEST",
+      "title": "Paired t-test",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Paired samples t-test",
+      "description_ar": "اختبار ت للعينات المقترنة"
+    },
+    {
+      "id": "MANN_WHITNEY_REF",
+      "title": "Mann-Whitney U",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Mann-Whitney U nonparametric test",
+      "description_ar": "اختبار مان-ويتني يو"
+    },
+    {
+      "id": "WILCOXON_REF",
+      "title": "Wilcoxon Signed Rank",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Wilcoxon signed-rank test",
+      "description_ar": "اختبار ويلكوكسون للرتب الموقعة"
+    },
+    {
+      "id": "KRUSKAL_WALLIS",
+      "title": "Kruskal-Wallis",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Kruskal-Wallis H test",
+      "description_ar": "اختبار كروسكال-واليس"
+    },
+    {
+      "id": "EFFECT_SIZE_INVITRO",
+      "title": "Effect Size",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Effect size measures for in vitro studies",
+      "description_ar": "مقاييس حجم الأثر"
+    },
+    {
+      "id": "POWER_ANALYSIS_INVITRO",
+      "title": "Power Analysis",
+      "category": "statistics",
+      "subcategory": "الإحصاء",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "Power analysis for in vitro experiments",
+      "description_ar": "تحليل القوة للتجارب المخبرية"
+    },
+    {
+      "id": "CRIS_CHECKLIST",
+      "title": "CRIS Checklist",
+      "category": "quality_assessment",
+      "subcategory": "تقييم الجودة",
+      "study_types": [
+        "in_vitro"
+      ],
+      "description_en": "CRIS quality assessment checklist",
+      "description_ar": "قائمة التحقق من جودة CRIS"
+    },
+    {
+      "id": "HELSINKI",
+      "title": "Declaration of Helsinki",
+      "category": "ethics",
+      "subcategory": "أخلاقيات البحث",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "WMA ethical principles for medical research involving human subjects",
+      "description_ar": "إعلان هلسنكي للمبادئ الأخلاقية"
+    },
+    {
+      "id": "BELMONT",
+      "title": "Belmont Report",
+      "category": "ethics",
+      "subcategory": "أخلاقيات البحث",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Ethical principles and guidelines for research with human subjects",
+      "description_ar": "تقرير بلمونت للمبادئ الأخلاقية"
+    },
+    {
+      "id": "CIOMS",
+      "title": "CIOMS",
+      "category": "ethics",
+      "subcategory": "أخلاقيات البحث",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "International ethical guidelines for biomedical research",
+      "description_ar": "الإرشادات الأخلاقية الدولية للبحوث الطبية"
+    },
+    {
+      "id": "CDISC",
+      "title": "CDISC",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Clinical Data Interchange Standards Consortium",
+      "description_ar": "معايير تبادل البيانات السريرية"
+    },
+    {
+      "id": "CDASH",
+      "title": "CDASH",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Clinical Data Acquisition Standards Harmonization",
+      "description_ar": "معايير اكتساب البيانات السريرية"
+    },
+    {
+      "id": "SDTM",
+      "title": "SDTM",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Study Data Tabulation Model",
+      "description_ar": "نموذج جدولة بيانات الدراسة"
+    },
+    {
+      "id": "ADAM",
+      "title": "ADaM",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Analysis Data Model",
+      "description_ar": "نموذج بيانات التحليل"
+    },
+    {
+      "id": "ODM",
+      "title": "ODM",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Operational Data Model",
+      "description_ar": "نموذج البيانات التشغيلي"
+    },
+    {
+      "id": "DEFINE_XML",
+      "title": "Define-XML",
+      "category": "data_standard",
+      "subcategory": "إدارة البيانات",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Define-XML metadata standard",
+      "description_ar": "معيار البيانات الوصفية Define-XML"
+    },
+    {
+      "id": "GDPR",
+      "title": "GDPR",
+      "category": "privacy",
+      "subcategory": "الخصوصية والامتثال",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "General Data Protection Regulation",
+      "description_ar": "اللائحة العامة لحماية البيانات"
+    },
+    {
+      "id": "HIPAA",
+      "title": "HIPAA",
+      "category": "privacy",
+      "subcategory": "الخصوصية والامتثال",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Health Insurance Portability and Accountability Act",
+      "description_ar": "قانون التأمين الصحي وقابلية النقل والمساءلة"
+    },
+    {
+      "id": "FDA_21CFR11",
+      "title": "FDA 21 CFR Part 11",
+      "category": "privacy",
+      "subcategory": "الخصوصية والامتثال",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Electronic records and electronic signatures",
+      "description_ar": "السجلات والتوقيعات الإلكترونية"
+    },
+    {
+      "id": "FDA_GUIDANCE",
+      "title": "FDA Clinical Trial Guidance",
+      "category": "regulatory",
+      "subcategory": "الجهات التنظيمية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "FDA guidance for clinical trials",
+      "description_ar": "إرشادات FDA للتجارب السريرية"
+    },
+    {
+      "id": "EMA_GUIDANCE",
+      "title": "EMA Clinical Trial Guidance",
+      "category": "regulatory",
+      "subcategory": "الجهات التنظيمية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "EMA guidelines for clinical trials",
+      "description_ar": "إرشادات EMA للتجارب السريرية"
+    },
+    {
+      "id": "WHO_GUIDANCE",
+      "title": "WHO Clinical Trial Guidance",
+      "category": "regulatory",
+      "subcategory": "الجهات التنظيمية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "WHO clinical trial registration and guidelines",
+      "description_ar": "إرشادات WHO للتجارب السريرية"
+    },
+    {
+      "id": "ADA_GUIDELINES",
+      "title": "ADA Guidelines",
+      "category": "dental_ebd",
+      "subcategory": "طب الأسنان المبني على الدليل",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "American Dental Association clinical practice guidelines",
+      "description_ar": "إرشادات الجمعية الأمريكية لطب الأسنان"
+    },
+    {
+      "id": "FDI_GUIDELINES",
+      "title": "FDI Guidelines",
+      "category": "dental_ebd",
+      "subcategory": "طب الأسنان المبني على الدليل",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "FDI World Dental Federation guidelines",
+      "description_ar": "إرشادات الاتحاد العالمي لطب الأسنان"
+    },
+    {
+      "id": "IADR_RECS",
+      "title": "IADR Recommendations",
+      "category": "dental_ebd",
+      "subcategory": "طب الأسنان المبني على الدليل",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "International Association for Dental Research recommendations",
+      "description_ar": "توصيات الجمعية الدولية لأبحاث طب الأسنان"
+    },
+    {
+      "id": "COCHRANE_ORAL",
+      "title": "Cochrane Oral Health",
+      "category": "dental_ebd",
+      "subcategory": "طب الأسنان المبني على الدليل",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Cochrane Oral Health systematic reviews",
+      "description_ar": "مراجعات كوكرين لصحة الفم"
+    },
+    {
+      "id": "COMET",
+      "title": "COMET Initiative",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Core Outcome Measures in Effectiveness Trials",
+      "description_ar": "مبادرة مقاييس النتائج الأساسية"
+    },
+    {
+      "id": "COSMIN",
+      "title": "COSMIN Guidelines",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "COnsensus-based Standards for the selection of Measurement Instruments",
+      "description_ar": "معايير اختيار أدوات القياس"
+    },
+    {
+      "id": "PROMIS",
+      "title": "PROMIS",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Patient-Reported Outcomes Measurement Information System",
+      "description_ar": "نظام معلومات قياس النتائج المبلّغة من المرضى"
+    },
+    {
+      "id": "OHIP",
+      "title": "OHIP",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Oral Health Impact Profile",
+      "description_ar": "ملف تأثير صحة الفم"
+    },
+    {
+      "id": "GOHAI",
+      "title": "GOHAI",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "General Oral Health Assessment Index",
+      "description_ar": "مؤشر تقييم صحة الفم العام"
+    },
+    {
+      "id": "OIDP",
+      "title": "OIDP",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Oral Impacts on Daily Performances",
+      "description_ar": "تأثيرات الفم على الأداء اليومي"
+    },
+    {
+      "id": "MCID_MDC",
+      "title": "MCID / MDC",
+      "category": "outcomes",
+      "subcategory": "مقاييس النتائج",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Minimal Clinically Important Difference / Minimal Detectable Change",
+      "description_ar": "الفرق السريري الأدنى المهم / التغيير الأدنى القابل للاكتشاف"
+    },
+    {
+      "id": "ICDAS",
+      "title": "ICDAS II",
+      "category": "diagnostics",
+      "subcategory": "معايير التشخيص",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "International Caries Detection and Assessment System",
+      "description_ar": "النظام الدولي لاكتشاف وتقييم التسوس"
+    },
+    {
+      "id": "WHO_ORAL_SURVEYS_DIAG",
+      "title": "WHO Oral Health Surveys (Diagnostic)",
+      "category": "diagnostics",
+      "subcategory": "معايير التشخيص",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "WHO basic methods for oral health surveys — diagnostic criteria",
+      "description_ar": "معايير تشخيص مسوح صحة الفم"
+    },
+    {
+      "id": "AAE_TERMINOLOGY",
+      "title": "AAE Diagnostic Terminology",
+      "category": "diagnostics",
+      "subcategory": "معايير التشخيص",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "American Association of Endodontists diagnostic terminology",
+      "description_ar": "مصطلحات تشخيص جمعية علاج الجذور الأمريكية"
+    },
+    {
+      "id": "PERIO_CLASSIFICATION_2017",
+      "title": "2017 World Workshop Classification of Periodontal Diseases",
+      "category": "diagnostics",
+      "subcategory": "معايير التشخيص",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "2017 classification of periodontal and peri-implant diseases",
+      "description_ar": "تصنيف 2017 لأمراض اللثة وحول الزرعات"
+    },
+    {
+      "id": "AAOMR",
+      "title": "AAOMR Guidelines",
+      "category": "radiology",
+      "subcategory": "تقييم الأشعة",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "American Academy of Oral and Maxillofacial Radiology guidelines",
+      "description_ar": "إرشادات الأكاديمية الأمريكية لأشعة الفم والوجه"
+    },
+    {
+      "id": "EU_CBCT",
+      "title": "European CBCT Guidelines",
+      "category": "radiology",
+      "subcategory": "تقييم الأشعة",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "European guidelines for CBCT use in dental practice",
+      "description_ar": "الإرشادات الأوروبية لاستخدام CBCT"
+    },
+    {
+      "id": "COHENS_KAPPA",
+      "title": "Cohen's Kappa",
+      "category": "calibration",
+      "subcategory": "معايرة الفاحصين",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Cohen's kappa for inter-rater agreement",
+      "description_ar": "كابا كوهين للاتفاق بين المقيّمين"
+    },
+    {
+      "id": "WEIGHTED_KAPPA",
+      "title": "Weighted Kappa",
+      "category": "calibration",
+      "subcategory": "معايرة الفاحصين",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Weighted kappa for ordinal agreement",
+      "description_ar": "كابا الموزون للاتفاق الترتيبي"
+    },
+    {
+      "id": "ICC",
+      "title": "Intraclass Correlation Coefficient (ICC)",
+      "category": "calibration",
+      "subcategory": "معايرة الفاحصين",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "ICC for rater reliability assessment",
+      "description_ar": "معامل الارتباط داخل الصف"
+    },
+    {
+      "id": "BLAND_ALTMAN",
+      "title": "Bland-Altman Analysis",
+      "category": "calibration",
+      "subcategory": "معايرة الفاحصين",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Bland-Altman method for measurement agreement",
+      "description_ar": "تحليل بلاند-ألتمان للاتفاق"
+    },
+    {
+      "id": "SNOMED_CT",
+      "title": "SNOMED CT",
+      "category": "medical_dictionary",
+      "subcategory": "القواميس الطبية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Systematized Nomenclature of Medicine — Clinical Terms",
+      "description_ar": "نظام المصطلحات الطبية السريرية"
+    },
+    {
+      "id": "MESH",
+      "title": "MeSH",
+      "category": "medical_dictionary",
+      "subcategory": "القواميس الطبية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Medical Subject Headings",
+      "description_ar": "عناوين الموضوعات الطبية"
+    },
+    {
+      "id": "UMLS",
+      "title": "UMLS",
+      "category": "medical_dictionary",
+      "subcategory": "القواميس الطبية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Unified Medical Language System",
+      "description_ar": "نظام اللغة الطبية الموحد"
+    },
+    {
+      "id": "LOINC",
+      "title": "LOINC",
+      "category": "medical_dictionary",
+      "subcategory": "القواميس الطبية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "Logical Observation Identifiers Names and Codes",
+      "description_ar": "معرفات ورموز المراقبة المنطقية"
+    },
+    {
+      "id": "ICD11",
+      "title": "ICD-11",
+      "category": "medical_dictionary",
+      "subcategory": "القواميس الطبية",
+      "study_types": [
+        "shared"
+      ],
+      "description_en": "International Classification of Diseases 11th Revision",
+      "description_ar": "التصنيف الدولي للأمراض — الإصدار الحادي عشر"
+    }
+  ]
+}
