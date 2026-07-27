@@ -1,0 +1,965 @@
+{
+  "nav": {
+    "login": "تسجيل الدخول",
+    "getStarted": "ابدأ الآن"
+  },
+  "landing": {
+    "badge": "إدارة البحوث السريرية المطورة",
+    "title": "مستقبل إدارة البحوث السريرية",
+    "subtitle": "قم بتمكين بحثك بتحليل البروتوكولات بالذكاء الاصطناعي، وتوليد نماذج CRF الذكية، والإحصائيات الآلية، والتقارير الشاملة. سرع دراساتك مع ضمان الامتثال والجودة.",
+    "startFreeTrial": "ابدأ تجربتك المجانية",
+    "watchDemo": "شاهد العرض",
+    "preview": {
+      "protocol": {
+        "label": "تحليل البروتوكول",
+        "status": "اكتمل بنجاح"
+      },
+      "crf": {
+        "label": "إنشاء نموذج CRF",
+        "status": "قيد التنفيذ..."
+      },
+      "statistics": {
+        "label": "التقرير الإحصائي",
+        "status": "جاهز للمراجعة"
+      }
+    },
+    "stats": {
+      "studies": "دراسة تم إجراؤها",
+      "patients": "مريض مسجل",
+      "uptime": "وقت التشغيل",
+      "institutions": "مؤسسة"
+    },
+    "features": {
+      "title": "كل ما تحتاجه لبحث استثنائي",
+      "subtitle": "منصة كاملة مصممة لتبسيط كل خطوة من عملية بحثك السريري.",
+      "protocol": {
+        "title": "تحليل البروتوكول بالذكاء الاصطناعي",
+        "desc": "ذكاء اصطناعي متقدم يفهم ويستخرج البيانات الحرجة من بروتوكولات البحث تلقائياً."
+      },
+      "crf": {
+        "title": "توليد نماذج CRF الذكية",
+        "desc": "توليد نماذج تقارير الحالات الشاملة المصممة خصيصاً لتصميم دراستك في ثوانٍ."
+      },
+      "statistics": {
+        "title": "محرك التحليل الإحصائي",
+        "desc": "اختيار و تحليل الاختبارات الإحصائية الآلي مع تقارير بناءً على نمط APA."
+      },
+      "compliance": {
+        "title": "الامتثال و الأمن",
+        "desc": "متوافق مع HIPAA و GDPR و FDA 21 CFR Part 11 مع مسارات تدقيق كاملة."
+      },
+      "collaboration": {
+        "title": "التعاون الجماعي",
+        "desc": "تعاون في الوقت الفعلي بين الطلاب والمشرفين والمؤسسات."
+      },
+      "monitoring": {
+        "title": "المراقبة في الوقت الفعلي",
+        "desc": "لوحات تحكم مباشرة لتتبع تقدم الدراسة وجودة البيانات والمقاييس الرئيسية."
+      }
+    },
+    "cta": {
+      "title": "جاهز لتحويل بحثك؟",
+      "subtitle": "انضم لمئات الباحثين والمؤسسات التي تستخدم ClinResearch AI بالفعل لتسريع دراساتهم.",
+      "button": "ابدأ مجاناً"
+    },
+    "footer": {
+      "copyright": "© 2026 ClinResearch AI. جميع الحقوق محفوظة."
+    }
+  },
+  "signup": {
+    "title": "إنشاء حسابك",
+    "subtitle": "ابدأ رحلتك في إدارة البحوث السريرية",
+    "accountType": {
+      "student": "طالب",
+      "co_researcher": "باحث مشارك",
+      "supervisor": "مشرف",
+      "assistant_supervisor": "مشرف مساعد",
+      "clinical_evaluator": "مقيم علاجي",
+      "institution": "مؤسسة"
+    },
+    "common": {
+      "phone": "رقم الهاتف",
+      "dateOfBirth": "تاريخ الميلاد",
+      "country": "البلد",
+      "governorate": "المحافظة",
+      "password": "كلمة المرور",
+      "university": "الجامعة",
+      "college": "الكلية"
+    },
+    "student": {
+      "fullName": "الاسم بالكامل (بالإنجليزية)",
+      "email": "البريد الإلكتروني",
+      "emailType": "نوع البريد الإلكتروني",
+      "academicEmail": "بريد أكاديمي",
+      "personalEmail": "بريد شخصي",
+      "institution": "الجامعة / المؤسسة",
+      "academicLevel": "الدرجة العلمية",
+      "specialization": "التخصص",
+      "academicId": "الرقم الأكاديمي (اختياري)",
+      "supervisorLinkage": "ربط بالمشرف",
+      "independent": "باحث مستقل",
+      "supervisorId": "إدخال رقم المشرف"
+    },
+    "co_researcher": {
+      "fullName": "اسم الباحث المشارك بالكامل",
+      "email": "البريد الإلكتروني",
+      "academicLevel": "الدرجة العلمية",
+      "specialization": "التخصص",
+      "academicId": "الرقم الأكاديمي / الوظيفي",
+      "supervisorLinkage": "ربط بالمشرف أو الباحث الرئيسي",
+      "independent": "عمل تعاوني مستقل",
+      "supervisorId": "إدخال رقم الربط"
+    },
+    "supervisor": {
+      "fullName": "الاسم بالكامل",
+      "email": "البريد الإلكتروني",
+      "emailType": "نوع البريد الإلكتروني",
+      "institution": "المؤسسة",
+      "academicRank": "الرتبة العلمية",
+      "specialization": "التخصص"
+    },
+    "assistant_supervisor": {
+      "fullName": "اسم المشرف المساعد بالكامل",
+      "email": "البريد الإلكتروني",
+      "emailType": "نوع البريد الإلكتروني",
+      "academicRank": "الرتبة العلمية",
+      "specialization": "التخصص"
+    },
+    "clinical_evaluator": {
+      "fullName": "اسم المقيم العلاجي بالكامل",
+      "email": "البريد الإلكتروني",
+      "emailType": "نوع البريد الإلكتروني",
+      "academicRank": "الرتبة العلمية",
+      "specialization": "التخصص العلاجي"
+    },
+    "institution": {
+      "officialName": "اسم المؤسسة الرسمي",
+      "type": "نوع المؤسسة",
+      "university": "جامعة",
+      "hospital": "مستشفى",
+      "researchCenter": "مركز بحوث",
+      "officialEmail": "البريد الإلكتروني الرسمي",
+      "authorizedInfo": "معلومات المختص المفوض",
+      "authFullName": "الاسم بالكامل",
+      "jobTitle": "الوظيفة",
+      "directContact": "رقم الاتصال المباشر"
+    },
+    "placeholders": {
+      "phone": "+20 123 456 7890",
+      "governorate": "القاهرة",
+      "password": "6 أحرف على الأقل",
+      "email": "name@example.com",
+      "studentName": "John Doe",
+      "coResearcherName": "باحث مشارك",
+      "supervisorName": "د. أحمد محمد",
+      "assistantSupervisorName": "د. مشرف مساعد",
+      "clinicalEvaluatorName": "د. مقيم علاجي",
+      "university": "اكتب اسم الجامعة",
+      "college": "اكتب اسم الكلية",
+      "academicId": "123456",
+      "supervisorId": "اكتب رقم المشرف",
+      "institutionName": "اكتب اسم المؤسسة الرسمي",
+      "officialEmail": "info@university.edu",
+      "authorizedName": "اسم المختص المفوض",
+      "jobTitle": "مدير البحث العلمي",
+      "selectOption": "اختر من القائمة"
+    },
+    "actions": {
+      "creating": "جاري إنشاء الحساب..."
+    },
+    "messages": {
+      "supervisorIdRequired": "يرجى إدخال رقم المشرف أو اختيار باحث مستقل.",
+      "success": "تم إنشاء الحساب بنجاح.",
+      "genericError": "تعذر إنشاء الحساب، يرجى مراجعة البيانات والمحاولة مرة أخرى."
+    },
+    "options": {
+      "academicLevels": {
+        "intern": "امتياز",
+        "resident": "طبيب مقيم / مقيم أكاديمي",
+        "diploma": "دبلوم",
+        "masters": "ماجستير",
+        "doctorate": "دكتوراه"
+      },
+      "academicRanks": {
+        "lecturer": "أستاذ",
+        "assistantProfessor": "أستاذ مساعد",
+        "associateProfessor": "أستاذ مشارك",
+        "professor": "أستاذ دكتور"
+      },
+      "specializations": {
+        "orthodontics": "تقويم الأسنان وعظام الوجه والفكين",
+        "oralAndMaxillofacialSurgery": "جراحة الفم والوجه والفكين",
+        "endodontics": "علاج الجذور وعصب الأسنان",
+        "pediatricDentistry": "طب أسنان الأطفال",
+        "prosthodontics": "استعاضة الأسنان والتركيبات",
+        "periodontology": "طب أمراض وجراحة اللثة",
+        "dentalPublicHealth": "طب أسنان الصحة العامة",
+        "oralAndMaxillofacialPathology": "أمراض الفم والوجه والفكين",
+        "oralAndMaxillofacialRadiology": "أشعة الفم والوجه والفكين",
+        "oralMedicine": "طب الفم"
+      }
+    },
+    "button": "إنشاء الحساب",
+    "alreadyHaveAccount": "لديك حساب بالفعل؟",
+    "loginHere": "تسجيل الدخول هنا"
+  },
+  "login": {
+    "title": "مرحباً بعودتك",
+    "subtitle": "سجل الدخول إلى حسابك",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "button": "تسجيل الدخول",
+    "noAccount": "ليس لديك حساب؟",
+    "signupHere": "إنشاء حساب هنا",
+    "messages": {
+      "invalidCredentials": "بيانات الدخول غير صحيحة أو الخادم غير متاح.",
+      "loading": "جاري تسجيل الدخول..."
+    }
+  },
+  "dashboard": {
+    "common": {
+      "appName": "ClinResearch AI",
+      "logout": "تسجيل الخروج",
+      "loading": "جاري التحميل...",
+      "signedIn": "تم تسجيل الدخول",
+      "fallbackResearcher": "باحث",
+      "fallbackCoResearcher": "باحث مشارك",
+      "fallbackSupervisor": "مشرف",
+      "fallbackClinicalEvaluator": "مقيم علاجي",
+      "fallbackInstitution": "مؤسسة",
+      "sidebar": {
+        "dashboard": "لوحة التحكم",
+        "myStudies": "دراساتي",
+        "aiAssistant": "المساعد الذكي",
+        "upgrade": "الترقية"
+      }
+    },
+    "student": {
+      "badge": "لوحة تحكم الطالب",
+      "greeting": "أهلاً بعودتك، {{name}}",
+      "subtitle": "تابع دورة البحث السريري بالكامل من مكان واحد، من التقدم السريري حتى الاستعلامات والجودة والتحليل.",
+      "sidebarDescription": "مركز موحد لإدارة الدراسات، بنك البيانات، أدوات الذكاء الاصطناعي، وخطوط المتابعة الحرجة.",
+      "dataAlert": {
+        "title": "محرك جودة البيانات رصد قيماً تحتاج إلى تصحيح",
+        "description": "يوجد تنبيه جودة مفتوح ولن يختفي إلا بعد تصحيح القيم الطبية غير المنطقية واستكمال الحقول الإلزامية.",
+        "status": "تنبيه أحمر"
+      },
+      "metrics": {
+        "activeStudies": {
+          "label": "الدراسات النشطة",
+          "helper": "مرتبطة بصفحة دراساتي وتعرض الأبحاث المعتمدة والفعالة."
+        },
+        "patientsEnrolled": {
+          "label": "المرضى المسجلون",
+          "helper": "إجمالي العينات المسجلة ضمن بنك البيانات الحالي."
+        },
+        "criticalVisits": {
+          "label": "الزيارات القادمة والحرجة",
+          "helper": "عداد للمواعيد القادمة خلال 7 أيام مع تنبيه للمواعيد الفائتة."
+        },
+        "openQueries": {
+          "label": "الاستعلامات المفتوحة",
+          "helper": "استعلامات جودة ومراقبة لا تُغلق إلا بالتصحيح أو الرد."
+        }
+      },
+      "progress": {
+        "title": "مخطط التقدم",
+        "subtitle": "نسبة الإنجاز السريري لكل مرحلة رئيسية في الدراسة.",
+        "items": {
+          "protocol": {
+            "title": "اعتماد البروتوكول",
+            "subtitle": "البروتوكول مقفل بعد الاعتماد"
+          },
+          "recruitment": {
+            "title": "تجنيد المرضى",
+            "subtitle": "التقدم الحالي في حجم العينة"
+          },
+          "followUp": {
+            "title": "المتابعة السريرية",
+            "subtitle": "إنجاز الزيارات وتوثيق الحالات"
+          }
+        }
+      },
+      "upcomingVisits": {
+        "title": "الزيارات القادمة والحرجة",
+        "subtitle": "حالات تحتاج إلى متابعة قبل تفعيل تنبيه التسرب.",
+        "items": {
+          "visit1": {
+            "title": "زيارة متابعة للمريض CR-018",
+            "details": "تجربة الزرعات السنية • متابعة ما بعد الإجراء",
+            "eta": "خلال يومين"
+          },
+          "visit2": {
+            "title": "زيارة استقرار للمريض CR-041",
+            "details": "تقويم الأسنان • يلزم تأكيد الحضور",
+            "eta": "خلال 5 أيام"
+          }
+        }
+      },
+      "activity": {
+        "title": "الخط الزمني للأنشطة",
+        "subtitle": "آخر السجلات المسحوبة من سجل التدقيق الأمني.",
+        "items": {
+          "protocolLocked": {
+            "title": "تم قفل البروتوكول بعد اعتماد المشرف",
+            "time": "منذ 15 دقيقة",
+            "description": "أصبحت الدراسة في وضع مقيد التعديل مع تفعيل بنك البيانات."
+          },
+          "missedVisitAlert": {
+            "title": "تم رصد موعد فائت وإطلاق تنبيه متابعة",
+            "time": "منذ 40 دقيقة",
+            "description": "انتقل ملف المريض إلى حالة تتطلب تواصلًا موثقًا خلال البروتوكول."
+          },
+          "queryResolved": {
+            "title": "أغلق استعلام جودة بيانات بعد التصحيح",
+            "time": "منذ ساعتين",
+            "description": "تمت مراجعة القيمة خارج النطاق الطبي وتحديثها بنجاح."
+          },
+          "analysisPrepared": {
+            "title": "اكتمل تجهيز تعليق إحصائي أولي",
+            "time": "أمس",
+            "description": "محرك التحليل جهز ملخصًا أوليًا استعدادًا للمراجعة."
+          }
+        }
+      },
+      "openQueries": {
+        "title": "الاستعلامات المفتوحة",
+        "subtitle": "استفسارات وملاحظات الجودة التي تمنع الإغلاق الكامل للملف.",
+        "items": {
+          "query1": {
+            "title": "قيمة ضغط دم خارج النطاق المنطقي",
+            "description": "سجل المريض CR-018 يحتوي على قراءة تحتاج مراجعة أو تبرير سريري.",
+            "severity": "حرج"
+          },
+          "query2": {
+            "title": "حقل إلزامي غير مكتمل في eCRF",
+            "description": "لا يمكن اعتماد السجل قبل استكمال بيانات الفحص السريري.",
+            "severity": "مرتفع"
+          }
+        }
+      },
+      "recentStudies": {
+        "title": "أحدث الدراسات",
+        "subtitle": "آخر الدراسات التي تعمل عليها أو تنتظر خطوة إجرائية.",
+        "viewAll": "عرض الكل",
+        "items": {
+          "study1": {
+            "title": "فعالية مادة حيوية جديدة في الزرعات السنية",
+            "details": "تجربة عشوائية مضبوطة • 50 مريضًا",
+            "status": "نشطة"
+          },
+          "study2": {
+            "title": "دراسة متابعة لعلاج الجذور السريري",
+            "details": "دراسة رصدية • 92 مريضًا",
+            "status": "بانتظار الاعتماد"
+          }
+        }
+      },
+      "aiActions": {
+        "title": "إجراءات الذكاء الاصطناعي السريعة",
+        "subtitle": "تشغيل مباشر للأدوات المرتبطة بالمقترح والاستمارة والتحليل.",
+        "items": {
+          "proposalBuilder": {
+            "title": "تحليل المقترح الذكي",
+            "description": "استخراج الأهداف والفرضيات وبناء مربعات ذكية قابلة للتعديل."
+          },
+          "crfGeneration": {
+            "title": "بناء eCRF تلقائي",
+            "description": "توليد استمارة رقمية بناءً على مسار الدراسة ومكوناتها السريرية."
+          },
+          "statisticalReview": {
+            "title": "تعليق إحصائي أولي",
+            "description": "تلخيص الجاهزية التحليلية وإبراز الملاحظات المبكرة للباحث."
+          }
+        }
+      },
+      "workflows": {
+        "title": "مسارات إنشاء الدراسات",
+        "subtitle": "المساران الأساسيان المذكوران في المواصفات الخاصة بالطالب.",
+        "items": {
+          "supervised": {
+            "title": "مسار دراسة جديدة يتطلب موافقة المشرف",
+            "description": "يشمل رفع المقترح، التحليل الذكي، تجميد الصلاحيات عند الإرسال، ثم فتح بنك البيانات بعد الاعتماد."
+          },
+          "migration": {
+            "title": "مسار ترحيل ومتابعة دراسة جارية",
+            "description": "يركز على رفع الوثائق، رقمنة الاستمارات الورقية، ثم التفعيل المباشر للدراسة وإدخال العينات."
+          }
+        }
+      },
+      "upgrade": {
+        "badge": "بوابة الترقية",
+        "sidebarHint": "سياسة المنع من التصدير مفعلة للحسابات المجانية حتى الترقية.",
+        "title": "الترقية مطلوبة لفتح التصدير المتقدم",
+        "description": "الحساب الحالي يعمل بسياسة Zero-Export، لذلك يتم تعطيل تصدير PDF والميزات المتقدمة حتى تفعيل الخطة المدفوعة.",
+        "button": "ترقية الحساب"
+      }
+    },
+    "supervisor": {
+      "badge": "لوحة تحكم المشرف",
+      "greeting": "مرحبًا، {{name}}",
+      "subtitle": "تابع الطلاب، وراجع الدراسات المرسلة، وأدر قرارات الاعتماد والملاحظات.",
+      "sidebarDescription": "واجهة إشراف أكاديمية لمراجعة المقترحات وتقييم حالة الطلاب والدراسات.",
+      "sidebar": {
+        "students": "طلابي",
+        "reviews": "دراسات للمراجعة"
+      },
+      "metrics": {
+        "activeStudents": "الطلاب النشطون",
+        "pendingApprovals": "اعتمادات معلقة",
+        "reviewedStudies": "دراسات تمت مراجعتها"
+      },
+      "messages": {
+        "loading": "جاري تحميل قائمة المراجعة...",
+        "reviewError": "تعذر إرسال قرار المراجعة الآن.",
+        "submitting": "جاري إرسال المراجعة..."
+      },
+      "pending": {
+        "title": "الدراسات بانتظار الاعتماد",
+        "subtitle": "طلبات وصلت إلى المشرف بعد التجميد وإرسال المقترح.",
+        "emptyTitle": "لا توجد دراسات معلقة",
+        "emptyDescription": "ستظهر هنا الدراسات التي يرسلها الطلاب للمراجعة والإعتماد.",
+        "reviewNotes": "ملاحظات المشرف",
+        "reviewNotesPlaceholder": "اكتب سبب الموافقة أو الملاحظات المطلوبة للتعديل.",
+        "study": {
+          "title": "فعالية مادة حيوية جديدة في الزرعات السنية",
+          "student": "الطالب: جون دو",
+          "studentLabel": "الطالب: {{name}}",
+          "description": "دراسة عشوائية مزدوجة التعمية لتقييم مادة علاجية جديدة وتأثيرها على الالتئام السريري."
+        },
+        "actions": {
+          "approve": "اعتماد",
+          "requestChanges": "طلب تعديلات",
+          "reject": "رفض"
+        }
+      }
+    },
+    "coResearcher": {
+      "badge": "لوحة الباحث المشارك",
+      "greeting": "مرحبًا، {{name}}",
+      "subtitle": "نفذ أعمال الباحث الرئيسي على الملفات المشتركة، وادخل مساحة العمل الذكية، وتابع التقدم اليومي للدراسة.",
+      "sidebarDescription": "واجهة تنفيذية للباحث المشارك بنفس إمكانات الباحث الرئيسي على مستوى العمل اليومي.",
+      "metrics": {
+        "assignedStudies": "الدراسات المسندة",
+        "sharedWorkspaces": "مساحات العمل المشتركة",
+        "teamThreads": "مسارات التعاون"
+      },
+      "permissions": {
+        "title": "الصلاحيات الأساسية",
+        "subtitle": "هذه اللوحة تمنح الباحث المشارك صلاحيات تشغيلية مماثلة للباحث الرئيسي داخل النظام.",
+        "items": {
+          "createAndUpdate": "إنشاء وتحديث ومتابعة الدراسات المرتبطة به.",
+          "workspace": "فتح مساحة الذكاء والتحليل لكل دراسة.",
+          "files": "رفع الملفات الدائمة واستعراض نتائج التحليل والتقارير."
+        }
+      },
+      "nextSteps": {
+        "title": "ابدأ العمل",
+        "subtitle": "ادخل مباشرة إلى الدراسات أو إلى مساحة العمل الذكية المشتركة.",
+        "openStudies": "فتح الدراسات",
+        "openWorkspace": "فتح مساحة الذكاء"
+      }
+    },
+    "assistantSupervisor": {
+      "badge": "لوحة المشرف المساعد",
+      "greeting": "مرحبًا، {{name}}",
+      "subtitle": "راجع الدراسات، ودوّن الملاحظات، وطبّق صلاحيات الاعتماد نفسها الخاصة بالمشرف الرئيسي.",
+      "sidebarDescription": "واجهة مراجعة موازية تمنح المشرف المساعد نفس أدوات مراجعة المقترحات والقرارات.",
+      "sidebar": {
+        "reviews": "قائمة المراجعة"
+      },
+      "metrics": {
+        "assignedResearchers": "الباحثون المرتبطون",
+        "pendingReviews": "مراجعات معلقة",
+        "closedReviews": "مراجعات مغلقة"
+      },
+      "messages": {
+        "loading": "جاري تحميل مراجعات المشرف المساعد...",
+        "loadError": "تعذر تحميل قائمة المراجعات.",
+        "reviewError": "تعذر إرسال قرار المشرف المساعد."
+      },
+      "pending": {
+        "title": "الدراسات المطلوب مراجعتها",
+        "subtitle": "قائمة دراسات يمكن للمشرف المساعد اعتمادها أو طلب تعديلها أو رفضها.",
+        "emptyTitle": "لا توجد دراسات للمراجعة الآن",
+        "emptyDescription": "ستظهر هنا الدراسات المحالة للمراجعة الأكاديمية.",
+        "studyOwner": "الباحث: {{name}}",
+        "reviewNotesPlaceholder": "اكتب ملاحظاتك الأكاديمية أو المنهجية هنا."
+      },
+      "actions": {
+        "approve": "اعتماد",
+        "requestChanges": "طلب تعديل",
+        "reject": "رفض"
+      }
+    },
+    "clinicalEvaluator": {
+      "badge": "لوحة المقيم العلاجي",
+      "greeting": "مرحبًا، {{name}}",
+      "subtitle": "قيّم نتائج الباحثين للحالات التي طُلب فيها تقييم علاجي داخل مقترح الدراسة.",
+      "sidebarDescription": "واجهة مخصصة لمراجعة النتائج السريرية وإعطاء قرار علاجي موثق لكل دراسة.",
+      "metrics": {
+        "requestedCases": "حالات مطلوبة",
+        "acceptedResults": "نتائج مقبولة",
+        "awaitingAction": "بانتظار الإجراء"
+      },
+      "messages": {
+        "loading": "جاري تحميل قائمة التقييم العلاجي...",
+        "loadError": "تعذر تحميل دراسات التقييم العلاجي.",
+        "submitError": "تعذر إرسال التقييم العلاجي."
+      },
+      "queue": {
+        "title": "قائمة التقييم العلاجي",
+        "subtitle": "كل دراسة طُلب لها تقييم علاجي ستظهر هنا بعد اعتمادها أو تفعيلها.",
+        "emptyTitle": "لا توجد دراسات بانتظار التقييم",
+        "emptyDescription": "عند طلب تقييم علاجي داخل المقترح ستظهر الدراسة هنا تلقائيًا.",
+        "researcherLabel": "الباحث: {{name}}",
+        "requested": "مطلوب تقييم",
+        "notes": "ملاحظات المقيم",
+        "notesPlaceholder": "اكتب تقييمك العلاجي وملخص قرارك النهائي."
+      },
+      "actions": {
+        "accept": "قبول النتائج",
+        "requestRevision": "طلب إعادة نظر",
+        "notRecommended": "غير موصى به"
+      }
+    },
+    "institution": {
+      "badge": "لوحة تحكم المؤسسة",
+      "greeting": "مرحبًا، {{name}}",
+      "subtitle": "تابع مؤشرات المؤسسة البحثية، الأرشيف، والجاهزية الأخلاقية والإدارية.",
+      "sidebarDescription": "واجهة إدارية للمؤسسة لمتابعة الموارد البشرية والدراسات والأرشيف والاعتمادات.",
+      "sidebar": {
+        "humanResources": "الموارد البشرية",
+        "archive": "أرشيف الدراسات",
+        "irb": "اعتمادات الأخلاقيات"
+      },
+      "metrics": {
+        "totalStudents": "إجمالي الطلاب",
+        "supervisors": "المشرفون",
+        "activeStudies": "الدراسات النشطة"
+      },
+      "statistics": {
+        "title": "إحصاءات المؤسسة",
+        "subtitle": "ملخص سريع لأبرز المؤشرات الحالية داخل المؤسسة.",
+        "specializations": {
+          "title": "أكثر التخصصات نشاطًا",
+          "items": {
+            "specialization1": "تقويم الأسنان (10 دراسات)",
+            "specialization2": "جراحة الفم والوجه والفكين (8 دراسات)",
+            "specialization3": "علاج الجذور وعصب الأسنان (6 دراسات)"
+          }
+        },
+        "growth": {
+          "title": "النمو",
+          "value": "+15% هذا الشهر"
+        }
+      }
+    }
+  },
+  "studies": {
+    "badge": "إدارة الدراسات",
+    "title": "دراساتي",
+    "subtitle": "إدارة وإنشاء دراساتك السريرية، {{name}}",
+    "sidebarDescription": "متابعة الدراسات السريرية، فتح التفاصيل، وتشغيل المسارات الأساسية من مكان واحد.",
+    "actions": {
+      "create": "إنشاء دراسة جديدة",
+      "viewDetails": "عرض التفاصيل",
+      "managePatients": "إدارة المرضى",
+      "analysis": "التحليل الإحصائي",
+      "openWorkspace": "فتح مساحة الذكاء",
+      "downloadFile": "تنزيل الملف",
+      "downloadReport": "تنزيل التقرير",
+      "resubmit": "إعادة الإرسال للمشرف",
+      "cancel": "إلغاء",
+      "submit": "إنشاء الدراسة"
+    },
+    "messages": {
+      "loading": "جاري تحميل الدراسات...",
+      "loadingResources": "جاري تحميل موارد الدراسة...",
+      "downloading": "جاري التنزيل...",
+      "loadError": "تعذر تحميل الدراسات الحالية.",
+      "downloadError": "تعذر تنزيل المورد المطلوب.",
+      "createError": "تعذر إنشاء الدراسة، يرجى مراجعة البيانات والمحاولة مرة أخرى.",
+      "resubmitError": "تعذر إعادة إرسال الدراسة إلى المشرف.",
+      "creating": "جاري إنشاء الدراسة...",
+      "resubmitting": "جاري إعادة الإرسال..."
+    },
+    "empty": {
+      "title": "لا توجد دراسات بعد",
+      "description": "ابدأ بإنشاء دراسة جديدة لتظهر هنا وتصبح جزءًا من رحلة العمل."
+    },
+    "labels": {
+      "patients": "مريض",
+      "noDescription": "لا يوجد وصف متاح لهذه الدراسة."
+    },
+    "status": {
+      "draft": "مسودة",
+      "pending": "بانتظار الاعتماد",
+      "approved": "معتمدة",
+      "active": "نشطة",
+      "completed": "مكتملة",
+      "cancelled": "ملغاة"
+    },
+    "workflow": {
+      "supervised": "يتطلب موافقة المشرف",
+      "migration": "ترحيل ومتابعة دراسة جارية"
+    },
+    "create": {
+      "title": "إنشاء دراسة جديدة",
+      "fields": {
+        "title": "عنوان الدراسة",
+        "description": "وصف مختصر",
+        "studyType": "نوع الدراسة",
+        "workflowType": "مسار الدراسة",
+        "targetSampleSize": "حجم العينة المستهدف",
+        "ethicsApprovalNumber": "رقم الموافقة الأخلاقية",
+        "clinicalRegistrationNumber": "رقم التسجيل السريري",
+        "protocolFileName": "اسم ملف البروتوكول",
+        "hasRandomization": "تتضمن عشوائية",
+        "hasBlinding": "تتضمن تعمية",
+        "requiresClinicalEvaluation": "تتطلب تقييمًا علاجيًا"
+      },
+      "placeholders": {
+        "title": "اكتب عنوان الدراسة",
+        "description": "اكتب وصفًا مختصرًا للدراسة",
+        "studyType": "مثل: تجربة عشوائية مضبوطة",
+        "protocolFileName": "مثل: protocol-v1.pdf"
+      },
+      "workflow": {
+        "supervised": "مسار يحتاج موافقة المشرف",
+        "migration": "مسار ترحيل ودراسة جارية"
+      }
+    },
+    "details": {
+      "studyType": "نوع الدراسة",
+      "workflowType": "مسار الدراسة",
+      "status": "الحالة",
+      "targetSampleSize": "حجم العينة المستهدف",
+      "enrolledPatients": "عدد المرضى المسجلين",
+      "updatedAt": "آخر تحديث",
+      "clinicalEvaluationRequested": "طلب تقييم علاجي",
+      "description": "الوصف",
+      "review": "مراجعة المشرف",
+      "clinicalEvaluation": "التقييم العلاجي",
+      "workspace": "مساحة الذكاء",
+      "workspaceDescription": "افتح مساحة التحليل المرتبطة بالدراسة، وراجع الملفات المحفوظة، ونزّل التقارير الناتجة.",
+      "files": "الملفات المحفوظة",
+      "analyses": "التحليلات المحفوظة",
+      "noFiles": "لا توجد ملفات محفوظة بعد.",
+      "noAnalyses": "لا توجد تحليلات محفوظة بعد."
+    },
+    "review": {
+      "decisions": {
+        "approved": "تم اعتماد الدراسة من المشرف",
+        "changes_requested": "طلب المشرف تعديلات على الدراسة",
+        "rejected": "تم رفض الدراسة من المشرف"
+      }
+    }
+  ,
+    "evaluation": {
+      "requested": "مطلوب",
+      "notRequested": "غير مطلوب",
+      "status": {
+        "pending": "بانتظار التقييم",
+        "accepted": "النتائج مقبولة",
+        "needs_revision": "تحتاج إعادة نظر",
+        "not_recommended": "غير موصى بها"
+      }
+    }
+  },
+  "aiChat": {
+    "title": "المساعد الذكي للبحث",
+    "sidebarDescription": "مساحة تحليل ذكية للمقترحات، بناء الـ eCRF، ودعم التحليل الإحصائي الأولي.",
+    "initialMessage": "مرحبًا، أنا مساعدك الذكي للأبحاث السريرية. يمكنني مساعدتك في تحليل البروتوكول، بناء الاستمارة، وتجهيز التحليل الإحصائي.",
+    "replyMessage": "شكرًا لسؤالك. أقوم الآن بتحليل الطلب، ويمكنني دعمك في بناء CRF، اختيار الاختبارات الإحصائية المناسبة، وتجهيز التقرير النهائي.",
+    "placeholder": "اسأل سؤالًا عن دراستك...",
+    "send": "إرسال",
+    "workspaceSubtitle": "فهم البروتوكول، معالجة الملفات، تشغيل الاختبارات الإحصائية، OCR، وصياغة التقرير النهائي من مساحة عمل واحدة.",
+    "controlPanel": "مساحة عمل الذكاء والتحليل",
+    "controlPanelDescription": "ارفع ملف الدراسة أو البيانات، اختر مسار التحليل، ودع المنصة تجمع بين فهم GPT والمحركات الإحصائية الموثوقة.",
+    "noFileSelected": "لم يتم اختيار ملف بعد.",
+    "processing": "جاري تنفيذ الطلب...",
+    "actions": {
+      "uploadToStudy": "رفع إلى الدراسة",
+      "profile": "فحص البيانات",
+      "recommend": "اقتراح التحليل",
+      "runAnalysis": "تشغيل التحليل",
+      "runOcr": "تشغيل OCR",
+      "askAssistant": "اسأل المساعد",
+      "downloadPdf": "تنزيل تقرير PDF"
+    },
+    "fields": {
+      "study": "الدراسة",
+      "studyPlaceholder": "اختر دراسة",
+      "mode": "وضع المساعد",
+      "analysisType": "نوع التحليل",
+      "prompt": "سؤال الباحث أو نص البروتوكول",
+      "file": "ملف البيانات أو الصورة",
+      "groupColumn": "عمود المجموعات",
+      "valueColumn": "عمود القيم",
+      "xColumn": "عمود X",
+      "yColumn": "عمود Y",
+      "dependentColumn": "المتغير التابع",
+      "independentColumns": "المتغيرات المستقلة",
+      "covariates": "المتغيرات المصاحبة",
+      "timeColumn": "عمود الزمن",
+      "eventColumn": "عمود الحدث",
+      "scoreColumn": "عمود الدرجة",
+      "truthColumn": "عمود الحقيقة",
+      "chartType": "نوع الرسم",
+      "fillMissing": "معالجة القيم المفقودة",
+      "paired": "مقارنة مزدوجة",
+      "binaryTarget": "هدف ثنائي"
+    },
+    "placeholders": {
+      "csvColumns": "column_a, column_b, column_c"
+    },
+    "fillMissing": {
+      "none": "بدون تغيير",
+      "mean": "ملء القيم الرقمية المفقودة بالمتوسط",
+      "median": "ملء القيم الرقمية المفقودة بالوسيط"
+    },
+    "modes": {
+      "protocol_understanding": "فهم البروتوكول",
+      "study_elements": "استخراج عناصر الدراسة",
+      "analysis_selection": "اختيار التحليل",
+      "results_explanation": "شرح النتائج",
+      "final_report": "كتابة التقرير النهائي",
+      "researcher_response": "الرد على الباحث"
+    },
+    "analysisTypes": {
+      "auto": "اختيار تلقائي",
+      "dataset_profile": "ملف وصفي للبيانات",
+      "independent_t_test": "اختبار t المستقل",
+      "paired_t_test": "اختبار t المزدوج",
+      "chi_square": "كاي تربيع",
+      "mann_whitney": "مان-ويتني",
+      "wilcoxon": "ويلكوكسون",
+      "linear_regression": "انحدار خطي",
+      "logistic_regression": "انحدار لوجستي",
+      "anova": "ANOVA",
+      "ancova": "ANCOVA",
+      "survival_analysis": "تحليل البقاء",
+      "roc_curve": "منحنى ROC",
+      "visualization": "رسم بياني"
+    },
+    "chartTypes": {
+      "histogram": "هيستوجرام",
+      "box_plot": "Box Plot",
+      "scatter": "Scatter Plot"
+    },
+    "metrics": {
+      "analyticsEngine": "محرك التحليل",
+      "llmStatus": "حالة LLM",
+      "dataPipelines": "المكتبات المتصلة",
+      "available": "متاح",
+      "unavailable": "غير متاح",
+      "fallback": "وضع احتياطي",
+      "connected": "متصل"
+    },
+    "results": {
+      "serviceHealth": "حالة الخدمة",
+      "serviceHealthDescription": "الحالة الحية لخدمة Python ومحرك Plotly وOCR واتصال GPT.",
+      "serviceUnavailable": "خدمة التحليل غير متاحة الآن. شغّل خدمة Python لتفعيل الفحص والـ OCR والإحصاء المتقدم.",
+      "model": "النموذج المضبوط",
+      "llmConnection": "اتصال LLM",
+      "libraries": "المكتبات الفعالة",
+      "datasetProfile": "ملف البيانات",
+      "rows": "الصفوف",
+      "columns": "الأعمدة",
+      "missingFields": "الأعمدة التي بها قيم مفقودة",
+      "suggestions": "اقتراحات النظام",
+      "analysis": "نتائج التحليل",
+      "recommendedTest": "الاختبار المقترح",
+      "analysisType": "نوع التحليل",
+      "testStatistic": "إحصائية الاختبار",
+      "assistant": "رد المساعد",
+      "fallbackAssistant": "المساعد الاحتياطي",
+      "ocr": "استخراج OCR",
+      "noOcrText": "لم يتم استخراج نص.",
+      "studyResources": "موارد الدراسة",
+      "studyResourcesDescription": "الملفات الدائمة والتحليلات المحفوظة المرتبطة بالدراسة المحددة.",
+      "savedFiles": "الملفات المحفوظة",
+      "savedAnalyses": "التحليلات المحفوظة",
+      "noSavedFiles": "لا توجد ملفات محفوظة لهذه الدراسة بعد.",
+      "noSavedAnalyses": "لا توجد تحليلات محفوظة لهذه الدراسة بعد.",
+      "unspecifiedAnalysis": "تحليل غير محدد"
+    },
+    "errors": {
+      "fileRequired": "يرجى اختيار ملف بيانات أو صورة أولًا.",
+      "studyAndFileRequired": "يرجى اختيار دراسة وملف أولًا.",
+      "promptRequired": "يرجى إدخال سؤال الباحث أو نص البروتوكول.",
+      "uploadFailed": "تعذر رفع الملف إلى الدراسة المحددة.",
+      "profileFailed": "تعذر فحص ملف البيانات.",
+      "recommendationFailed": "تعذر اقتراح التحليل المناسب.",
+      "analysisFailed": "تعذر تشغيل التحليل المطلوب.",
+      "ocrFailed": "تعذر استخراج النص من الصورة.",
+      "assistantFailed": "تعذر إنشاء رد المساعد."
+    }
+  },
+  "pwaInstall": {
+    "title": "ثبت ClinResearch AI",
+    "description": "ثبت المنصة على جهازك لتجربة أسرع بملء الشاشة ووصول أسهل.",
+    "iosHint": "على iPhone أو iPad، افتح قائمة المشاركة في المتصفح ثم اختر Add to Home Screen.",
+    "later": "لاحقًا",
+    "install": "تثبيت"
+  },
+  "countries": {
+    "select": "اختر البلد",
+    "afghanistan": "أفغانستان",
+    "albania": "ألبانيا",
+    "algeria": "الجزائر",
+    "andorra": "أندورا",
+    "angola": "أنغولا",
+    "argentina": "الأرجنتين",
+    "australia": "أستراليا",
+    "austria": "النمسا",
+    "bahrain": "البحرين",
+    "bangladesh": "بنغلاديش",
+    "belgium": "بلجيكا",
+    "benin": "بنين",
+    "bhutan": "بوتان",
+    "bolivia": "بوليفيا",
+    "bosniaAndHerzegovina": "البوسنة والهرسك",
+    "botswana": "بوتسوانا",
+    "brazil": "البرازيل",
+    "brunei": "بروناي",
+    "bulgaria": "بلغاريا",
+    "burkinaFaso": "بوركينا فاسو",
+    "burundi": "بوروندي",
+    "cambodia": "كمبوديا",
+    "cameroon": "الكاميرون",
+    "canada": "كندا",
+    "chad": "تشاد",
+    "chile": "تشيلي",
+    "china": "الصين",
+    "colombia": "كولومبيا",
+    "congo": "الكونغو",
+    "costaRica": "كوستاريكا",
+    "croatia": "كرواتيا",
+    "cuba": "كوبا",
+    "cyprus": "قبرص",
+    "czechRepublic": "جمهورية التشيك",
+    "denmark": "الدانمارك",
+    "djibouti": "جيبوتي",
+    "dominicanRepublic": "الجمهورية الدومينيكية",
+    "ecuador": "الإكوادور",
+    "egypt": "مصر",
+    "elSalvador": "السلفادور",
+    "estonia": "إستونيا",
+    "ethiopia": "إثيوبيا",
+    "finland": "فنلندا",
+    "france": "فرنسا",
+    "gabon": "الغابون",
+    "gambia": "غامبيا",
+    "georgia": "جورجيا",
+    "germany": "المانيا",
+    "ghana": "غانا",
+    "greece": "اليونان",
+    "guatemala": "غواتيمالا",
+    "guinea": "غينيا",
+    "guyana": "غيانا",
+    "haiti": "هايتي",
+    "honduras": "هندوراس",
+    "hongKong": "هونغ كونغ",
+    "hungary": "المجر",
+    "iceland": "آيسلندا",
+    "india": "الهند",
+    "indonesia": "إندونيسيا",
+    "iran": "إيران",
+    "iraq": "العراق",
+    "ireland": "أيرلندا",
+    "israel": "إسرائيل",
+    "italy": "إيطاليا",
+    "ivoryCoast": "ساحل العاج",
+    "jamaica": "جامايكا",
+    "japan": "اليابان",
+    "jordan": "الأردن",
+    "kazakhstan": "كازاخستان",
+    "kenya": "كينيا",
+    "southKorea": "كوريا الجنوبية",
+    "kuwait": "الكويت",
+    "latvia": "لاتفيا",
+    "lebanon": "لبنان",
+    "lesotho": "ليسوتو",
+    "liberia": "ليبيريا",
+    "libya": "ليبيا",
+    "lithuania": "ليتوانيا",
+    "luxembourg": "لوكسمبورغ",
+    "macau": "ماكاو",
+    "madagascar": "مدغشقر",
+    "malawi": "ملاوي",
+    "malaysia": "ماليزيا",
+    "maldives": "المالديف",
+    "mali": "مالي",
+    "malta": "مالطا",
+    "mauritania": "موريتانيا",
+    "mauritius": "موريشيوس",
+    "mexico": "المكسيك",
+    "moldova": "مولدوفا",
+    "mongolia": "منغوليا",
+    "montenegro": "الجبل الأسود",
+    "morocco": "المغرب",
+    "mozambique": "موزمبيق",
+    "namibia": "ناميبيا",
+    "nepal": "نيبال",
+    "netherlands": "هولندا",
+    "newZealand": "نيوزيلندا",
+    "nicaragua": "نيكاراغوا",
+    "niger": "النيجر",
+    "nigeria": "نيجيريا",
+    "northMacedonia": "مقدونيا الشمالية",
+    "norway": "النرويج",
+    "oman": "عمان",
+    "pakistan": "باكستان",
+    "palestine": "فلسطين",
+    "panama": "بنما",
+    "paraguay": "باراغواي",
+    "peru": "بيرو",
+    "philippines": "الفلبين",
+    "poland": "بولندا",
+    "portugal": "البرتغال",
+    "qatar": "قطر",
+    "romania": "رومانيا",
+    "rwanda": "رواندا",
+    "saudiArabia": "السعودية",
+    "senegal": "السنغال",
+    "serbia": "صربيا",
+    "seychelles": "السيشيل",
+    "sierraLeone": "سيراليون",
+    "singapore": "سنغافورة",
+    "slovakia": "سلوفاكيا",
+    "slovenia": "سلوفينيا",
+    "somalia": "الصومال",
+    "southAfrica": "جنوب إفريقيا",
+    "southSudan": "جنوب السودان",
+    "spain": "إسبانيا",
+    "sriLanka": "سريلانكا",
+    "sudan": "السودان",
+    "suriname": "سورينام",
+    "swaziland": "إسواتيني",
+    "sweden": "السويد",
+    "switzerland": "سويسرا",
+    "syria": "سوريا",
+    "taiwan": "تايوان",
+    "tajikistan": "طاجيكستان",
+    "tanzania": "تنزانيا",
+    "thailand": "تايلاند",
+    "togo": "توغو",
+    "tunisia": "تونس",
+    "turkey": "تركيا",
+    "turkmenistan": "تركمانستان",
+    "uganda": "أوغندا",
+    "ukraine": "أوكرانيا",
+    "unitedArabEmirates": "الإمارات العربية المتحدة",
+    "unitedKingdom": "المملكة المتحدة",
+    "unitedStates": "الولايات المتحدة الأمريكية",
+    "uruguay": "أوروغواي",
+    "uzbekistan": "أوزبكستان",
+    "venezuela": "فنزويلا",
+    "vietnam": "فيتنام",
+    "yemen": "اليمن",
+    "zambia": "زامبيا",
+    "zimbabwe": "زيمبابوي"
+  }
+}
