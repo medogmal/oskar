@@ -10,6 +10,8 @@ const generateToken = (id: string) => {
   });
 };
 
+const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
+
 const allowedDirectoryAccountTypes: AccountType[] = [
   'student',
   'co_researcher',
@@ -27,6 +29,7 @@ const parseRequestedAccountTypes = (rawValue: unknown, allowedAccountTypes: Acco
 
 export const register = async (req: Request, res: Response) => {
   try {
+    console.log('[auth.register] start');
     const {
       email,
       password,
@@ -50,28 +53,11 @@ export const register = async (req: Request, res: Response) => {
       directContactNumber
     } = req.body;
 
-    const userExists = await findUserByEmail(email);
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    if (typeof academicId === 'string' && academicId.trim()) {
-      const duplicateAcademicId = await findUserByAcademicId(academicId.trim());
-      if (duplicateAcademicId) {
-        return res.status(400).json({ message: 'Academic ID already exists' });
-      }
-    }
-
-    if (
-      ['student', 'co_researcher'].includes(accountType) &&
-      typeof supervisorId === 'string' &&
-      supervisorId.trim()
-    ) {
-      const linkedSupervisor = await findUserByIdAndAccountType(supervisorId.trim(), 'supervisor');
-      if (!linkedSupervisor) {
-        return res.status(400).json({ message: 'Selected supervisor account is invalid' });
-      }
-    }
+    console.log('[auth.register] payload received', {
+      email,
+      accountType,
+      hasPassword: Boolean(password),
+    });
 
     const user = await createUser({
       email,
@@ -106,7 +92,9 @@ export const register = async (req: Request, res: Response) => {
       subscription: user.subscription,
       token: generateToken(String(user.id))
     });
+    console.log('[auth.register] success');
   } catch (error: any) {
+    console.error('[auth.register] error', error);
     res.status(500).json({ message: error.message });
   }
 };

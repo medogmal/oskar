@@ -1,11 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Activity, Bot, Brain, FileSearch, LoaderCircle, LogOut, ScanText, Send } from 'lucide-react';
+import { Activity, Bot, Brain, FileSearch, LoaderCircle, LogOut, ScanText, Send, Printer } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components/ResearchWorkspaceShell';
 import { useAuth } from '../context/useAuth';
 import { saveAutofillSnapshot } from '../lib/aiAutofill';
 import { apiBaseUrl } from '../lib/auth';
+import { getStudyTypeInfo } from '../lib/studyTypes';
+
 
 type AnalyticsHealth = {
   status: string;
@@ -95,6 +98,9 @@ type AssistantResult = {
   answer: string;
   usedLLM: boolean;
   model: string;
+  provider?: string;
+  responseLanguage?: 'arabic' | 'english' | string;
+  error?: string;
   extractedStudyElements?: {
     title?: string;
     objective?: string;
@@ -208,19 +214,217 @@ type OcrResult = {
   };
 };
 
+type DocumentTextResult = {
+  documentReady: boolean;
+  message: string;
+  text: string;
+  format: string;
+  metadata?: Record<string, unknown>;
+};
+
 const isAssistantResult = (value: unknown): value is AssistantResult =>
   value !== null && typeof value === 'object' && 'answer' in value;
 
-const genericKnowledgeAnswerPatterns = [
-  /i cannot answer/i,
-  /cannot answer based on the provided references/i,
-  /no relevant references/i,
-  /insufficient references/i,
-  /no sufficient evidence/i,
-];
+const hasGroundedKnowledgeResult = (result: KnowledgeQueryResult) => result.citations.length > 0;
 
-const hasGroundedKnowledgeResult = (result: KnowledgeQueryResult) =>
-  result.citations.length > 0 || !genericKnowledgeAnswerPatterns.some((pattern) => pattern.test(result.answer));
+const getTextDirection = (text: string): 'rtl' | 'ltr' => {
+  const arabicCount = (text.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) ?? []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+  return arabicCount > 0 && arabicCount >= Math.max(3, latinCount * 0.25) ? 'rtl' : 'ltr';
+};
+
+const stripFence = (text: string) =>
+  text
+    .replace(/^```(?:markdown|md|text)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+const isTableSeparator = (line: string) =>
+  /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+
+const parseTableRow = (line: string) =>
+  line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+
+const renderInlineMarkdown = (text: string, keyPrefix: string): ReactNode[] => {
+  const nodes: ReactNode[] = [];
+  const tokenPattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    const key = `${keyPrefix}-${match.index}`;
+    if (token.startsWith('**')) {
+      nodes.push(
+        <strong key={key} className="font-semibold text-slate-950">
+          {token.slice(2, -2)}
+        </strong>,
+      );
+    } else {
+      nodes.push(
+        <code key={key} className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.92em] text-slate-800">
+          {token.slice(1, -1)}
+        </code>,
+      );
+    }
+    lastIndex = tokenPattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+};
+
+function FormattedResponse({ text }: { text: string }) {
+  const cleanText = stripFence(text);
+  const direction = getTextDirection(cleanText);
+  const lines = cleanText.replace(/\r\n/g, '\n').split('\n');
+  const blocks: ReactNode[] = [];
+  let index = 0;
+
+  const isSpecialLine = (line: string, nextLine?: string) => {
+    const trimmed = line.trim();
+    return (
+      !trimmed ||
+      /^#{1,4}\s+/.test(trimmed) ||
+      /^[-*]\s+/.test(trimmed) ||
+      /^\d+[.)]\s+/.test(trimmed) ||
+      /^-{3,}$/.test(trimmed) ||
+      (trimmed.includes('|') && Boolean(nextLine && isTableSeparator(nextLine)))
+    );
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1].length;
+      const className = level <= 2 ? 'text-lg font-bold text-slate-950' : 'text-base font-bold text-slate-900';
+      blocks.push(
+        <h3 key={`heading-${index}`} className={className}>
+          {renderInlineMarkdown(heading[2], `heading-${index}`)}
+        </h3>,
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^-{3,}$/.test(trimmed)) {
+      blocks.push(<hr key={`rule-${index}`} className="border-slate-200" />);
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.includes('|') && index + 1 < lines.length && isTableSeparator(lines[index + 1])) {
+      const headers = parseTableRow(trimmed);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
+        rows.push(parseTableRow(lines[index]));
+        index += 1;
+      }
+      blocks.push(
+        <div key={`table-${index}`} className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                {headers.map((header, headerIndex) => (
+                  <th key={`${header}-${headerIndex}`} className="px-3 py-2 font-semibold text-slate-900">
+                    {renderInlineMarkdown(header, `table-header-${index}-${headerIndex}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {rows.map((row, rowIndex) => (
+                <tr key={`row-${index}-${rowIndex}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top text-slate-700">
+                      {renderInlineMarkdown(cell, `table-cell-${index}-${rowIndex}-${cellIndex}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ul key={`ul-${index}`} className={`space-y-2 ${direction === 'rtl' ? 'list-disc pr-5' : 'list-disc pl-5'}`}>
+          {items.map((item, itemIndex) => (
+            <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item, `ul-${index}-${itemIndex}`)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+[.)]\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+[.)]\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+[.)]\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ol key={`ol-${index}`} className={`space-y-2 ${direction === 'rtl' ? 'list-decimal pr-5' : 'list-decimal pl-5'}`}>
+          {items.map((item, itemIndex) => (
+            <li key={`${item}-${itemIndex}`}>{renderInlineMarkdown(item, `ol-${index}-${itemIndex}`)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (index < lines.length && !isSpecialLine(lines[index], lines[index + 1])) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    blocks.push(
+      <p key={`paragraph-${index}`} className="whitespace-pre-wrap">
+        {renderInlineMarkdown(paragraphLines.join(' '), `paragraph-${index}`)}
+      </p>,
+    );
+  }
+
+  return (
+    <div
+      dir={direction}
+      className={`rounded-xl border border-slate-200 bg-white p-5 text-[15px] leading-7 text-slate-800 shadow-sm ${
+        direction === 'rtl' ? 'text-right' : 'text-left'
+      }`}
+    >
+      <div className="space-y-4">{blocks}</div>
+    </div>
+  );
+}
 
 const sampleSizeTestTypes = [
   'independent_t_test',
@@ -229,6 +433,100 @@ const sampleSizeTestTypes = [
   'anova',
   'repeated_measures_anova',
 ] as const;
+
+type SampleSizeAutofillDraft = {
+  testType?: (typeof sampleSizeTestTypes)[number];
+  effectSize?: string;
+  alpha?: string;
+  power?: string;
+  ratio?: string;
+  dropoutRate?: string;
+  alternative?: 'two-sided' | 'larger' | 'smaller';
+  approved?: boolean;
+};
+
+const normalizeDecimalString = (value?: string | null) => {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value.replace(',', '.').trim());
+  return Number.isFinite(parsed) ? String(parsed) : undefined;
+};
+
+const normalizePercentLike = (value?: string | null) => {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value.replace(',', '.'));
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed > 1 ? String(parsed / 100) : String(parsed);
+};
+
+const firstMatch = (text: string, patterns: RegExp[]) => {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+  return undefined;
+};
+
+const extractSampleSizeDraftFromText = (text: string): SampleSizeAutofillDraft => {
+  const normalized = text.replace(/\s+/g, ' ');
+  const draft: SampleSizeAutofillDraft = {};
+
+  if (/repeated\s+measures|within[-\s]?subject|longitudinal|متكررة/i.test(normalized)) {
+    draft.testType = 'repeated_measures_anova';
+  } else if (/paired|matched|before\s+and\s+after|pre[-\s]?post|زوج/i.test(normalized)) {
+    draft.testType = 'paired_t_test';
+  } else if (/anova|three\s+groups|3\s+groups|more\s+than\s+two\s+groups|أكثر من مجموعتين/i.test(normalized)) {
+    draft.testType = 'anova';
+  } else if (/proportion|prevalence|percentage|rate|نسبة|انتشار/i.test(normalized)) {
+    draft.testType = 'two_proportion_z_test';
+  } else if (/rct|random|two\s+groups|intervention|control|تجربة|عشو/i.test(normalized)) {
+    draft.testType = 'independent_t_test';
+  }
+
+  draft.effectSize = normalizeDecimalString(firstMatch(normalized, [
+    /(?:effect\s*size|cohen'?s?\s*d|hedges'?s?\s*g|حجم\s*الأثر)\s*[:=]?\s*(\d+(?:[.,]\d+)?)/i,
+    /\bd\s*=\s*(\d+(?:[.,]\d+)?)/i,
+    /\bg\s*=\s*(\d+(?:[.,]\d+)?)/i,
+  ]));
+  draft.alpha = normalizePercentLike(firstMatch(normalized, [
+    /(?:alpha|significance\s*level|مستوى\s*الدلالة|α)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*%?/i,
+    /\bp\s*<\s*(0?\.\d+)/i,
+  ]));
+  draft.power = normalizePercentLike(firstMatch(normalized, [
+    /(?:power|statistical\s*power|قوة\s*إحصائية|القوة)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*%?/i,
+    /\b(80|85|90|95)\s*%\s*(?:power|statistical\s*power|قوة)/i,
+  ]));
+  draft.dropoutRate = normalizePercentLike(firstMatch(normalized, [
+    /(?:dropout|attrition|loss\s*to\s*follow[-\s]?up|انسحاب|فقدان\s*المتابعة)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*%?/i,
+    /(\d+(?:[.,]\d+)?)\s*%\s*(?:dropout|attrition|loss\s*to\s*follow[-\s]?up|انسحاب)/i,
+  ]));
+
+  const ratioMatch = normalized.match(/(?:allocation\s*ratio|ratio|نسبة\s*التوزيع)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*[:/]\s*(\d+(?:[.,]\d+)?)/i);
+  if (ratioMatch) {
+    const first = Number(ratioMatch[1].replace(',', '.'));
+    const second = Number(ratioMatch[2].replace(',', '.'));
+    if (Number.isFinite(first) && Number.isFinite(second) && first > 0) {
+      draft.ratio = String(second / first);
+    }
+  }
+
+  if (/one[-\s]?sided|اتجاه\s+واحد/i.test(normalized)) {
+    draft.alternative = 'larger';
+  } else if (/two[-\s]?sided|two[-\s]?tailed|اتجاهين|ثنائي/i.test(normalized)) {
+    draft.alternative = 'two-sided';
+  }
+
+  draft.approved = Boolean(draft.effectSize && draft.alpha && draft.power);
+
+  return draft;
+};
 
 const createEmptyClinicalDraft = (): ClinicalDraft => ({
   patientAge: '',
@@ -241,6 +539,7 @@ const createEmptyClinicalDraft = (): ClinicalDraft => ({
 
 const extractClinicalDraftFromText = (text: string): Partial<ClinicalDraft> => {
   const draft: Partial<ClinicalDraft> = {};
+  const normalized = text.replace(/\s+/g, ' ');
   const ageMatch = text.match(/(?:age|العمر)\s*[:=-]?\s*(\d{1,3})/i);
   const pocketDepthMatch = text.match(/(?:ppd|pocket depth|probing depth|عمق الجيب)\s*[:=-]?\s*(\d+(?:\.\d+)?)/i);
   const bloodPressureMatch = text.match(/(?:bp|blood pressure|ضغط الدم)\s*[:=-]?\s*(\d{2,3})\s*\/\s*(\d{2,3})/i);
@@ -262,6 +561,38 @@ const extractClinicalDraftFromText = (text: string): Partial<ClinicalDraft> => {
   }
   if (smokingMatch) {
     draft.smokingStatus = smokingMatch[1] === 'نعم' ? 'yes' : smokingMatch[1] === 'لا' ? 'no' : (smokingMatch[1].toLowerCase() as 'yes' | 'no');
+  }
+
+  const ageFallback = normalized.match(/(?:patient\s*)?(?:age|العمر|سن)\s*[:=-]?\s*(\d{1,3})(?:\s*(?:years?|yrs?|سنة|عام))?/i);
+  const pocketFallback = normalized.match(/(?:ppd|pocket\s*depth|probing\s*depth|عمق\s*الجيب)\s*[:=-]?\s*(\d+(?:[.,]\d+)?)/i);
+  const bpFallback = normalized.match(/(?:bp|blood\s*pressure|ضغط\s*الدم)\s*[:=-]?\s*(\d{2,3})\s*\/\s*(\d{2,3})/i);
+  const systolicFallback = normalized.match(/(?:systolic|sbp|الانقباضي)\s*[:=-]?\s*(\d{2,3})/i);
+  const diastolicFallback = normalized.match(/(?:diastolic|dbp|الانبساطي)\s*[:=-]?\s*(\d{2,3})/i);
+  const heartFallback = normalized.match(/(?:heart\s*rate|pulse|معدل\s*القلب|النبض)\s*[:=-]?\s*(\d{2,3})/i);
+  const smokingFallback = normalized.match(/(?:smoking\s*status|smoker|smoking|التدخين|مدخن)\s*[:=-]?\s*(yes|no|نعم|لا)/i);
+
+  if (!draft.patientAge && ageFallback) {
+    draft.patientAge = ageFallback[1];
+  }
+  if (!draft.pocketDepthMm && pocketFallback) {
+    draft.pocketDepthMm = pocketFallback[1].replace(',', '.');
+  }
+  if ((!draft.systolicBpMmhg || !draft.diastolicBpMmhg) && bpFallback) {
+    draft.systolicBpMmhg = bpFallback[1];
+    draft.diastolicBpMmhg = bpFallback[2];
+  }
+  if (!draft.systolicBpMmhg && systolicFallback) {
+    draft.systolicBpMmhg = systolicFallback[1];
+  }
+  if (!draft.diastolicBpMmhg && diastolicFallback) {
+    draft.diastolicBpMmhg = diastolicFallback[1];
+  }
+  if (!draft.heartRateBpm && heartFallback) {
+    draft.heartRateBpm = heartFallback[1];
+  }
+  if (!draft.smokingStatus && smokingFallback) {
+    const smoking = smokingFallback[1].toLowerCase();
+    draft.smokingStatus = smoking === 'yes' || smoking === 'نعم' ? 'yes' : 'no';
   }
 
   return draft;
@@ -303,6 +634,9 @@ const analysisTypes = [
 ] as const;
 
 const chartTypes = ['histogram', 'box_plot', 'scatter'] as const;
+const datasetFileAccept = '.csv,.xlsx,.xls,.sav';
+const documentFileAccept = '.pdf';
+const imageFileAccept = '.png,.jpg,.jpeg,.webp,.gif';
 const LazyPlotFigure = lazy(() => import('../components/LazyPlotFigure'));
 
 function AIChat() {
@@ -353,6 +687,7 @@ function AIChat() {
   const [clinicalDraft, setClinicalDraft] = useState<ClinicalDraft>(createEmptyClinicalDraft);
   const [clinicalValidation, setClinicalValidation] = useState<ClinicalValidationResult | null>(null);
   const [autofillSnapshot, setAutofillSnapshot] = useState<AutofillSnapshot | null>(null);
+  const [autofillNotice, setAutofillNotice] = useState('');
   const [studies, setStudies] = useState<StudyOption[]>([]);
   const [selectedStudyId, setSelectedStudyId] = useState(searchParams.get('studyId') ?? '');
   const [persistedFiles, setPersistedFiles] = useState<PersistedStudyFile[]>([]);
@@ -360,6 +695,9 @@ function AIChat() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState('');
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const datasetInputRef = useRef<HTMLInputElement | null>(null);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   const acceptedFileLabel = useMemo(() => {
     if (selectedFile) {
@@ -371,6 +709,33 @@ function AIChat() {
 
   const availableColumns = datasetProfile?.profile.columnNames ?? [];
   const selectedStudy = studies.find((study) => study.id === selectedStudyId) ?? null;
+  const knowledgeEngineAvailable = Boolean(knowledgeHealth || health);
+
+  const setSelectedFileAndFocus = (file: File | null, source: 'dataset' | 'document' | 'image') => {
+    setSelectedFile(file);
+    if (!file) {
+      return;
+    }
+
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isPdf = extension === 'pdf';
+    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extension);
+    const isDataset = ['csv', 'xlsx', 'xls', 'sav'].includes(extension);
+
+    if (source === 'dataset' && !isDataset) {
+      setError('اختر ملف بيانات بصيغة CSV أو XLSX أو XLS أو SAV.');
+      return;
+    }
+    if (source === 'document' && !isPdf) {
+      setError('اختر ملف PDF فقط لهذا المسار.');
+      return;
+    }
+    if (source === 'image' && !isImage) {
+      setError('اختر صورة بصيغة PNG أو JPG أو JPEG أو WEBP أو GIF.');
+      return;
+    }
+    setError('');
+  };
 
   const handleLogout = () => {
     signOut();
@@ -842,6 +1207,8 @@ function AIChat() {
         body: JSON.stringify({
           mode,
           prompt,
+          response_language: getTextDirection(prompt) === 'rtl' ? 'arabic' : 'english',
+          study_type: selectedStudy?.studyType,
           protocol_text: prompt,
           useKnowledgeEngine,
           knowledgeFilterSource: knowledgeFilterSource || undefined,
@@ -850,6 +1217,7 @@ function AIChat() {
           statistical_result: analysisResult,
           study_context: buildKnowledgeStudyContext(),
         }),
+
       });
 
       if (!response.ok) {
@@ -932,6 +1300,158 @@ function AIChat() {
     }
   };
 
+  const handleSmartKnowledgeAutofill = async () => {
+    if (!authHeaders) {
+      return;
+    }
+
+    if (!selectedFile && !prompt.trim()) {
+      setError('ارفع مقترح البحث أو اكتب نص البروتوكول أولا حتى يستطيع AI تعبئة الحقول.');
+      return;
+    }
+
+    try {
+      setError('');
+      setAutofillNotice('');
+      setIsBusy(true);
+
+      let sourceText = prompt.trim();
+      let sourceLabel = selectedStudy?.title || 'Prompt';
+      let ingestedEffectSize: number | undefined;
+      let ingestedStudyGroups: string[] | undefined;
+
+      if (selectedFile) {
+        sourceLabel = selectedFile.name;
+
+        const textFormData = new FormData();
+        textFormData.append('file', selectedFile);
+        const textResponse = await fetch(`${apiBaseUrl}/analytics/document/extract-text`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: textFormData,
+        });
+
+        if (textResponse.ok) {
+          const documentText = (await textResponse.json()) as DocumentTextResult;
+          if (documentText.text.trim()) {
+            sourceText = documentText.text.trim();
+            if (!prompt.trim()) {
+              setPrompt(sourceText.slice(0, 1600));
+            }
+          }
+        }
+
+        const ingestFormData = new FormData();
+        ingestFormData.append('file', selectedFile);
+        ingestFormData.append('document_type', knowledgeDocumentType);
+        const ingestResponse = await fetch(`${apiBaseUrl}/analytics/knowledge/ingest`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: ingestFormData,
+        });
+
+        if (ingestResponse.ok) {
+          const ingestData = (await ingestResponse.json()) as KnowledgeIngestResult;
+          setKnowledgeIngestResult(ingestData);
+          setKnowledgeFilterSource(ingestData.filename);
+          ingestedEffectSize = ingestData.extracted_effect_size ?? undefined;
+          ingestedStudyGroups = ingestData.study_groups ?? undefined;
+        }
+      }
+
+      if (!sourceText.trim()) {
+        setError('لم أستطع استخراج نص من الملف. جرّب PDF نصي أو صورة أوضح أو الصق نص البروتوكول في السؤال.');
+        return;
+      }
+
+      const sampleDraft = extractSampleSizeDraftFromText(sourceText);
+      if (!sampleDraft.effectSize && typeof ingestedEffectSize === 'number') {
+        sampleDraft.effectSize = String(ingestedEffectSize);
+      }
+      if (!sampleDraft.alpha) {
+        sampleDraft.alpha = sampleSizeAlpha || '0.05';
+      }
+      if (!sampleDraft.power) {
+        sampleDraft.power = sampleSizePower || '0.8';
+      }
+      if (!sampleDraft.ratio) {
+        sampleDraft.ratio = sampleSizeRatio || '1';
+      }
+      if (!sampleDraft.dropoutRate) {
+        sampleDraft.dropoutRate = sampleSizeDropoutRate || '0.15';
+      }
+      if (!sampleDraft.alternative) {
+        sampleDraft.alternative = sampleSizeAlternative;
+      }
+      sampleDraft.approved = Boolean(sampleDraft.effectSize && sampleDraft.alpha && sampleDraft.power);
+
+      if (sampleDraft.testType) {
+        setSampleSizeTestType(sampleDraft.testType);
+      }
+      if (sampleDraft.effectSize) {
+        setSampleSizeEffectSize(sampleDraft.effectSize);
+      }
+      if (sampleDraft.alpha) {
+        setSampleSizeAlpha(sampleDraft.alpha);
+      }
+      if (sampleDraft.power) {
+        setSampleSizePower(sampleDraft.power);
+      }
+      if (sampleDraft.ratio) {
+        setSampleSizeRatio(sampleDraft.ratio);
+      }
+      if (sampleDraft.dropoutRate) {
+        setSampleSizeDropoutRate(sampleDraft.dropoutRate);
+      }
+      if (sampleDraft.alternative) {
+        setSampleSizeAlternative(sampleDraft.alternative);
+      }
+      setSampleSizeApproved(sampleDraft.approved);
+      if (!knowledgeLimit.trim()) {
+        setKnowledgeLimit('5');
+      }
+      if (knowledgeDocumentType === 'research_proposal') {
+        setMode('study_elements');
+      }
+
+      const extractedClinicalDraft = extractClinicalDraftFromText(sourceText);
+      const nextClinicalDraft: ClinicalDraft = {
+        ...clinicalDraft,
+        ...extractedClinicalDraft,
+      };
+      setClinicalDraft(nextClinicalDraft);
+
+      mergeAutofillSnapshot({
+        studyGroups: ingestedStudyGroups,
+        suggestedEffectSize: sampleDraft.effectSize ? Number(sampleDraft.effectSize) : ingestedEffectSize,
+        suggestedPrompt: sourceText.slice(0, 1200),
+        sourceLabel,
+        clinicalDraft: extractedClinicalDraft,
+      });
+
+      const actions: string[] = [];
+      if (sampleDraft.effectSize) {
+        await handleSampleSizeCalculation(sampleDraft, false);
+        actions.push('تم حساب حجم العينة');
+      } else {
+        actions.push('لم يتم العثور على effect size واضح');
+      }
+
+      if (nextClinicalDraft.patientAge && nextClinicalDraft.pocketDepthMm) {
+        await handleClinicalValidation(nextClinicalDraft, false);
+        actions.push('تم التحقق السريري');
+      } else {
+        actions.push('الحقول السريرية تحتاج بيانات مريض أو OCR أوضح');
+      }
+
+      setAutofillNotice(`تمت التعبئة الذكية من ${sourceLabel}. ${actions.join('، ')}.`);
+    } catch {
+      setError('تعذر تنفيذ التعبئة الذكية. تأكد من الملف أو الصق نص المقترح ثم أعد المحاولة.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const handleKnowledgeQuery = async () => {
     if (!prompt.trim() || !authHeaders) {
       setError(t('aiChat.errors.promptRequired'));
@@ -969,14 +1489,16 @@ function AIChat() {
     }
   };
 
-  const handleSampleSizeCalculation = async () => {
+  const handleSampleSizeCalculation = async (draft: SampleSizeAutofillDraft = {}, manageBusy = true) => {
     if (!authHeaders) {
       return;
     }
 
     try {
       setError('');
-      setIsBusy(true);
+      if (manageBusy) {
+        setIsBusy(true);
+      }
       const response = await fetch(`${apiBaseUrl}/analytics/knowledge/sample-size`, {
         method: 'POST',
         headers: {
@@ -984,14 +1506,14 @@ function AIChat() {
           ...authHeaders,
         },
         body: JSON.stringify({
-          test_type: sampleSizeTestType,
-          effect_size: toOptionalNumber(sampleSizeEffectSize),
-          alpha: Number(sampleSizeAlpha || 0.05),
-          power: Number(sampleSizePower || 0.8),
-          ratio: Number(sampleSizeRatio || 1),
-          alternative: sampleSizeAlternative,
-          approved: sampleSizeApproved,
-          dropout_rate: Number(sampleSizeDropoutRate || 0.15),
+          test_type: draft.testType ?? sampleSizeTestType,
+          effect_size: toOptionalNumber(draft.effectSize ?? sampleSizeEffectSize),
+          alpha: Number((draft.alpha ?? sampleSizeAlpha) || 0.05),
+          power: Number((draft.power ?? sampleSizePower) || 0.8),
+          ratio: Number((draft.ratio ?? sampleSizeRatio) || 1),
+          alternative: draft.alternative ?? sampleSizeAlternative,
+          approved: draft.approved ?? sampleSizeApproved,
+          dropout_rate: Number((draft.dropoutRate ?? sampleSizeDropoutRate) || 0.15),
         }),
       });
 
@@ -1001,23 +1523,25 @@ function AIChat() {
 
       const data = (await response.json()) as KnowledgeSampleSizeResult;
       setSampleSizeResult(data);
-      if (!sampleSizeEffectSize && typeof data.proposed_effect_size === 'number') {
+      if (!sampleSizeEffectSize && !draft.effectSize && typeof data.proposed_effect_size === 'number') {
         setSampleSizeEffectSize(String(data.proposed_effect_size));
       }
     } catch {
       setError('تعذر تنفيذ حساب حجم العينة عبر المكتبة المعرفية.');
     } finally {
-      setIsBusy(false);
+      if (manageBusy) {
+        setIsBusy(false);
+      }
     }
   };
 
-  const handleClinicalValidation = async () => {
+  const handleClinicalValidation = async (draft: ClinicalDraft = clinicalDraft, manageBusy = true) => {
     if (!authHeaders) {
       return;
     }
 
-    const patientAge = toOptionalNumber(clinicalDraft.patientAge);
-    const pocketDepthMm = toOptionalNumber(clinicalDraft.pocketDepthMm);
+    const patientAge = toOptionalNumber(draft.patientAge);
+    const pocketDepthMm = toOptionalNumber(draft.pocketDepthMm);
     if (patientAge === undefined || pocketDepthMm === undefined) {
       setError('أدخل العمر وعمق الجيب أو استخرجهما من OCR قبل التحقق السريري.');
       return;
@@ -1025,7 +1549,9 @@ function AIChat() {
 
     try {
       setError('');
-      setIsBusy(true);
+      if (manageBusy) {
+        setIsBusy(true);
+      }
       const response = await fetch(`${apiBaseUrl}/analytics/knowledge/validate-clinical`, {
         method: 'POST',
         headers: {
@@ -1035,10 +1561,10 @@ function AIChat() {
         body: JSON.stringify({
           patient_age: patientAge,
           pocket_depth_mm: pocketDepthMm,
-          systolic_bp_mmhg: toOptionalNumber(clinicalDraft.systolicBpMmhg),
-          diastolic_bp_mmhg: toOptionalNumber(clinicalDraft.diastolicBpMmhg),
-          heart_rate_bpm: toOptionalNumber(clinicalDraft.heartRateBpm),
-          smoking_status: clinicalDraft.smokingStatus,
+          systolic_bp_mmhg: toOptionalNumber(draft.systolicBpMmhg),
+          diastolic_bp_mmhg: toOptionalNumber(draft.diastolicBpMmhg),
+          heart_rate_bpm: toOptionalNumber(draft.heartRateBpm),
+          smoking_status: draft.smokingStatus,
         }),
       });
 
@@ -1050,7 +1576,9 @@ function AIChat() {
     } catch {
       setError('تعذر تنفيذ التحقق السريري من البيانات المستخرجة.');
     } finally {
-      setIsBusy(false);
+      if (manageBusy) {
+        setIsBusy(false);
+      }
     }
   };
 
@@ -1104,7 +1632,7 @@ function AIChat() {
     },
     {
       label: 'Knowledge Engine',
-      value: knowledgeHealth ? 'Connected' : 'Unavailable',
+      value: knowledgeEngineAvailable ? 'Connected' : 'Unavailable',
       icon: Bot,
     },
   ] as const;
@@ -1156,14 +1684,24 @@ function AIChat() {
         active: item.key === 'analysis',
       }))}
       actions={
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100"
-        >
-          <LogOut className="h-4 w-4" />
-          {t('dashboard.common.logout')}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100"
+          >
+            <Printer className="h-4 w-4" />
+            طباعة كـ PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100"
+          >
+            <LogOut className="h-4 w-4" />
+            {t('dashboard.common.logout')}
+          </button>
+        </>
       }
     >
       <div className="space-y-6">
@@ -1176,16 +1714,34 @@ function AIChat() {
                 مساحة تقارير وتحليل موحدة لرفع الملفات، تشخيص البيانات، تشغيل التحليل الإحصائي، وإصدار مخرجات الذكاء الاصطناعي والتقارير النهائية.
               </p>
             </div>
-            <div className="grid min-w-[280px] gap-3">
-              <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-100">
-                {selectedStudy ? `${selectedStudy.studyType} • ${selectedStudy.status}` : 'Standalone analysis mode'}
-              </div>
-              {user ? (
+            <div className="grid min-w-[300px] gap-3">
+              {selectedStudy ? (
+                <div className="rounded-2xl bg-white/10 p-4 backdrop-blur-md">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-teal-400"></span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-teal-200">
+                      مكتبة معرفية مربوطة: {getStudyTypeInfo(selectedStudy.studyType).shortLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm font-black text-white">
+                    {getStudyTypeInfo(selectedStudy.studyType).labelAr}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-300">
+                    {getStudyTypeInfo(selectedStudy.studyType).primaryGuideline}
+                  </p>
+                </div>
+              ) : (
                 <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-100">
+                  تحليل خارجي حر (غير مرتبط بدراسة)
+                </div>
+              )}
+              {user ? (
+                <div className="rounded-2xl bg-white/10 px-4 py-2.5 text-xs font-extrabold text-slate-200">
                   {user.fullName ?? t('dashboard.common.fallbackResearcher')}
                 </div>
               ) : null}
             </div>
+
           </div>
         </div>
 
@@ -1275,14 +1831,27 @@ function AIChat() {
                 <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-medium text-slate-700">{t('aiChat.fields.file')}</label>
                   <div className="prototype-dropzone rounded-3xl p-5">
-                    <input type="file" accept=".csv,.xlsx,.xls,.sav,.png,.jpg,.jpeg,.webp,.gif,.pdf" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} className="block w-full text-sm text-slate-600" />
-                    <p className="mt-3 text-sm font-semibold text-slate-700">{acceptedFileLabel}</p>
-                    <p className="mt-1 text-xs text-slate-500">CSV / XLSX / SAV / PDF / Images</p>
-                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} className="hidden" />
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-3">
+                      <input ref={datasetInputRef} type="file" accept={datasetFileAccept} onChange={(event) => setSelectedFileAndFocus(event.target.files?.[0] ?? null, 'dataset')} className="hidden" />
+                      <input ref={pdfInputRef} type="file" accept={documentFileAccept} onChange={(event) => setSelectedFileAndFocus(event.target.files?.[0] ?? null, 'document')} className="hidden" />
+                      <input ref={imageInputRef} type="file" accept={imageFileAccept} onChange={(event) => setSelectedFileAndFocus(event.target.files?.[0] ?? null, 'image')} className="hidden" />
+                      <button type="button" onClick={() => datasetInputRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                        ملف بيانات
+                      </button>
+                      <button type="button" onClick={() => pdfInputRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                        ملف PDF
+                      </button>
+                      <button type="button" onClick={() => imageInputRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                        صورة
+                      </button>
                       <button type="button" onClick={() => cameraInputRef.current?.click()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
                         التقاط صورة من الهاتف
                       </button>
+                    </div>
+                    <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={(event) => setSelectedFileAndFocus(event.target.files?.[0] ?? null, 'image')} className="hidden" />
+                    <p className="mt-3 text-sm font-semibold text-slate-700">{acceptedFileLabel}</p>
+                    <p className="mt-1 text-xs text-slate-500">CSV / XLSX / SAV / PDF / PNG / JPG / JPEG / WEBP / GIF</p>
+                    <div className="mt-4 flex flex-wrap gap-3">
                       <button
                         type="button"
                         onClick={() => void handleUploadStudyFile()}
@@ -1351,7 +1920,7 @@ function AIChat() {
                   <h2 className="text-xl font-bold text-slate-900">Knowledge, Auto-fill & Validation</h2>
                   <p className="mt-1 text-sm text-slate-500">فهرسة المقترح أو المرجع، تعبئة ذكية، حساب حجم العينة، والتحقق من الحقول السريرية.</p>
                 </div>
-                <div className={`prototype-chip ${knowledgeHealth ? 'active' : ''}`}>{knowledgeHealth ? 'Connected' : 'Offline'}</div>
+                <div className={`prototype-chip ${knowledgeEngineAvailable ? 'active' : ''}`}>{knowledgeEngineAvailable ? 'Connected' : 'Offline'}</div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1446,9 +2015,15 @@ function AIChat() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">
+                <button type="button" onClick={() => void handleSmartKnowledgeAutofill()} className="rounded-xl bg-teal-600 px-4 py-3 text-sm font-medium text-white hover:bg-teal-700">AI تعبئة ذكية كاملة</button>
                 <button type="button" onClick={() => void handleSampleSizeCalculation()} className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-700">حساب حجم العينة</button>
                 <button type="button" onClick={() => void handleClinicalValidation()} className="rounded-xl border border-purple-300 bg-purple-50 px-4 py-3 text-sm font-medium text-purple-700 hover:bg-purple-100">تحقق سريري من الحقول</button>
               </div>
+              {autofillNotice ? (
+                <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm font-medium text-teal-800">
+                  {autofillNotice}
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -1657,16 +2232,41 @@ function AIChat() {
 
             {assistantResult ? (
               <div className="workspace-card p-6">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
-                    <Bot className="h-5 w-5" />
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+                      <Bot className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">{t('aiChat.results.assistant')}</h2>
+                      <p className="text-sm text-slate-500">
+                        {assistantResult.usedLLM ? assistantResult.model : t('aiChat.results.fallbackAssistant')}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">{t('aiChat.results.assistant')}</h2>
-                    <p className="text-sm text-slate-500">{assistantResult.usedLLM ? assistantResult.model : t('aiChat.results.fallbackAssistant')}</p>
+                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className={`rounded-full px-3 py-1 ${
+                      assistantResult.usedLLM
+                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
+                        : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100'
+                    }`}>
+                      {assistantResult.usedLLM ? 'Live AI' : 'Fallback'}
+                    </span>
+                    {assistantResult.provider ? (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700 ring-1 ring-blue-100">
+                        {assistantResult.provider}
+                      </span>
+                    ) : null}
+                    {assistantResult.responseLanguage ? (
+                      <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600 ring-1 ring-slate-200">
+                        {assistantResult.responseLanguage === 'arabic' ? 'العربية' : 'English'}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200"><pre className="whitespace-pre-wrap">{assistantResult.answer}</pre></div>
+                <div className="mt-4">
+                  <FormattedResponse text={assistantResult.answer} />
+                </div>
                 {assistantResult.extractedStudyElements ? (
                   <div className="mt-4 rounded-2xl bg-teal-50 p-4 text-sm text-teal-900 ring-1 ring-teal-100">
                     <p className="font-semibold">{assistantResult.extractedStudyElements.title}</p>
@@ -1713,8 +2313,8 @@ function AIChat() {
                         </div>
                       </div>
                     ) : null}
-                    <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
-                      <pre className="whitespace-pre-wrap">{knowledgeResult.answer}</pre>
+                    <div className="mt-4">
+                      <FormattedResponse text={knowledgeResult.answer} />
                     </div>
                     {knowledgeResult.retrieval?.attempts.length ? (
                       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -1732,7 +2332,9 @@ function AIChat() {
                               Source: {attempt.filterSource || 'all indexed references'}
                             </p>
                             <p className="mt-1 text-xs">Citations: {attempt.citationCount}</p>
-                            <p className="mt-1 text-xs">{attempt.useful ? 'Grounded answer found' : 'No grounded evidence returned'}</p>
+                            <p className="mt-1 text-xs">
+                              {attempt.useful ? 'Cited evidence found' : 'No citable evidence returned'}
+                            </p>
                           </div>
                         ))}
                       </div>

@@ -1,7 +1,9 @@
 import { Response } from 'express';
+import fs from 'node:fs/promises';
 import { query } from '../db.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { findStudyByIdForSupervisor, findStudyByIdForUser } from '../models/Study.js';
+import { listStudyAnalyses, listStudyFiles, type StudyFileRecord } from '../models/StudyAsset.js';
 import {
   approveOutcomeAssessmentTemplateVersion,
   createOutcomeAssessmentNote,
@@ -22,6 +24,10 @@ import {
   type AssessmentTemplateField,
 } from '../models/OutcomeAssessment.js';
 import { findUserByIdAndAccountType } from '../models/User.js';
+import { resolveStoredPath } from '../lib/storage.js';
+
+const analyticsBaseUrl = (process.env.PYTHON_ANALYTICS_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
+const analyticsTimeoutMs = Number(process.env.PYTHON_ANALYTICS_TIMEOUT_MS ?? 120000);
 
 const ensureStudyManagerAccount = (req: AuthRequest, res: Response) => {
   if (!req.user) {
@@ -118,6 +124,196 @@ const ensureStudyFilesBelongToStudy = async (
   return result.rows.length === assetLinks.length;
 };
 
+const getErrorPayload = async (response: globalThis.Response) => {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+  return { detail: await response.text() };
+};
+
+const postJsonToAnalytics = async (endpoint: string, payload: Record<string, unknown>) => {
+  const response = await fetch(`${analyticsBaseUrl}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(analyticsTimeoutMs),
+  });
+
+  if (!response.ok) {
+    const data = await getErrorPayload(response);
+    throw new Error(data.detail || data.message || 'Analytics request failed');
+  }
+
+  return response.json();
+};
+
+const postFileToAnalytics = async (endpoint: string, file: StudyFileRecord, buffer: Buffer) => {
+  const formData = new FormData();
+  formData.append(
+    'file',
+    new Blob([new Uint8Array(buffer)], { type: file.mimeType || 'application/octet-stream' }),
+    file.originalName,
+  );
+
+  const response = await fetch(`${analyticsBaseUrl}${endpoint}`, {
+    method: 'POST',
+    body: formData,
+    signal: AbortSignal.timeout(analyticsTimeoutMs),
+  });
+
+  if (!response.ok) {
+    const data = await getErrorPayload(response);
+    throw new Error(data.detail || data.message || 'Document extraction failed');
+  }
+
+  return response.json() as Promise<{
+    documentReady: boolean;
+    message: string;
+    text: string;
+    format: string;
+    metadata?: Record<string, unknown>;
+  }>;
+};
+
+const normalizeStudyType = (value: unknown) => {
+  const normalized = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) {
+    return 'rct';
+  }
+  if (normalized.includes('rct') || normalized.includes('random')) {
+    return 'rct';
+  }
+  if (normalized.includes('prospective') || normalized.includes('cohort')) {
+    return 'prospective';
+  }
+  if (normalized.includes('retrospective') || normalized.includes('record') || normalized.includes('ehr')) {
+    return 'retrospective';
+  }
+  if (normalized.includes('cross') || normalized.includes('sectional') || normalized.includes('survey')) {
+    return 'cross_sectional';
+  }
+  if (normalized.includes('vitro') || normalized.includes('lab')) {
+    return 'in_vitro';
+  }
+  return ['rct', 'prospective', 'retrospective', 'cross_sectional', 'in_vitro'].includes(normalized)
+    ? normalized
+    : 'rct';
+};
+
+const isProposalLikeFile = (file: StudyFileRecord) => {
+  const name = file.originalName.toLowerCase();
+  const mime = (file.mimeType ?? '').toLowerCase();
+  return (
+    file.fileCategory === 'protocol' ||
+    file.fileCategory === 'report' ||
+    file.fileCategory === 'attachment' ||
+    name.endsWith('.pdf') ||
+    name.endsWith('.docx') ||
+    name.endsWith('.txt') ||
+    name.endsWith('.md') ||
+    mime.includes('pdf') ||
+    mime.includes('word') ||
+    mime.startsWith('text/')
+  );
+};
+
+const extractTextFromStudyFile = async (file: StudyFileRecord) => {
+  try {
+    const buffer = await fs.readFile(resolveStoredPath(file.relativePath));
+    const extraction = await postFileToAnalytics('/document/extract-text', file, buffer);
+    return {
+      fileId: file.id,
+      originalName: file.originalName,
+      fileCategory: file.fileCategory,
+      ready: extraction.documentReady,
+      message: extraction.message,
+      format: extraction.format,
+      text: extraction.text?.slice(0, 18000) ?? '',
+    };
+  } catch (error) {
+    return {
+      fileId: file.id,
+      originalName: file.originalName,
+      fileCategory: file.fileCategory,
+      ready: false,
+      message: error instanceof Error ? error.message : 'Unable to extract document text',
+      format: 'unknown',
+      text: '',
+    };
+  }
+};
+
+const getAssistantAnalysisSnippet = (analysis: Awaited<ReturnType<typeof listStudyAnalyses>>[number]) => {
+  const assistantAnswer =
+    analysis.assistant && typeof analysis.assistant.answer === 'string'
+      ? analysis.assistant.answer
+      : undefined;
+  const extractedElements =
+    analysis.assistant && typeof analysis.assistant.extractedStudyElements === 'object'
+      ? JSON.stringify(analysis.assistant.extractedStudyElements)
+      : undefined;
+  const resultSummary =
+    analysis.result && typeof analysis.result.summaryText === 'string'
+      ? analysis.result.summaryText
+      : undefined;
+
+  return [analysis.title, analysis.analysisType, analysis.prompt, assistantAnswer, extractedElements, resultSummary]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 3000);
+};
+
+const buildAiDraftProtocolText = (input: {
+  study: NonNullable<Awaited<ReturnType<typeof getManagedStudy>>>;
+  extractedDocuments: Array<Awaited<ReturnType<typeof extractTextFromStudyFile>>>;
+  analyses: Awaited<ReturnType<typeof listStudyAnalyses>>;
+}) => {
+  const { study, extractedDocuments, analyses } = input;
+  const sections = [
+    `Study title: ${study.title}`,
+    study.description ? `Description: ${study.description}` : '',
+    `Study type: ${study.studyType}`,
+    `Target sample size: ${study.targetSampleSize}`,
+    `Randomization: ${study.hasRandomization ? 'yes' : 'no'}`,
+    study.randomizationMethod ? `Randomization method: ${study.randomizationMethod}` : '',
+    `Blinding: ${study.hasBlinding ? 'yes' : 'no'}`,
+    study.groups?.length ? `Study groups: ${study.groups.join(', ')}` : '',
+    study.ethicsApprovalNumber ? `Ethics approval: ${study.ethicsApprovalNumber}` : '',
+    study.clinicalRegistrationNumber ? `Trial registration: ${study.clinicalRegistrationNumber}` : '',
+    study.blindingSettings ? `Blinding settings: ${JSON.stringify(study.blindingSettings)}` : '',
+  ].filter(Boolean);
+
+  for (const document of extractedDocuments) {
+    if (document.text.trim()) {
+      sections.push(`\nSource document: ${document.originalName}\n${document.text}`);
+    } else {
+      sections.push(`\nSource document: ${document.originalName}\nText extraction unavailable: ${document.message}`);
+    }
+  }
+
+  const analysisSnippets = analyses
+    .map(getAssistantAnalysisSnippet)
+    .filter(Boolean)
+    .slice(0, 3);
+  if (analysisSnippets.length) {
+    sections.push(`\nPrevious AI/analysis outputs:\n${analysisSnippets.join('\n\n---\n\n')}`);
+  }
+
+  return sections.join('\n').slice(0, 60000);
+};
+
+const buildCrfGenerationPrompt = (studyType: string) =>
+  [
+    'Generate a clinical dental assessment form / CRF based on this research proposal and the authorized knowledge base.',
+    `Study design route: ${studyType}.`,
+    'Apply three layers: Layer 1 Extraction for the 23 proposal sections, Layer 2 Validation, Layer 3 Missing Information.',
+    'The final fields must be practical for patient screening, clinical examination, outcome measurement, follow-up, reliability, safety, and assessor comments.',
+    'Return a strict JSON object with extracted_summary, extraction, validation, missing_information, and fields.',
+  ].join('\n');
+
 export const getOutcomeAssessmentOverviewRecord = async (req: AuthRequest, res: Response) => {
   const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const study = await getManagedStudy(req, res, studyId);
@@ -141,6 +337,105 @@ export const getOutcomeAssessmentOverviewRecord = async (req: AuthRequest, res: 
     templateVersions,
     approvedTemplate: templateVersions.find((item) => item.approvalStatus === 'approved') ?? null,
   });
+};
+
+export const generateOutcomeAssessmentTemplateDraftRecord = async (req: AuthRequest, res: Response) => {
+  const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const study = await getManagedStudy(req, res, studyId);
+  if (!study) {
+    return;
+  }
+  if (!ensureUnlockedManagedStudy(study, res)) {
+    return;
+  }
+
+  try {
+    const [files, analyses] = await Promise.all([
+      listStudyFiles(studyId),
+      listStudyAnalyses(studyId),
+    ]);
+    const proposalFiles = files.filter(isProposalLikeFile).slice(0, 5);
+    const extractedDocuments = await Promise.all(proposalFiles.map(extractTextFromStudyFile));
+    const studyType = normalizeStudyType(study.studyType);
+    const protocolText = buildAiDraftProtocolText({
+      study,
+      extractedDocuments,
+      analyses,
+    });
+    const prompt = buildCrfGenerationPrompt(studyType);
+
+    let knowledgePayload: Record<string, unknown> | null = null;
+    try {
+      knowledgePayload = (await postJsonToAnalytics('/api/v1/query', {
+        question: `${prompt}\n\n${protocolText.slice(0, 5000)}`,
+        study_type: studyType,
+        limit: 8,
+      })) as Record<string, unknown>;
+    } catch (error) {
+      knowledgePayload = {
+        answer: '',
+        citations: [],
+        error: error instanceof Error ? error.message : 'Unable to query knowledge base',
+      };
+    }
+
+    const assistantPayload = (await postJsonToAnalytics('/assistant/chat', {
+      mode: 'crf_generation',
+      prompt,
+      protocol_text: protocolText,
+      study_type: studyType,
+      study_context: {
+        study_metadata: {
+          id: study.id,
+          title: study.title,
+          description: study.description,
+          studyType: study.studyType,
+          normalizedStudyType: studyType,
+          targetSampleSize: study.targetSampleSize,
+          hasRandomization: study.hasRandomization,
+          hasBlinding: study.hasBlinding,
+          randomizationMethod: study.randomizationMethod,
+          groups: study.groups,
+          blindingSettings: study.blindingSettings,
+          ethicsApprovalNumber: study.ethicsApprovalNumber,
+          clinicalRegistrationNumber: study.clinicalRegistrationNumber,
+        },
+        retrieved_resources: {
+          files: files.slice(0, 20).map((file) => ({
+            id: file.id,
+            originalName: file.originalName,
+            fileCategory: file.fileCategory,
+          })),
+          analyses: analyses.slice(0, 10).map((analysis) => ({
+            id: analysis.id,
+            title: analysis.title,
+            analysisType: analysis.analysisType,
+            createdAt: analysis.createdAt,
+          })),
+        },
+        knowledge_context: knowledgePayload,
+      },
+    })) as Record<string, unknown>;
+
+    return res.json({
+      ...assistantPayload,
+      knowledge: knowledgePayload,
+      sourceDocuments: extractedDocuments.map((document) => ({
+        fileId: document.fileId,
+        originalName: document.originalName,
+        fileCategory: document.fileCategory,
+        ready: document.ready,
+        message: document.message,
+        format: document.format,
+        extractedCharacters: document.text.length,
+      })),
+      protocolCharactersUsed: protocolText.length,
+    });
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Unable to generate an AI assessment form draft',
+    });
+  }
 };
 
 export const createOutcomeAssessmentRequestsRecord = async (req: AuthRequest, res: Response) => {

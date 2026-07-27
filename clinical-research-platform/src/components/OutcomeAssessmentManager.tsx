@@ -53,6 +53,9 @@ type AssessmentTemplateField = {
   label: string;
   responseType: 'numeric' | 'choice' | 'text' | 'boolean';
   options?: string[];
+  section?: string;
+  required?: boolean;
+  note?: string;
 };
 
 type AssessmentTemplateVersion = {

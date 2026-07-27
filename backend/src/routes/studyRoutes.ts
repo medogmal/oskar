@@ -17,6 +17,7 @@ import {
   createResearcherAssessmentTemplateVersionRecord,
   createOutcomeAssessmentNoteRecord,
   createOutcomeAssessmentRequestsRecord,
+  generateOutcomeAssessmentTemplateDraftRecord,
   getOutcomeAssessmentOverviewRecord,
   getOutcomeAssessmentWorkspaceRecord,
   listOutcomeAssessmentNotesRecord,
@@ -99,6 +100,7 @@ router.get('/review/queue', getSupervisorReviewQueue);
 router.get('/clinical-evaluation/queue', getClinicalEvaluationQueue);
 router.get('/', getStudies);
 router.get('/:id/outcome-assessment/overview', getOutcomeAssessmentOverviewRecord);
+router.post('/:id/outcome-assessment/ai-draft', generateOutcomeAssessmentTemplateDraftRecord);
 router.post(
   '/:id/outcome-assessment/requests',
   createOutcomeAssessmentRequestValidator,

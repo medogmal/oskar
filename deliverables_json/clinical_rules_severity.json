@@ -1,0 +1,59 @@
+{
+  "description": "Standard Clinical & Physiological Range Rules with Severity Tags",
+  "rules": {
+    "patientAge": {
+      "min": 0,
+      "max": 120,
+      "label_ar": "عمر المريض (سنة)",
+      "unit": "years"
+    },
+    "pocketDepthMm": {
+      "min": 0.0,
+      "max": 15.0,
+      "label_ar": "عمق الجيب اللثوي (مم)",
+      "unit": "mm"
+    },
+    "clinicalAttachmentLossMm": {
+      "min": 0.0,
+      "max": 15.0,
+      "label_ar": "فقدان الالتصاق السريري CAL (مم)",
+      "unit": "mm"
+    },
+    "bleedingOnProbingPercent": {
+      "min": 0.0,
+      "max": 100.0,
+      "label_ar": "نسبة النزف عند السبر BOP (%)",
+      "unit": "%"
+    },
+    "plaqueIndexPercent": {
+      "min": 0.0,
+      "max": 100.0,
+      "label_ar": "مؤشر اللويحة السنية Plaque Index (%)",
+      "unit": "%"
+    },
+    "systolicBpMmhg": {
+      "min": 50,
+      "max": 250,
+      "label_ar": "ضغط الدم الانقباضي (مم زئبق)",
+      "unit": "mmHg"
+    },
+    "diastolicBpMmhg": {
+      "min": 30,
+      "max": 150,
+      "label_ar": "ضغط الدم الانبساطي (مم زئبق)",
+      "unit": "mmHg"
+    },
+    "heartRateBpm": {
+      "min": 30,
+      "max": 220,
+      "label_ar": "معدل نبضات القلب (نبضة/دقيقة)",
+      "unit": "bpm"
+    },
+    "hba1cPercent": {
+      "min": 3.0,
+      "max": 18.0,
+      "label_ar": "السكر التراكمي HbA1c (%)",
+      "unit": "%"
+    }
+  }
+}

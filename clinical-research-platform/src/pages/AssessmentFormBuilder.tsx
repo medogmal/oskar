@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FileText, Image, LoaderCircle, LogOut, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Database, FileText, Image, LoaderCircle, LogOut, Plus, Printer, Save, Trash2, Wand2, X } from 'lucide-react';
 import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components/ResearchWorkspaceShell';
 import { useAuth } from '../context/useAuth';
 import { apiBaseUrl } from '../lib/auth';
+import { normalizeStudyType } from '../lib/studyTypes';
 
 type AssessmentTemplateField = {
   id: string;
   label: string;
   responseType: 'numeric' | 'choice' | 'text' | 'boolean';
   options?: string[];
+  section?: string;
+  required?: boolean;
+  note?: string;
 };
 
 type TemplateVersion = {
@@ -28,9 +32,62 @@ type OverviewResponse = {
     id: string;
     title: string;
     studyType: string;
+    description?: string;
+    targetSampleSize?: number;
+    hasRandomization?: boolean;
+    hasBlinding?: boolean;
+    randomizationMethod?: string;
+    groups?: string[];
   };
   templateVersions: TemplateVersion[];
   approvedTemplate?: TemplateVersion | null;
+};
+
+type AiExtractionSection = {
+  key: string;
+  title: string;
+  status: 'complete' | 'partial' | 'missing';
+  presentCount: number;
+  totalCount: number;
+  items?: Array<{
+    label: string;
+    present: boolean;
+    value?: string | null;
+  }>;
+};
+
+type AiValidationItem = {
+  id: string;
+  status: 'pass' | 'warning' | 'missing';
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+};
+
+type AiSourceDocument = {
+  fileId: string;
+  originalName: string;
+  fileCategory: string;
+  ready: boolean;
+  message: string;
+  format: string;
+  extractedCharacters: number;
+};
+
+type AiCrfResult = {
+  extracted_summary?: string;
+  extraction?: AiExtractionSection[];
+  validation?: AiValidationItem[];
+  missing_information?: string[];
+  fields?: AssessmentTemplateField[];
+};
+
+type AiDraftResponse = {
+  answer?: string;
+  usedLLM?: boolean;
+  model?: string;
+  crfResult?: AiCrfResult;
+  sourceDocuments?: AiSourceDocument[];
+  protocolCharactersUsed?: number;
 };
 
 function AssessmentFormBuilder() {
@@ -45,6 +102,16 @@ function AssessmentFormBuilder() {
   const [isApprovingId, setIsApprovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationSummary, setGenerationSummary] = useState('');
+  const [missingInfo, setMissingInfo] = useState<string[]>([]);
+  const [extractionLayer, setExtractionLayer] = useState<AiExtractionSection[]>([]);
+  const [validationLayer, setValidationLayer] = useState<AiValidationItem[]>([]);
+  const [sourceDocuments, setSourceDocuments] = useState<AiSourceDocument[]>([]);
+  const [aiModel, setAiModel] = useState('');
+  const [protocolCharactersUsed, setProtocolCharactersUsed] = useState(0);
+  const [showGenerationModal, setShowGenerationModal] = useState(false);
 
   const formatDate = useCallback(
     (value: string) =>
@@ -95,6 +162,20 @@ function AssessmentFormBuilder() {
     [overview],
   );
 
+  const groupedDraftFields = useMemo(() => {
+    const groups = new Map<string, AssessmentTemplateField[]>();
+    for (const field of draft) {
+      const section = field.section?.trim() || 'General';
+      groups.set(section, [...(groups.get(section) ?? []), field]);
+    }
+    return Array.from(groups.entries()).map(([section, fields]) => ({ section, fields }));
+  }, [draft]);
+
+  const normalizedStudyType = useMemo(
+    () => normalizeStudyType(overview?.study.studyType),
+    [overview?.study.studyType],
+  );
+
   const handleLogout = () => {
     signOut();
     navigate('/login');
@@ -107,6 +188,7 @@ function AssessmentFormBuilder() {
         id: `field_${Date.now()}`,
         label: 'New field',
         responseType: 'text',
+        section: 'General',
       },
     ]);
   };
@@ -184,6 +266,56 @@ function AssessmentFormBuilder() {
     }
   };
 
+  const generateWithAI = async () => {
+    if (!token || !id) return;
+    try {
+      setError('');
+      setSuccessMessage('');
+      setIsGenerating(true);
+
+      const response = await fetch(`${apiBaseUrl}/studies/${id}/outcome-assessment/ai-draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || 'فشل التوليد عبر الذكاء الاصطناعي');
+      }
+
+      const data = (await response.json()) as AiDraftResponse;
+      const crfResult = data.crfResult;
+      if (crfResult && Array.isArray(crfResult.fields)) {
+        setDraft(
+          crfResult.fields.map((field, index) => ({
+            ...field,
+            id: field.id || `ai_field_${Date.now()}_${index}`,
+            responseType: field.responseType || 'text',
+            section: field.section || 'AI Generated',
+          })),
+        );
+        setGenerationSummary(crfResult.extracted_summary || '');
+        setMissingInfo(crfResult.missing_information || []);
+        setExtractionLayer(crfResult.extraction || []);
+        setValidationLayer(crfResult.validation || []);
+        setSourceDocuments(data.sourceDocuments || []);
+        setAiModel(data.model || (data.usedLLM ? 'AI model' : 'Deterministic AI fallback'));
+        setProtocolCharactersUsed(data.protocolCharactersUsed || 0);
+        setShowGenerationModal(true);
+        setSuccessMessage('تم توليد الاستمارة بنجاح عبر الذكاء الاصطناعي.');
+      } else {
+        throw new Error('لم يتمكن الذكاء الاصطناعي من استخراج هيكل صحيح للاستمارة.');
+      }
+    } catch (event: unknown) {
+      setError(event instanceof Error ? event.message : 'حدث خطأ غير متوقع أثناء المعالجة بالذكاء الاصطناعي.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <ResearchWorkspaceShell
       title="استعراض الاستمارة"
@@ -232,15 +364,79 @@ function AssessmentFormBuilder() {
                 <FileText className="h-5 w-5 text-teal-500" />
                 <p className="text-sm font-black text-slate-700">استمارة الفحص السريري - معاينة الهوية البصرية والمواصفات</p>
               </div>
+              <button type="button" onClick={() => void generateWithAI()} disabled={isGenerating || isLoading} className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-indigo-700 disabled:opacity-70">
+                <Wand2 className="ml-2 inline h-3.5 w-3.5" />
+                {isGenerating ? 'جاري التوليد بالذكاء الاصطناعي...' : 'توليد بالذكاء الاصطناعي'}
+              </button>
               <button type="button" onClick={() => void saveTemplate()} disabled={isSaving} className="rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-extrabold text-white transition hover:bg-teal-700 disabled:opacity-70">
                 <Save className="ml-2 inline h-3.5 w-3.5" />
                 {isSaving ? 'جاري الحفظ...' : 'تحديث الاستمارة'}
               </button>
-              <button type="button" className="rounded-xl bg-slate-100 px-5 py-2.5 text-xs font-extrabold text-slate-600 transition hover:bg-slate-200">
+              <button type="button" onClick={() => window.print()} className="rounded-xl bg-slate-100 px-5 py-2.5 text-xs font-extrabold text-slate-600 transition hover:bg-slate-200">
                 <Printer className="ml-2 inline h-3.5 w-3.5" />
                 طباعة
               </button>
             </div>
+
+            {(generationSummary || extractionLayer.length > 0 || validationLayer.length > 0 || sourceDocuments.length > 0) ? (
+              <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+                <div className="workspace-card p-5">
+                  <div className="flex items-center gap-3">
+                    <Database className="h-5 w-5 text-indigo-600" />
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">AI Source Context</p>
+                      <p className="text-sm font-bold text-slate-900">{aiModel || 'ClinResearch AI'}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-600">{generationSummary}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                    <span className="rounded-full bg-slate-100 px-3 py-1">{normalizedStudyType}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1">{protocolCharactersUsed} chars</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1">{draft.length} fields</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1">{groupedDraftFields.length} sections</span>
+                  </div>
+                </div>
+
+                <div className="workspace-card p-5">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-teal-600" />
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">Layer 1 + 2</p>
+                      <p className="text-sm font-bold text-slate-900">Extraction and validation</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-bold">
+                    <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">
+                      {extractionLayer.filter((item) => item.status === 'complete').length}
+                      <p className="mt-1 text-[10px]">Complete</p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 p-3 text-amber-700">
+                      {extractionLayer.filter((item) => item.status === 'partial').length}
+                      <p className="mt-1 text-[10px]">Partial</p>
+                    </div>
+                    <div className="rounded-xl bg-rose-50 p-3 text-rose-700">
+                      {validationLayer.filter((item) => item.status !== 'pass').length}
+                      <p className="mt-1 text-[10px]">Flags</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="workspace-card p-5">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">Layer 3</p>
+                      <p className="text-sm font-bold text-slate-900">Missing information</p>
+                    </div>
+                  </div>
+                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                    {(missingInfo.length ? missingInfo : ['No critical missing information detected in the current draft.']).slice(0, 4).map((item) => (
+                      <li key={item}>- {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr_0.7fr]">
               <div className="workspace-card p-6">
@@ -262,13 +458,20 @@ function AssessmentFormBuilder() {
                 <div className="mt-6 space-y-4">
                   {draft.map((field, index) => (
                     <div key={field.id} className="rounded-2xl border border-slate-200 p-4">
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-3 md:grid-cols-3">
                         <input
                           type="text"
                           value={field.label}
                           onChange={(event) => updateField(index, 'label', event.target.value)}
                           className="rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="عنوان الحقل"
+                        />
+                        <input
+                          type="text"
+                          value={field.section ?? ''}
+                          onChange={(event) => updateField(index, 'section', event.target.value)}
+                          className="rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Section"
                         />
                         <select
                           value={field.responseType}
@@ -281,6 +484,16 @@ function AssessmentFormBuilder() {
                           <option value="boolean">Boolean</option>
                         </select>
                       </div>
+
+                      <label className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(field.required)}
+                          onChange={(event) => updateField(index, 'required', event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Required field
+                      </label>
 
                       {field.responseType === 'choice' ? (
                         <input
@@ -355,8 +568,9 @@ function AssessmentFormBuilder() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 pb-4 md:grid-cols-2">
-                    {draft.slice(0, 6).map((field) => (
+                    {draft.map((field) => (
                       <div key={field.id} className="rounded-2xl border-2 border-slate-100 p-4">
+                        {field.section ? <p className="mb-1 text-[10px] font-black uppercase text-rose-500">{field.section}</p> : null}
                         <p className="mb-2 text-xs font-black text-slate-700">{field.label}</p>
                         {field.responseType === 'choice' ? (
                           <div className="prototype-field-box">
@@ -463,6 +677,110 @@ function AssessmentFormBuilder() {
           </div>
         )}
       </div>
+
+      {showGenerationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <Wand2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">تقرير الذكاء الاصطناعي</h3>
+                  <p className="text-sm text-slate-500">تم توليد هيكل الاستمارة السريرية</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowGenerationModal(false)} className="rounded-full bg-slate-50 p-2 text-slate-500 hover:bg-slate-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-5">
+              {generationSummary && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-bold text-slate-800">الملخص المستخرج</h4>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{generationSummary}</p>
+                </div>
+              )}
+
+              {sourceDocuments.length > 0 ? (
+                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+                  <h4 className="text-sm font-bold text-indigo-900">Proposal sources</h4>
+                  <div className="mt-3 space-y-2">
+                    {sourceDocuments.map((document) => (
+                      <div key={document.fileId} className="rounded-xl bg-white/70 p-3 text-xs text-indigo-900 ring-1 ring-indigo-100">
+                        <p className="font-bold">{document.originalName}</p>
+                        <p className="mt-1">{document.ready ? 'Extracted' : 'Not extracted'} - {document.extractedCharacters} chars - {document.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {validationLayer.length > 0 ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <h4 className="text-sm font-bold text-amber-900">Layer 2 - Validation</h4>
+                  <ul className="mt-2 space-y-2">
+                    {validationLayer.map((item) => (
+                      <li key={item.id} className="flex items-start gap-2 text-sm text-amber-900">
+                        <span className={`mt-1 h-2 w-2 rounded-full ${item.status === 'pass' ? 'bg-emerald-500' : item.status === 'warning' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                        <span>{item.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {extractionLayer.length > 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-sm font-bold text-slate-800">Layer 1 - 23-section extraction</h4>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {extractionLayer.map((section) => (
+                      <div key={section.key} className="rounded-xl bg-slate-50 p-3 text-xs text-slate-700 ring-1 ring-slate-100">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold">{section.title}</p>
+                          <span className={`rounded-full px-2 py-0.5 font-bold ${section.status === 'complete' ? 'bg-emerald-100 text-emerald-700' : section.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {section.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-slate-500">{section.presentCount}/{section.totalCount} items detected</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {missingInfo && missingInfo.length > 0 && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                  <h4 className="text-sm font-bold text-rose-800">نواقص في مقترح البحث (Missing Information)</h4>
+                  <ul className="mt-2 space-y-2">
+                    {missingInfo.map((info, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-rose-700">
+                        <span className="mt-1 text-[10px]">❌</span>
+                        <span>{info}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-xs font-semibold text-rose-600">
+                    * يرجى إدراج هذه المعلومات لضمان تكامل وثائق البحث.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowGenerationModal(false)}
+                className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800"
+              >
+                موافق ومراجعة الحقول
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </ResearchWorkspaceShell>
   );
 }

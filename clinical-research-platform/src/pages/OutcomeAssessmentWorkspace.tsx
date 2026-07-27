@@ -10,6 +10,9 @@ type AssessmentTemplateField = {
   label: string;
   responseType: 'numeric' | 'choice' | 'text' | 'boolean';
   options?: string[];
+  section?: string;
+  required?: boolean;
+  note?: string;
 };
 
 type WorkspaceData = {
@@ -446,6 +449,7 @@ function OutcomeAssessmentWorkspace() {
                     <div className="mt-4 space-y-4">
                       {(workspace.approvedTemplate?.template ?? []).map((field) => (
                         <div key={field.id}>
+                          {field.section ? <p className="mb-1 text-xs font-bold uppercase text-indigo-600">{field.section}</p> : null}
                           <label className="mb-1 block text-sm font-medium text-slate-700">{field.label}</label>
                           {field.responseType === 'choice' ? (
                             <select

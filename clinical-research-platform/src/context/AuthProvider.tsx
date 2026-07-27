@@ -26,6 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
+    if (import.meta.env.VITE_ENABLE_LOCAL_AUTH_FALLBACK === 'true') {
+      setUser(stored);
+      return stored;
+    }
+
     try {
       const response = await fetch(`${apiBaseUrl}/auth/me`, {
         headers: {

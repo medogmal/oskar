@@ -10,7 +10,8 @@
     "start": "node dist/server.js",
     "seed:test-accounts": "node scripts/seedTestAccounts.mjs",
     "analytics:install": "pip install -r python_analytics/requirements.txt",
-    "analytics:dev": "python -m uvicorn python_analytics.app.main:app --host 0.0.0.0 --port 8001"
+    "analytics:dev": "python -m uvicorn app.main:app --app-dir python_analytics --host 0.0.0.0 --port 8001"
+
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -2,9 +2,8 @@ import type { Request, Response } from 'express';
 
 const analyticsBaseUrl = (process.env.PYTHON_ANALYTICS_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
 const analyticsTimeoutMs = Number(process.env.PYTHON_ANALYTICS_TIMEOUT_MS ?? 120000);
-const knowledgeBaseUrl = (
-  process.env.KNOWLEDGE_ENGINE_URL ?? 'https://dental-research-knowledge-engine-backend-api-production.up.railway.app'
-).replace(/\/$/, '');
+const knowledgeBaseUrl = (process.env.KNOWLEDGE_ENGINE_URL ?? analyticsBaseUrl).replace(/\/$/, '');
+
 
 type MulterRequest = Request & {
   file?: Express.Multer.File;
@@ -35,14 +34,6 @@ type KnowledgeQueryResponse = {
   };
 };
 
-const genericKnowledgeAnswerPatterns = [
-  /i cannot answer/i,
-  /cannot answer based on the provided references/i,
-  /no relevant references/i,
-  /insufficient references/i,
-  /no sufficient evidence/i,
-] as const;
-
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
 
 const clampKnowledgeLimit = (value: unknown) => {
@@ -69,17 +60,7 @@ const asKnowledgeQueryResponse = (value: unknown): KnowledgeQueryResponse => {
   };
 };
 
-const isKnowledgeAnswerUseful = (answer: string) => {
-  const normalizedAnswer = normalizeWhitespace(answer);
-  if (!normalizedAnswer) {
-    return false;
-  }
-
-  return !genericKnowledgeAnswerPatterns.some((pattern) => pattern.test(normalizedAnswer));
-};
-
-const isKnowledgePayloadUseful = (payload: KnowledgeQueryResponse) =>
-  payload.citations.length > 0 || isKnowledgeAnswerUseful(payload.answer);
+const isKnowledgePayloadUseful = (payload: KnowledgeQueryResponse) => payload.citations.length > 0;
 
 const getKeywordCandidates = (value: string, maxKeywords = 8) =>
   Array.from(
@@ -94,6 +75,71 @@ const getKeywordCandidates = (value: string, maxKeywords = 8) =>
 const getRecord = (value: unknown) =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 
+const normalizeStudyType = (value: unknown) => {
+  const normalized = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized.includes('rct') || normalized.includes('random')) {
+    return 'rct';
+  }
+  if (normalized.includes('prospective') || normalized.includes('cohort')) {
+    return 'prospective';
+  }
+  if (normalized.includes('retrospective') || normalized.includes('record') || normalized.includes('ehr')) {
+    return 'retrospective';
+  }
+  if (normalized.includes('cross') || normalized.includes('sectional') || normalized.includes('survey')) {
+    return 'cross_sectional';
+  }
+  if (normalized.includes('vitro') || normalized.includes('lab')) {
+    return 'in_vitro';
+  }
+  return ['rct', 'prospective', 'retrospective', 'cross_sectional', 'in_vitro'].includes(normalized)
+    ? normalized
+    : undefined;
+};
+
+const detectResponseLanguage = (value: unknown) => {
+  const text = typeof value === 'string' ? value : '';
+  if (!text.trim()) {
+    return 'english';
+  }
+
+  const arabicCount = (text.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) ?? []).length;
+  const mojibakeArabicCount = (text.match(/[ØÙ][\x80-\xBF]?/g) ?? []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) ?? []).length;
+
+  if (arabicCount > 0 && arabicCount >= Math.max(3, latinCount * 0.25)) {
+    return 'arabic';
+  }
+  if (mojibakeArabicCount >= 3) {
+    return 'arabic';
+  }
+  return 'english';
+};
+
+const normalizeResponseLanguage = (value: unknown, fallbackText: string) => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (['arabic', 'ar', 'rtl'].includes(normalized)) {
+    return 'arabic';
+  }
+  if (['english', 'en', 'ltr'].includes(normalized)) {
+    return 'english';
+  }
+  return detectResponseLanguage(fallbackText);
+};
+
+const getStudyTypeFromRequestContext = (studyContext: unknown, explicitStudyType?: unknown) => {
+  const explicit = normalizeStudyType(explicitStudyType);
+  if (explicit) {
+    return explicit;
+  }
+  const context = getRecord(studyContext);
+  const metadata = getRecord(context?.study_metadata);
+  return normalizeStudyType(metadata?.studyType ?? metadata?.study_type);
+};
+
 const getTextList = (value: unknown, maxItems = 5) =>
   Array.isArray(value)
     ? value
@@ -107,6 +153,7 @@ const buildKnowledgeQueryCandidates = (input: {
   mode?: unknown;
   filterSource?: string;
   requestedLimit: number;
+  studyType?: string;
   protocolText?: unknown;
   studyContext?: unknown;
 }) => {
@@ -154,6 +201,7 @@ const buildKnowledgeQueryCandidates = (input: {
   return Array.from(new Set([normalizedQuestion, contextualQuestion, keywordFocusedQuestion].filter(Boolean))).map((question) => ({
     question,
     filter_source: input.filterSource || undefined,
+    study_type: input.studyType,
     limit: input.requestedLimit,
   }));
 };
@@ -174,15 +222,18 @@ const queryKnowledgeEngineWithFallback = async (input: {
   question: string;
   mode?: unknown;
   filterSource?: string;
+  studyType?: unknown;
   requestedLimit?: unknown;
   protocolText?: unknown;
   studyContext?: unknown;
 }) => {
+  const studyType = getStudyTypeFromRequestContext(input.studyContext, input.studyType);
   const candidates = buildKnowledgeQueryCandidates({
     question: input.question,
     mode: input.mode,
     filterSource: input.filterSource,
     requestedLimit: clampKnowledgeLimit(input.requestedLimit),
+    studyType,
     protocolText: input.protocolText,
     studyContext: input.studyContext,
   });
@@ -192,6 +243,7 @@ const queryKnowledgeEngineWithFallback = async (input: {
         mode: input.mode,
         filterSource: undefined,
         requestedLimit: Math.min(12, clampKnowledgeLimit(input.requestedLimit) + 2),
+        studyType,
         protocolText: input.protocolText,
         studyContext: input.studyContext,
       })
@@ -436,6 +488,17 @@ export const runOcrExtraction = async (req: MulterRequest, res: Response) => {
   }
 };
 
+export const extractDocumentText = async (req: MulterRequest, res: Response) => {
+  try {
+    const payload = await forwardMultipartRequest(req.file, '/document/extract-text');
+    return res.json(payload);
+  } catch (error) {
+    return res.status(400).json({
+      message: error instanceof Error ? error.message : 'Unable to extract document text',
+    });
+  }
+};
+
 export const runAssistantChat = async (req: Request, res: Response) => {
   try {
     const prompt =
@@ -454,6 +517,7 @@ export const runAssistantChat = async (req: Request, res: Response) => {
         knowledgePayload = await queryKnowledgeEngineWithFallback({
           question: prompt,
           mode: req.body?.mode,
+          studyType: req.body?.study_type,
           filterSource:
             typeof req.body?.knowledgeFilterSource === 'string' && req.body.knowledgeFilterSource.trim().length > 0
               ? req.body.knowledgeFilterSource.trim()
@@ -478,6 +542,7 @@ export const runAssistantChat = async (req: Request, res: Response) => {
       },
       body: JSON.stringify({
         ...(req.body ?? {}),
+        response_language: normalizeResponseLanguage(req.body?.response_language, prompt),
         study_context: {
           ...(req.body?.study_context ?? {}),
           knowledge_context: knowledgePayload ?? undefined,
@@ -505,7 +570,7 @@ export const runAssistantChat = async (req: Request, res: Response) => {
 
 export const getKnowledgeHealth = async (_req: Request, res: Response) => {
   try {
-    const response = await fetch(`${knowledgeBaseUrl}/`, {
+    const response = await fetch(`${knowledgeBaseUrl}/health`, {
       signal: AbortSignal.timeout(analyticsTimeoutMs),
     });
 
@@ -548,6 +613,7 @@ export const queryKnowledgeBase = async (req: Request, res: Response) => {
             ? req.body.prompt
             : '',
       mode: req.body?.mode,
+      studyType: req.body?.study_type,
       filterSource:
         typeof req.body?.filter_source === 'string' && req.body.filter_source.trim().length > 0
           ? req.body.filter_source.trim()
@@ -585,3 +651,45 @@ export const validateKnowledgeClinicalParameters = async (req: Request, res: Res
     });
   }
 };
+
+export const getKnowledgeStudyTypes = async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${analyticsBaseUrl}/knowledge/study-types`, {
+      signal: AbortSignal.timeout(analyticsTimeoutMs),
+    });
+    if (!response.ok) {
+      const payload = await getErrorPayload(response);
+      return res.status(response.status).json(payload);
+    }
+    return res.json(await response.json());
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Knowledge study types unavailable',
+    });
+  }
+};
+
+export const getKnowledgeReferences = async (req: Request, res: Response) => {
+  try {
+    const rawStudyType = req.params.studyType || req.query.studyType;
+    const studyType = Array.isArray(rawStudyType)
+      ? String(rawStudyType[0])
+      : typeof rawStudyType === 'string'
+        ? rawStudyType
+        : 'rct';
+    const response = await fetch(`${analyticsBaseUrl}/knowledge/references?study_type=${encodeURIComponent(studyType)}`, {
+      signal: AbortSignal.timeout(analyticsTimeoutMs),
+    });
+
+    if (!response.ok) {
+      const payload = await getErrorPayload(response);
+      return res.status(response.status).json(payload);
+    }
+    return res.json(await response.json());
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Knowledge references unavailable',
+    });
+  }
+};
+

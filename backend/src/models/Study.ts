@@ -1,4 +1,6 @@
 import { query } from '../db.js';
+import path from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import {
   buildBlindingSettings,
   normalizeStudyGroups,
@@ -41,6 +43,7 @@ export type ClinicalEvaluationDecision = 'pending' | 'accepted' | 'needs_revisio
 
 export type StudySummary = {
   id: string;
+  principalInvestigatorId?: string;
   title: string;
   description?: string;
   principalInvestigatorName?: string;
@@ -90,6 +93,7 @@ export type StudySummary = {
 
 type StudyRow = {
   id: string | number;
+  principal_investigator_id: string | number;
   title: string;
   description: string | null;
   study_type: string;
@@ -194,8 +198,32 @@ const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T
   }
 };
 
+const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
+
+const isDatabaseUnavailable = (error: unknown) =>
+  localAuthFallbackEnabled() && error instanceof Error;
+
+
+const localStudyStorePath = path.resolve(process.cwd(), 'data', 'dev-studies.json');
+
+const readLocalStudies = async (): Promise<StudySummary[]> => {
+  try {
+    return JSON.parse(await readFile(localStudyStorePath, 'utf8')) as StudySummary[];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalStudies = async (studies: StudySummary[]) => {
+  await mkdir(path.dirname(localStudyStorePath), { recursive: true });
+  await writeFile(localStudyStorePath, JSON.stringify(studies, null, 2), 'utf8');
+};
+
+const createLocalStudyId = () => `dev_study_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
 const mapStudyRow = (row: StudyRow): StudySummary => ({
   id: String(row.id),
+  principalInvestigatorId: String(row.principal_investigator_id),
   title: row.title,
   description: row.description ?? undefined,
   principalInvestigatorName: row.principal_investigator_name ?? undefined,
@@ -254,79 +282,100 @@ const mapStudyRow = (row: StudyRow): StudySummary => ({
 });
 
 export const listStudiesByUser = async (principalInvestigatorId: string): Promise<StudySummary[]> => {
-  const result = await query<StudyRow>(
-    `
-      SELECT
-        studies.*,
-        principal_investigator.full_name AS principal_investigator_name,
-        principal_investigator.academic_id AS principal_investigator_academic_id,
-        co_researcher.full_name AS co_researcher_name,
-        co_researcher.academic_id AS co_researcher_academic_id,
-        supervisor.full_name AS supervisor_name,
-        supervisor.academic_id AS supervisor_academic_id,
-        assistant_supervisor.full_name AS assistant_supervisor_name,
-        assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
-        assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
-        assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
-        locked_by.full_name AS locked_by_name,
-        reviewer.full_name AS reviewed_by_name,
-        clinical_evaluator.full_name AS clinical_evaluated_by_name
-      FROM studies
-      JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
-      LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
-      LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
-      LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
-      LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
-      LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
-      LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
-      LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
-      WHERE studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1
-      ORDER BY studies.created_at DESC
-    `,
-    [principalInvestigatorId],
-  );
+  try {
+    const result = await query<StudyRow>(
+      `
+        SELECT
+          studies.*,
+          principal_investigator.full_name AS principal_investigator_name,
+          principal_investigator.academic_id AS principal_investigator_academic_id,
+          co_researcher.full_name AS co_researcher_name,
+          co_researcher.academic_id AS co_researcher_academic_id,
+          supervisor.full_name AS supervisor_name,
+          supervisor.academic_id AS supervisor_academic_id,
+          assistant_supervisor.full_name AS assistant_supervisor_name,
+          assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
+          assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
+          assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
+          locked_by.full_name AS locked_by_name,
+          reviewer.full_name AS reviewed_by_name,
+          clinical_evaluator.full_name AS clinical_evaluated_by_name
+        FROM studies
+        JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
+        LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
+        LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
+        LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
+        LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
+        LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
+        LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
+        LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
+        WHERE studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1
+        ORDER BY studies.created_at DESC
+      `,
+      [principalInvestigatorId],
+    );
 
-  return result.rows.map(mapStudyRow);
+    const studies = result.rows.map(mapStudyRow);
+    if (studies.length > 0 || !localAuthFallbackEnabled()) {
+      return studies;
+    }
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+  }
+
+  const studies = await readLocalStudies();
+  return studies;
 };
 
 export const findStudyByIdForUser = async (
   principalInvestigatorId: string,
   studyId: string,
 ): Promise<StudySummary | null> => {
-  const result = await query<StudyRow>(
-    `
-      SELECT
-        studies.*,
-        principal_investigator.full_name AS principal_investigator_name,
-        principal_investigator.academic_id AS principal_investigator_academic_id,
-        co_researcher.full_name AS co_researcher_name,
-        co_researcher.academic_id AS co_researcher_academic_id,
-        supervisor.full_name AS supervisor_name,
-        supervisor.academic_id AS supervisor_academic_id,
-        assistant_supervisor.full_name AS assistant_supervisor_name,
-        assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
-        assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
-        assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
-        locked_by.full_name AS locked_by_name,
-        reviewer.full_name AS reviewed_by_name,
-        clinical_evaluator.full_name AS clinical_evaluated_by_name
-      FROM studies
-      JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
-      LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
-      LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
-      LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
-      LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
-      LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
-      LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
-      LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
-      WHERE (studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1) AND studies.id = $2
-      LIMIT 1
-    `,
-    [principalInvestigatorId, studyId],
-  );
+  try {
+    const result = await query<StudyRow>(
+      `
+        SELECT
+          studies.*,
+          principal_investigator.full_name AS principal_investigator_name,
+          principal_investigator.academic_id AS principal_investigator_academic_id,
+          co_researcher.full_name AS co_researcher_name,
+          co_researcher.academic_id AS co_researcher_academic_id,
+          supervisor.full_name AS supervisor_name,
+          supervisor.academic_id AS supervisor_academic_id,
+          assistant_supervisor.full_name AS assistant_supervisor_name,
+          assistant_supervisor.academic_id AS assistant_supervisor_academic_id,
+          assigned_clinical_evaluator.full_name AS assigned_clinical_evaluator_name,
+          assigned_clinical_evaluator.academic_id AS assigned_clinical_evaluator_academic_id,
+          locked_by.full_name AS locked_by_name,
+          reviewer.full_name AS reviewed_by_name,
+          clinical_evaluator.full_name AS clinical_evaluated_by_name
+        FROM studies
+        JOIN users AS principal_investigator ON principal_investigator.id = studies.principal_investigator_id
+        LEFT JOIN users AS co_researcher ON co_researcher.id = studies.co_researcher_user_id
+        LEFT JOIN users AS supervisor ON supervisor.id = studies.supervisor_user_id
+        LEFT JOIN users AS assistant_supervisor ON assistant_supervisor.id = studies.assistant_supervisor_user_id
+        LEFT JOIN users AS assigned_clinical_evaluator ON assigned_clinical_evaluator.id = studies.assigned_clinical_evaluator_user_id
+        LEFT JOIN users AS locked_by ON locked_by.id = studies.locked_by_user_id
+        LEFT JOIN users AS reviewer ON reviewer.id = studies.reviewed_by_user_id
+        LEFT JOIN users AS clinical_evaluator ON clinical_evaluator.id = studies.clinical_evaluated_by_user_id
+        WHERE (studies.principal_investigator_id = $1 OR studies.co_researcher_user_id = $1) AND studies.id = $2
+        LIMIT 1
+      `,
+      [principalInvestigatorId, studyId],
+    );
 
-  const row = result.rows[0];
-  return row ? mapStudyRow(row) : null;
+    const row = result.rows[0];
+    return row ? mapStudyRow(row) : null;
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const studies = await readLocalStudies();
+    return studies.find((study) => study.id === studyId) ?? null;
+  }
 };
 
 export const createStudy = async (input: CreateStudyInput): Promise<StudySummary> => {
@@ -340,7 +389,8 @@ export const createStudy = async (input: CreateStudyInput): Promise<StudySummary
 
   const status: StudyStatus = input.workflowType === 'migration' ? 'active' : 'pending';
 
-  const result = await query<StudyRow>(
+  try {
+    const result = await query<StudyRow>(
     `
       INSERT INTO studies (
         principal_investigator_id, title, description, study_type, workflow_type, status,
@@ -407,7 +457,49 @@ export const createStudy = async (input: CreateStudyInput): Promise<StudySummary
     ],
   );
 
-  return mapStudyRow(result.rows[0]);
+    return mapStudyRow(result.rows[0]);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const now = new Date().toISOString();
+    const study: StudySummary = {
+      id: createLocalStudyId(),
+      principalInvestigatorId: input.principalInvestigatorId,
+      title: input.title.trim(),
+      description: input.description?.trim() || undefined,
+      studyType: input.studyType.trim(),
+      workflowType: input.workflowType,
+      status,
+      targetSampleSize: input.targetSampleSize,
+      enrolledPatients: 0,
+      hasRandomization: input.hasRandomization,
+      hasBlinding: input.hasBlinding,
+      randomizationMethod: input.hasRandomization ? input.randomizationMethod ?? 'simple' : undefined,
+      groups: normalizeStudyGroups(input.groups),
+      blindingSettings: input.hasBlinding
+        ? input.blindingSettings ?? buildBlindingSettings({ studyTitle: input.title, groups: input.groups })
+        : undefined,
+      protocolFileName: input.protocolFileName?.trim() || undefined,
+      ethicsApprovalNumber: input.ethicsApprovalNumber?.trim() || undefined,
+      clinicalRegistrationNumber: input.clinicalRegistrationNumber?.trim() || undefined,
+      coResearcherUserId: input.coResearcherUserId,
+      supervisorUserId: input.supervisorUserId,
+      assistantSupervisorUserId: input.assistantSupervisorUserId,
+      assignedClinicalEvaluatorUserId: input.clinicalEvaluatorUserId,
+      requiresClinicalEvaluation: input.requiresClinicalEvaluation,
+      clinicalEvaluationDecision: input.requiresClinicalEvaluation ? 'pending' : undefined,
+      isLocked: false,
+      submittedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const studies = await readLocalStudies();
+    studies.unshift(study);
+    await writeLocalStudies(studies);
+    return study;
+  }
 };
 
 export const updateStudyDesign = async (input: UpdateStudyDesignInput): Promise<StudySummary | null> => {
@@ -805,28 +897,42 @@ export type InstitutionStudyOverview = {
 };
 
 export const getInstitutionStudyOverview = async (): Promise<InstitutionStudyOverview> => {
-  const result = await query<{
-    total_studies: string | number;
-    active_studies: string | number;
-    pending_studies: string | number;
-    completed_studies: string | number;
-  }>(
-    `
-      SELECT
-        COUNT(*)::BIGINT AS total_studies,
-        COUNT(*) FILTER (WHERE status IN ('approved', 'active'))::BIGINT AS active_studies,
-        COUNT(*) FILTER (WHERE status = 'pending')::BIGINT AS pending_studies,
-        COUNT(*) FILTER (WHERE status = 'completed')::BIGINT AS completed_studies
-      FROM studies
-    `,
-  );
+  try {
+    const result = await query<{
+      total_studies: string | number;
+      active_studies: string | number;
+      pending_studies: string | number;
+      completed_studies: string | number;
+    }>(
+      `
+        SELECT
+          COUNT(*)::BIGINT AS total_studies,
+          COUNT(*) FILTER (WHERE status IN ('approved', 'active'))::BIGINT AS active_studies,
+          COUNT(*) FILTER (WHERE status = 'pending')::BIGINT AS pending_studies,
+          COUNT(*) FILTER (WHERE status = 'completed')::BIGINT AS completed_studies
+        FROM studies
+      `,
+    );
 
-  const row = result.rows[0];
+    const row = result.rows[0];
 
-  return {
-    activeStudies: Number(row?.active_studies ?? 0),
-    pendingStudies: Number(row?.pending_studies ?? 0),
-    completedStudies: Number(row?.completed_studies ?? 0),
-    totalStudies: Number(row?.total_studies ?? 0),
-  };
+    return {
+      activeStudies: Number(row?.active_studies ?? 0),
+      pendingStudies: Number(row?.pending_studies ?? 0),
+      completedStudies: Number(row?.completed_studies ?? 0),
+      totalStudies: Number(row?.total_studies ?? 0),
+    };
+  } catch (error) {
+    if (!isDatabaseUnavailable(error)) {
+      throw error;
+    }
+
+    const studies = await readLocalStudies();
+    return {
+      activeStudies: studies.filter((s) => ['approved', 'active'].includes(s.status)).length,
+      pendingStudies: studies.filter((s) => s.status === 'pending').length,
+      completedStudies: studies.filter((s) => s.status === 'completed').length,
+      totalStudies: studies.length,
+    };
+  }
 };

@@ -25,6 +25,8 @@ import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components
 import { useAuth } from '../context/useAuth';
 import { clearAutofillSnapshot, loadAutofillSnapshot } from '../lib/aiAutofill';
 import { apiBaseUrl, type AccountType } from '../lib/auth';
+import { STUDY_TYPE_OPTIONS, getStudyTypeInfo } from '../lib/studyTypes';
+
 
 type RandomizationMethod = 'simple' | 'block';
 type BlindedParty = 'patient' | 'researcher' | 'assessor' | 'statistician';
@@ -138,8 +140,9 @@ type CreateStudyForm = {
 
 const initialFormState: CreateStudyForm = {
   title: '',
-  studyType: '',
+  studyType: 'rct',
   workflowType: 'supervised',
+
   targetSampleSize: '',
   ethicsApprovalNumber: '',
   clinicalRegistrationNumber: '',
@@ -952,10 +955,13 @@ function Studies() {
             <div key={study.id} className="workspace-card p-6">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="max-w-3xl">
-                  <h3 className="text-xl font-bold text-slate-900">{study.title}</h3>
                   <p className="mt-2 text-slate-600">
-                    {study.studyType} • {study.targetSampleSize} {t('studies.labels.patients')} • {t(`studies.status.${study.status}`)}
+                    <span className="inline-flex items-center rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800 border border-teal-200 ml-2">
+                      {getStudyTypeInfo(study.studyType).labelAr}
+                    </span>
+                    {study.targetSampleSize} {t('studies.labels.patients')} • {t(`studies.status.${study.status}`)}
                   </p>
+
                   <p className="mt-3 text-sm text-slate-500">{study.description || t('studies.labels.noDescription')}</p>
 
                   {study.reviewDecision ? (
@@ -1091,16 +1097,21 @@ function Studies() {
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <label className="block">
-                        <span className="mb-2 block text-xs font-extrabold text-slate-600">نوع الدراسة</span>
-                        <input
-                          type="text"
+                        <span className="mb-2 block text-xs font-extrabold text-slate-600">نوع الدراسة المنهجي</span>
+                        <select
                           value={formState.studyType}
                           onChange={(e) => handleChange('studyType', e.target.value)}
                           className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
-                          placeholder={t('studies.create.placeholders.studyType')}
                           required
-                        />
+                        >
+                          {STUDY_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.labelAr} ({opt.shortLabel})
+                            </option>
+                          ))}
+                        </select>
                       </label>
+
                       <label className="block">
                         <span className="mb-2 block text-xs font-extrabold text-slate-600">المشرف الأساسي</span>
                         <select

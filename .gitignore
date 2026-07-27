@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.tmp/
 
 # Editor directories and files
 .vscode/*
@@ -42,8 +43,14 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 parts/
 sdist/
 var/
@@ -59,3 +66,9 @@ ENV/
 # Analytics
 analytics/node_modules/
 backend/node_modules/
+backend/data/
+logs/
+tools/
+rag_index_db.json
+backend/python_analytics/data/
+*.db.json

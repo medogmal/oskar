@@ -23,99 +23,22 @@ export const registerValidator = [
     .withMessage(
       'Account type must be student, co_researcher, supervisor, assistant_supervisor, clinical_evaluator, or institution',
     ),
-  body('phone').trim().notEmpty().withMessage('Phone number is required'),
-  body('country').trim().notEmpty().withMessage('Country is required'),
-  body('governorate').trim().notEmpty().withMessage('Governorate is required'),
-  body('dateOfBirth')
-    .if(body('accountType').custom((value) => value !== 'institution'))
-    .notEmpty()
-    .withMessage('Date of birth is required')
-    .bail()
-    .isISO8601()
-    .withMessage('Date of birth must be a valid date'),
-  body('emailType')
-    .if(
-      body('accountType').custom((value) =>
-        ['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator'].includes(value),
-      ),
-    )
-    .isIn(emailTypes)
-    .withMessage('Email type must be academic or personal'),
-  body('university')
-    .if(
-      body('accountType').custom((value) =>
-        ['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator'].includes(value),
-      ),
-    )
-    .trim()
-    .notEmpty()
-    .withMessage('University is required'),
-  body('college')
-    .if(
-      body('accountType').custom((value) =>
-        ['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator'].includes(value),
-      ),
-    )
-    .trim()
-    .notEmpty()
-    .withMessage('College is required'),
-  body('specialization')
-    .if(
-      body('accountType').custom((value) =>
-        ['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator'].includes(value),
-      ),
-    )
-    .trim()
-    .notEmpty()
-    .withMessage('Specialization is required'),
-  body('academicLevel')
-    .if(body('accountType').custom((value) => value === 'student' || value === 'co_researcher'))
-    .trim()
-    .notEmpty()
-    .withMessage('Academic level is required'),
-  body('supervisorId')
-    .optional({ values: 'falsy' })
-    .trim()
-    .isInt({ min: 1 })
-    .withMessage('Supervisor selection is invalid'),
-  body('academicId')
-    .trim()
-    .custom((value, { req }) => {
-      const accountType = req.body.accountType;
-      if (['co_researcher', 'assistant_supervisor', 'clinical_evaluator'].includes(accountType) && !String(value ?? '').trim()) {
-        throw new Error('Academic ID is required for co-researchers, assistant supervisors, and assessors');
-      }
-
-      return true;
-    }),
-  body('academicRank')
-    .if(
-      body('accountType').custom((value) =>
-        value === 'supervisor' || value === 'assistant_supervisor' || value === 'clinical_evaluator',
-      ),
-    )
-    .trim()
-    .notEmpty()
-    .withMessage('Academic rank is required'),
-  body('institutionType')
-    .if(body('accountType').equals('institution'))
-    .isIn(institutionTypes)
-    .withMessage('Institution type is invalid'),
-  body('authorizedContactName')
-    .if(body('accountType').equals('institution'))
-    .trim()
-    .notEmpty()
-    .withMessage('Authorized contact name is required'),
-  body('jobTitle')
-    .if(body('accountType').equals('institution'))
-    .trim()
-    .notEmpty()
-    .withMessage('Job title is required'),
-  body('directContactNumber')
-    .if(body('accountType').equals('institution'))
-    .trim()
-    .notEmpty()
-    .withMessage('Direct contact number is required'),
+  body('phone').optional({ values: 'falsy' }).trim(),
+  body('country').optional({ values: 'falsy' }).trim(),
+  body('governorate').optional({ values: 'falsy' }).trim(),
+  body('dateOfBirth').optional({ values: 'falsy' }).isISO8601().withMessage('Date of birth must be a valid date'),
+  body('emailType').optional({ values: 'falsy' }).isIn(emailTypes).withMessage('Email type must be academic or personal'),
+  body('university').optional({ values: 'falsy' }).trim(),
+  body('college').optional({ values: 'falsy' }).trim(),
+  body('specialization').optional({ values: 'falsy' }).trim(),
+  body('academicLevel').optional({ values: 'falsy' }).trim(),
+  body('supervisorId').optional({ values: 'falsy' }).trim(),
+  body('academicId').optional({ values: 'falsy' }).trim(),
+  body('academicRank').optional({ values: 'falsy' }).trim(),
+  body('institutionType').optional({ values: 'falsy' }).isIn(institutionTypes).withMessage('Institution type is invalid'),
+  body('authorizedContactName').optional({ values: 'falsy' }).trim(),
+  body('jobTitle').optional({ values: 'falsy' }).trim(),
+  body('directContactNumber').optional({ values: 'falsy' }).trim(),
 ];
 
 export const loginValidator = [
