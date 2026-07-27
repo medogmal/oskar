@@ -19,6 +19,8 @@ class StudyType(str, Enum):
     RETROSPECTIVE = "retrospective"
     CROSS_SECTIONAL = "cross_sectional"
     IN_VITRO = "in_vitro"
+    SYSTEMATIC_REVIEW = "systematic_review"
+    META_ANALYSIS = "meta_analysis"
 
 
 STUDY_TYPE_LABELS: dict[str, dict[str, str]] = {
@@ -46,6 +48,16 @@ STUDY_TYPE_LABELS: dict[str, dict[str, str]] = {
         "en": "In Vitro Study",
         "ar": "دراسة مخبرية (In Vitro)",
         "short_en": "In Vitro",
+    },
+    StudyType.SYSTEMATIC_REVIEW: {
+        "en": "Systematic Review",
+        "ar": "مراجعة منهجية (Systematic Review)",
+        "short_en": "Systematic Review",
+    },
+    StudyType.META_ANALYSIS: {
+        "en": "Meta-Analysis",
+        "ar": "تحليل شمولي (Meta-Analysis)",
+        "short_en": "Meta-Analysis",
     },
 }
 

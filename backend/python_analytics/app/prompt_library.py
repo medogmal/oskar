@@ -75,6 +75,20 @@ Primary Guidelines & Standards:
 - Statistical Analysis: One-way / Two-way / Repeated Measures ANOVA, Independent & Paired t-tests, Mann-Whitney U, Wilcoxon, Kruskal-Wallis, Effect Size calculation, Power Analysis.
 - Quality Assessment: CRIS Checklist.
 Instruction: Focus on standardization of specimens, ISO compliance, testing machinery calibration, bond strength / mechanical testing, and ANOVA variance testing. Do NOT cite clinical patient trial standards like CONSORT, STROBE, or GCP.""",
+
+    StudyType.SYSTEMATIC_REVIEW: """STUDY DESIGN SCOPE: Systematic Review
+Primary Guidelines & Standards:
+- Protocol Registration: PROSPERO registration, PRISMA-P (Protocol) statement.
+- Reporting Standards: PRISMA Statement & Checklist (Preferred Reporting Items for Systematic Reviews and Meta-Analyses).
+- Quality / Risk of Bias Assessment: AMSTAR 2 (for systematic reviews of randomized and/or non-randomized trials), ROBIS tool, Cochrane Risk of Bias (RoB 2) for included trials, ROBINS-I for non-randomized studies.
+- Methodology: Cochrane Handbook for Systematic Reviews of Interventions.
+Instruction: Focus on search strategy documentation, eligibility criteria, study selection transparency, risk of bias mapping, and screening flowcharts. Do NOT focus on primary laboratory testing or direct clinical trials.""",
+
+    StudyType.META_ANALYSIS: """STUDY DESIGN SCOPE: Meta-Analysis
+Primary Guidelines & Standards:
+- Reporting Standards: PRISMA Statement, PRISMA-Network Meta-Analysis (PRISMA-NMA) extension, MOOSE guidelines (for meta-analysis of observational studies).
+- Statistical Priorities: Pooling models (Random-effects model via DerSimonian and Laird vs Fixed-effect model), Heterogeneity testing (Cochran's Q-test, I-squared index, Tau-squared), Publication bias assessment (Egger's regression test, Begg's rank correlation test, Funnel plots, Trim and Fill method), Subgroup & Sensitivity analyses.
+Instruction: Focus heavily on pooling statistics, heterogeneity testing, and publication bias. Ensure I-squared interpretation and selection of fixed vs random effects models are mathematically justified. Do NOT cite direct primary dental material testing rules.""",
 }
 
 # ---------------------------------------------------------------------------

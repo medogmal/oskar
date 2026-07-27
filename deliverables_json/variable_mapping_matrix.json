@@ -1,0 +1,90 @@
+{
+  "matrix_title": "ClinResearch AI - Variable Mapping Matrix",
+  "version": "1.0.0",
+  "variables": [
+    {
+      "variable_name": "patientAge",
+      "definition": "The chronological age of the human subject in years at the time of study enrolment.",
+      "type": "Continuous / Numeric",
+      "source": "Patient Demographics / Medical Chart",
+      "measurement_method": "Self-report or verified national identity document / clinical record birth date calculation.",
+      "unit": "Years",
+      "relation_to_outcome": "Confounder or covariate; used to adjust primary and secondary outcomes (e.g. periodontal healing rates or bone density changes depend on age).",
+      "relation_to_research_question": "Population characterization; ensures sample complies with inclusion criteria (e.g. adult cohort aged 18-65).",
+      "statistical_test": "Independent t-test / ANOVA (for group comparisons) or Multiple Linear/Logistic Regression (as a covariate for adjustment).",
+      "reference": "ICH E9 Statistical Principles for Clinical Trials (Section 5.7 - Covariates)."
+    },
+    {
+      "variable_name": "pocketDepthMm",
+      "definition": "Probing Pocket Depth (PPD) measured from the gingival margin to the bottom of the clinical pocket.",
+      "type": "Continuous / Numeric",
+      "source": "Clinical Periodontal Examination",
+      "measurement_method": "Manual probing using a calibrated periodontal probe (e.g. UNC-15) at 6 sites per tooth.",
+      "unit": "Millimeters (mm)",
+      "relation_to_outcome": "Primary outcome in periodontal intervention trials; reduction in PPD indicates successful treatment response.",
+      "relation_to_research_question": "Main clinical parameter to answer whether the intervention reduces periodontal pocket depth compared to the control group.",
+      "statistical_test": "Paired t-test (pre-to-post comparison) or ANCOVA (comparing post-op PPD between groups adjusting for baseline PPD).",
+      "reference": "Consensus Report on Periodontal Diseases (AAP/EFP guidelines) & STROBE reporting checklist."
+    },
+    {
+      "variable_name": "bleedingOnProbingPercent",
+      "definition": "Bleeding on Probing (BOP) score calculated as the percentage of probed sites that exhibit bleeding within 30 seconds of probing.",
+      "type": "Continuous (Percentage) or Binary per site",
+      "source": "Clinical Periodontal Examination",
+      "measurement_method": "Sensing presence (1) or absence (0) of bleeding at 6 sites per tooth after probing, then dividing by total probed sites.",
+      "unit": "Percentage (%)",
+      "relation_to_outcome": "Secondary outcome indicating active clinical inflammation status of the periodontal tissues.",
+      "relation_to_research_question": "Secondary question evaluating if the intervention leads to reduction in active tissue inflammation.",
+      "statistical_test": "Wilcoxon signed-rank test (non-parametric pre-to-post) or Chi-square test (for category proportions like BOP < 10% vs >= 10%).",
+      "reference": "World Health Organization (WHO) Oral Health Surveys basic methods."
+    },
+    {
+      "variable_name": "plaqueIndexPercent",
+      "definition": "Plaque Index representing the percentage of tooth surfaces covered with dental plaque.",
+      "type": "Continuous (Percentage)",
+      "source": "Clinical Periodontal Examination",
+      "measurement_method": "Visual inspection with a dental explorer or disclosing agent across 4 surfaces per tooth, dividing plaque-covered surfaces by total surfaces.",
+      "unit": "Percentage (%)",
+      "relation_to_outcome": "Covariate or secondary outcome; measures patient oral hygiene compliance which affects primary outcomes.",
+      "relation_to_research_question": "Used to verify that baseline oral hygiene was similar between experimental and control groups (preventing confounding).",
+      "statistical_test": "Independent t-test (group comparison) or Mann-Whitney U test.",
+      "reference": "Silness-Löe Plaque Index guidelines & AXIS appraisal tool."
+    },
+    {
+      "variable_name": "clinicalAttachmentLossMm",
+      "definition": "Clinical Attachment Loss (CAL) representing the distance from the cementoenamel junction (CEJ) to the bottom of the pocket.",
+      "type": "Continuous / Numeric",
+      "source": "Clinical Periodontal Examination",
+      "measurement_method": "Periodontal probing measuring PPD plus gingival recession (distance from CEJ to gingival margin).",
+      "unit": "Millimeters (mm)",
+      "relation_to_outcome": "Primary or co-primary outcome; measures actual skeletal/tissue attachment gain or loss.",
+      "relation_to_research_question": "Key index to prove true regeneration or loss of attachment in response to the surgical/non-surgical therapy.",
+      "statistical_test": "Independent t-test, ANCOVA, or Linear Mixed-Effect Models (to account for clustering within patient mouths).",
+      "reference": "CRIS Guidelines (Reporting In-Vitro Studies) and STROBE standards."
+    },
+    {
+      "variable_name": "systolicBpMmhg",
+      "definition": "The peak arterial pressure measured during contraction of the left ventricle of the heart.",
+      "type": "Continuous / Numeric",
+      "source": "Physiological Vital Signs",
+      "measurement_method": "Automated oscillometric blood pressure monitor or manual auscultation with a sphygmomanometer on the upper arm.",
+      "unit": "Millimeters of mercury (mmHg)",
+      "relation_to_outcome": "Safety outcome / Covariate; monitors cardiovascular safety of epinephrine-containing local anesthetics during dental procedures.",
+      "relation_to_research_question": "Ensures safety compliance; evaluates if hemodynamic changes occur during procedures.",
+      "statistical_test": "Repeated Measures ANOVA (baseline, during procedure, post-procedure) or paired t-tests.",
+      "reference": "AHA/ACC Hypertension Guidelines & CONSORT Harms extension."
+    },
+    {
+      "variable_name": "hba1cPercent",
+      "definition": "Glycated Hemoglobin (HbA1c) level reflecting average blood glucose levels over the past 2-3 months.",
+      "type": "Continuous / Numeric",
+      "source": "Laboratory Blood Test",
+      "measurement_method": "High-performance liquid chromatography (HPLC) from a venous blood sample.",
+      "unit": "Percentage (%)",
+      "relation_to_outcome": "Effect modifier or covariate; diabetic control level (HbA1c) significantly influences periodontal healing kinetics.",
+      "relation_to_research_question": "Stratification / subgroup analysis parameter to assess if treatment works differently in controlled vs uncontrolled diabetics.",
+      "statistical_test": "Two-way ANOVA (treatment group x diabetic status) or Multiple Linear Regression (HbA1c as an independent variable).",
+      "reference": "ADA Clinical Practice Recommendations & STARD standards for diagnostic tests."
+    }
+  ]
+}
