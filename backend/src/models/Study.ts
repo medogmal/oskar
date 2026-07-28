@@ -201,7 +201,9 @@ const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T
 const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
 
 const isDatabaseUnavailable = (error: unknown) =>
-  localAuthFallbackEnabled() && error instanceof Error;
+  localAuthFallbackEnabled() &&
+  error instanceof Error &&
+  /Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message);
 
 
 const localStudyStorePath = path.resolve(process.cwd(), 'data', 'dev-studies.json');
