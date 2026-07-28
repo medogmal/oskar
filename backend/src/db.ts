@@ -276,6 +276,26 @@ const createOutcomeAssessmentAuditTrailTableQuery = `
   );
 `;
 
+const createStudyVariableMappingsTableQuery = `
+  CREATE TABLE IF NOT EXISTS study_variable_mappings (
+    study_id BIGINT PRIMARY KEY REFERENCES studies(id) ON DELETE CASCADE,
+    matrix_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
+const createStudyGovernanceTableQuery = `
+  CREATE TABLE IF NOT EXISTS study_governance_snapshots (
+    study_id BIGINT PRIMARY KEY REFERENCES studies(id) ON DELETE CASCADE,
+    snapshot_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
 const ensureDatabaseExists = async () => {
   assertSafeDatabaseName(appDatabase);
 
@@ -319,6 +339,8 @@ export const initializeDatabase = async () => {
   await pool.query(createOutcomeAssessmentEntriesTableQuery);
   await pool.query(createOutcomeAssessmentNotesTableQuery);
   await pool.query(createOutcomeAssessmentAuditTrailTableQuery);
+  await pool.query(createStudyVariableMappingsTableQuery);
+  await pool.query(createStudyGovernanceTableQuery);
   await pool.query('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_account_type_check');
   await pool.query(`
     ALTER TABLE users

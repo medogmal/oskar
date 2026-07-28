@@ -112,6 +112,14 @@ Deliverables:
 - Blinding & Randomization scope (if applicable).
 - Recommended data collection tools / clinical indices.""",
 
+    "sample_size": """MODE: Sample Size Planning
+Goal: Explain and justify sample size assumptions and the formula selected.
+Deliverables:
+1. Explain the detected outcome type and why the specific sample size formula applies.
+2. State the required assumptions (alpha, power, effect size, ratio, ICC if relevant).
+3. Cite the scientific or regulatory sources behind these assumptions.
+4. Warn about uncertainty when assumptions are weak or unsupported.""",
+
     "analysis_selection": """MODE: Statistical Test Selection & Justification
 Goal: Recommend the optimal statistical analysis plan based on data structure and study design.
 Deliverables:
@@ -119,6 +127,27 @@ Deliverables:
 2. Scientific & Mathematical Justification (Explain WHY this test fits the variable types, distribution assumptions, and study design).
 3. Assumption Checks Required (e.g., Shapiro-Wilk for normality, Levene's test for homogeneity of variance).
 4. Alternative Non-Parametric Fallbacks.""",
+
+    "error_detection": """MODE: Methodological & Statistical Error Detection
+Goal: Detect protocol, CRF, analysis, and reporting deficiencies.
+Deliverables:
+1. Enumerate critical, high, and moderate issues.
+2. Explain the consequence of each issue.
+3. Provide corrective action and supporting guideline references.""",
+
+    "missing_data_assessment": """MODE: Missing Data Assessment
+Goal: Assess missingness pattern and recommend an analysis-ready strategy.
+Deliverables:
+1. Classify missingness as MCAR, MAR, or MNAR when evidence supports it.
+2. Recommend a primary handling method and mandatory sensitivity analysis.
+3. Explain risks of inappropriate methods such as naive mean imputation or primary LOCF.""",
+
+    "evaluation_form_review": """MODE: Evaluation Form / CRF Review
+Goal: Review the generated CRF for duplicates, conflicts, unrelated variables, and analysis readiness.
+Deliverables:
+1. Detect duplicate or ambiguous fields.
+2. Flag variables not linked to objectives or research questions.
+3. Warn about fields that may break the SAP or downstream statistical analysis.""",
 
     "results_explanation": """MODE: Results Interpretation & Clinical Synthesis
 Goal: Explain computed statistical output (P-values, effect sizes, confidence intervals).

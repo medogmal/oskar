@@ -22,11 +22,12 @@ type NavItem = {
 };
 
 type ResearchWorkspaceShellProps = {
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
   currentStudyLabel?: string;
   dateLabel?: string;
-  navItems: NavItem[];
+  navItems?: NavItem[];
+  nav?: NavItem[];
   actions?: ReactNode;
   children: ReactNode;
 };
@@ -43,7 +44,7 @@ const iconMap: Record<string, typeof Gauge> = {
   analysis: BarChart3,
 };
 
-export const buildResearchWorkspaceNav = (studyId?: string): NavItem[] => [
+export const buildResearchWorkspaceNav = (studyId?: string, _t?: unknown): NavItem[] => [
   {
     key: 'dashboard',
     label: 'لوحة التحكم',
@@ -100,9 +101,11 @@ function ResearchWorkspaceShell({
   currentStudyLabel,
   dateLabel,
   navItems,
+  nav,
   actions,
   children,
 }: ResearchWorkspaceShellProps) {
+  const resolvedNavItems = navItems ?? nav ?? [];
   const todayLabel =
     dateLabel ??
     new Intl.DateTimeFormat('ar-EG', {
@@ -132,7 +135,7 @@ function ResearchWorkspaceShell({
 
           <nav className="space-y-1.5 overflow-y-auto px-3 py-5">
             <p className="px-3 pb-1 text-[10px] font-bold tracking-widest text-slate-500">القائمة الرئيسية</p>
-            {navItems.map((item) => {
+            {resolvedNavItems.map((item) => {
               const Icon = iconMap[item.key] ?? FileText;
               return (
                 <Link
@@ -157,8 +160,8 @@ function ResearchWorkspaceShell({
         <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
           <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h2 className="truncate text-xl font-black text-slate-800">{title}</h2>
-              <p className="truncate text-xs font-semibold text-slate-400">{subtitle}</p>
+              {title ? <h2 className="truncate text-xl font-black text-slate-800">{title}</h2> : null}
+              {subtitle ? <p className="truncate text-xs font-semibold text-slate-400">{subtitle}</p> : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-3">

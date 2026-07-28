@@ -15,6 +15,11 @@ export interface StudyTypeInfo {
   primaryGuideline: string;
   color: string;
   badgeClass: string;
+  workflowSummaryAr: string;
+  screeningModeAr: string;
+  defaultGroups: string[];
+  supportsRandomization: boolean;
+  supportsBlinding: boolean;
 }
 
 export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
@@ -28,6 +33,11 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     primaryGuideline: 'CONSORT 2010 / SPIRIT 2013 / ICH E6(R3)',
     color: 'teal',
     badgeClass: 'bg-teal-100 text-teal-800 border-teal-200',
+    workflowSummaryAr: 'يفتح مسارًا تدخليًا كاملاً مع عشوائية وربط مباشر باستمارة الفحص وتخصيص المجموعات.',
+    screeningModeAr: 'Screening + randomization + blinded allocation',
+    defaultGroups: ['Experimental', 'Control'],
+    supportsRandomization: true,
+    supportsBlinding: true,
   },
   prospective: {
     id: 'prospective',
@@ -39,6 +49,11 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     primaryGuideline: 'STROBE / NOS / Kaplan-Meier / GEE',
     color: 'blue',
     badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+    workflowSummaryAr: 'يفتح مسار متابعة مستقبلية بدون عشوائية افتراضيًا، مع إمكانية تنظيم مجموعات المقارنة عند الحاجة.',
+    screeningModeAr: 'Eligibility + cohort follow-up registration',
+    defaultGroups: ['Exposed', 'Comparison'],
+    supportsRandomization: false,
+    supportsBlinding: true,
   },
   retrospective: {
     id: 'retrospective',
@@ -50,6 +65,11 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     primaryGuideline: 'STROBE / RECORD / Propensity Matching',
     color: 'purple',
     badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+    workflowSummaryAr: 'يعطّل العشوائية تلقائيًا ويركّز على السجلات التاريخية والتحليل المقارن.',
+    screeningModeAr: 'Record abstraction / retrospective data capture',
+    defaultGroups: ['Case', 'Comparison'],
+    supportsRandomization: false,
+    supportsBlinding: false,
   },
   cross_sectional: {
     id: 'cross_sectional',
@@ -61,6 +81,11 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     primaryGuideline: 'STROBE / AXIS / Cochran / WHO Indices',
     color: 'amber',
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+    workflowSummaryAr: 'يفتح مسار استبيان/فحص مقطعي ويركّز على التقاط نقطة زمنية واحدة بدون توزيع عشوائي.',
+    screeningModeAr: 'Cross-sectional screening form',
+    defaultGroups: ['Survey Cohort'],
+    supportsRandomization: false,
+    supportsBlinding: false,
   },
   in_vitro: {
     id: 'in_vitro',
@@ -72,10 +97,18 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     primaryGuideline: 'CRIS Guidelines / ISO Standards (11405/29022)',
     color: 'emerald',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    workflowSummaryAr: 'مسار مخبري للأبحاث المختبرية الحالية والمتوافقة مع النسخ القديمة من النظام.',
+    screeningModeAr: 'Laboratory specimen worksheet',
+    defaultGroups: ['Material A', 'Material B'],
+    supportsRandomization: true,
+    supportsBlinding: true,
   },
 };
 
 export const STUDY_TYPE_OPTIONS = Object.values(STUDY_TYPES);
+export const CREATE_STUDY_TYPE_OPTIONS = STUDY_TYPE_OPTIONS.filter((item) =>
+  ['rct', 'prospective', 'retrospective', 'cross_sectional'].includes(item.id),
+);
 
 /**
  * Normalizes legacy free-text study type values into one of the 5 canonical keys.

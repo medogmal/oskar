@@ -24,6 +24,16 @@
       "en": "In Vitro Study",
       "ar": "دراسة مخبرية (In Vitro)",
       "short_en": "In Vitro"
+    },
+    "systematic_review": {
+      "en": "Systematic Review",
+      "ar": "مراجعة منهجية (Systematic Review)",
+      "short_en": "Systematic Review"
+    },
+    "meta_analysis": {
+      "en": "Meta-Analysis",
+      "ar": "تحليل شمولي (Meta-Analysis)",
+      "short_en": "Meta-Analysis"
     }
   },
   "valid_study_types": [
@@ -31,7 +41,9 @@
     "prospective",
     "retrospective",
     "cross_sectional",
-    "in_vitro"
+    "in_vitro",
+    "systematic_review",
+    "meta_analysis"
   ],
   "references": [
     {

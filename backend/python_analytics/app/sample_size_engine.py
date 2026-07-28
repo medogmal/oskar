@@ -40,9 +40,17 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
     total = 0
     test_label = ""
     formula_desc = ""
+    why_formula_chosen = ""
+    references: list[str] = []
+    outcome_type_detected = "continuous"
+    effect_size_type = str(params.get("effect_size_type") or "").strip()
+    effect_size_source = str(params.get("effect_size_source") or "").strip()
+    assumptions_sources = params.get("assumptions_sources") if isinstance(params.get("assumptions_sources"), dict) else {}
 
     if test_type in {"independent_t_test", "two_sample_t_test", "t_test"}:
         test_label = "Independent Two-Sample t-Test"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's d"
         d = max(0.01, effect_size)
         # n per group = 2 * ((z_a + z_b) / d)^2
         n_raw = 2.0 * math.pow((z_a + z_b) / d, 2)
@@ -50,18 +58,26 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = math.ceil(n1 * ratio)
         total = n1 + n2
         formula_desc = f"n_group = 2 * [(z_{{1-α/2}} + z_{{1-β}}) / d]^2 | α={alpha}, 1-β={power}, d={d}"
+        why_formula_chosen = "Two independent groups with a continuous outcome map to the classical two-sample t-test sample size equation."
+        references = ["Chow, Shao & Wang 2008", "ICH E9 Statistical Principles for Clinical Trials"]
 
     elif test_type in {"paired_t_test", "matched_pairs"}:
         test_label = "Paired Samples t-Test"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's d (paired)"
         d = max(0.01, effect_size)
         n_raw = math.pow((z_a + z_b) / d, 2)
         n1 = math.ceil(n_raw)
         n2 = n1
         total = n1
         formula_desc = f"n_pairs = [(z_{{1-α/2}} + z_{{1-β}}) / d]^2 | α={alpha}, 1-β={power}, d={d}"
+        why_formula_chosen = "Matched or repeated measurements reduce between-subject variability, so the paired t-test equation is used."
+        references = ["Rosner Fundamentals of Biostatistics", "Altman 1991 Practical Statistics for Medical Research"]
 
     elif test_type in {"two_proportion_z_test", "proportions", "z_test"}:
         test_label = "Two-Proportion Z-Test"
+        outcome_type_detected = "binary"
+        effect_size_type = effect_size_type or "Risk Difference"
         p1 = float(params.get("p1", 0.50))
         p2 = float(params.get("p2", 0.30))
         p_bar = (p1 + p2) / 2.0
@@ -77,9 +93,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = math.ceil(n1 * ratio)
         total = n1 + n2
         formula_desc = f"Z-test for Proportions | p1={p1}, p2={p2}, α={alpha}, 1-β={power}"
+        why_formula_chosen = "Binary event rates in two independent groups require a two-proportion normal approximation design."
+        references = ["Fleiss, Levin & Paik 2003", "Chow, Shao & Wang 2008"]
 
     elif test_type in {"anova", "one_way_anova"}:
         test_label = "One-Way ANOVA"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's f"
         k_groups = int(params.get("groups_count", params.get("k_groups", 3)))
         f_effect = max(0.01, effect_size)
         # Approximate sample size per group for ANOVA: n_group = [(z_a + z_b) / f]^2 / (2 * k) + 1
@@ -88,9 +108,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = n1
         total = n1 * k_groups
         formula_desc = f"ANOVA Sample Size | k={k_groups} groups, f={f_effect}, α={alpha}, 1-β={power}"
+        why_formula_chosen = "Three or more independent groups with a continuous outcome are aligned with one-way ANOVA planning."
+        references = ["Cohen 1988", "Maxwell & Delaney 2004"]
 
     elif test_type in {"repeated_measures_anova", "rm_anova"}:
         test_label = "Repeated Measures ANOVA"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's f"
         k_measures = int(params.get("measures_count", 3))
         corr = float(params.get("correlation", 0.50))
         f_effect = max(0.01, effect_size)
@@ -100,9 +124,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = n1
         total = n1
         formula_desc = f"Repeated Measures ANOVA | {k_measures} measures, corr={corr}, f={f_effect}"
+        why_formula_chosen = "Within-subject repeated measurements require a repeated-measures ANOVA style power approximation."
+        references = ["Maxwell & Delaney 2004", "Girden 1992 ANOVA Repeated Measures"]
 
     elif test_type in {"non_inferiority", "noninferiority"}:
         test_label = "Non-Inferiority Trial"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Mean Difference / Margin"
         margin = float(params.get("margin", 0.10))
         d = max(0.01, effect_size)
         # Formula: n_group = 2 * [(z_a + z_b) / (d - margin)]^2
@@ -112,9 +140,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = n1
         total = n1 * 2
         formula_desc = f"Non-Inferiority Trial | margin={margin}, d={d}, α={alpha}, 1-β={power}"
+        why_formula_chosen = "A non-inferiority design requires margin-based testing with one-sided alpha."
+        references = ["ICH E10 Choice of Control Group", "Piaggio et al. 2006 CONSORT extension for non-inferiority"]
 
     elif test_type in {"equivalence"}:
         test_label = "Equivalence Trial"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Equivalence Margin"
         margin = float(params.get("margin", 0.10))
         denom = max(0.001, margin)
         n_raw = 2.0 * math.pow((_z_alpha(alpha, False) + _z_beta((1.0 + power) / 2.0)) / denom, 2)
@@ -122,9 +154,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = n1
         total = n1 * 2
         formula_desc = f"Equivalence Trial (TOST) | margin=±{margin}, α={alpha}, 1-β={power}"
+        why_formula_chosen = "Equivalence trials follow two one-sided tests (TOST) around a predefined equivalence margin."
+        references = ["Schuirmann 1987", "Piaggio et al. 2006"]
 
     elif test_type in {"survival_analysis", "log_rank", "survival"}:
         test_label = "Survival Analysis (Log-Rank Test)"
+        outcome_type_detected = "survival"
+        effect_size_type = effect_size_type or "Hazard Ratio"
         hr = float(params.get("hazard_ratio", 0.70))
         log_hr = abs(math.log(hr)) if hr > 0 and hr != 1.0 else 0.35
         # Total events required = 4 * [(z_a + z_b) / log(HR)]^2
@@ -135,9 +171,13 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = n1
         total = n1 * 2
         formula_desc = f"Log-Rank Survival Trial | HR={hr}, Events={n_events}, α={alpha}, 1-β={power}"
+        why_formula_chosen = "Time-to-event endpoints are best planned from the event count required by the log-rank test / Schoenfeld approximation."
+        references = ["Schoenfeld 1981", "Therneau & Grambsch 2000"]
 
     elif test_type in {"cluster_randomized", "cluster"}:
         test_label = "Cluster Randomized Trial"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's d with ICC adjustment"
         cluster_size = int(params.get("cluster_size", 20))
         icc = float(params.get("icc", 0.05))
         deff = 1.0 + (cluster_size - 1) * icc
@@ -147,17 +187,23 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         n2 = math.ceil(n1 * ratio)
         total = n1 + n2
         formula_desc = f"Cluster Trial | DEFF={deff:.2f} (m={cluster_size}, ICC={icc}), α={alpha}, 1-β={power}"
+        why_formula_chosen = "Cluster-randomized studies require design-effect inflation using average cluster size and ICC."
+        references = ["Campbell, Walters & Machin 2014", "CONSORT Extension for Cluster Trials"]
 
 
     else:
         # Fallback to independent t-test
         test_label = "Independent Two-Sample t-Test"
+        outcome_type_detected = "continuous"
+        effect_size_type = effect_size_type or "Cohen's d"
         d = max(0.01, effect_size)
         n_raw = 2.0 * math.pow((z_a + z_b) / d, 2)
         n1 = math.ceil(n_raw)
         n2 = n1
         total = n1 * 2
         formula_desc = f"n_group = 2 * [(z_{{1-α/2}} + z_{{1-β}}) / d]^2"
+        why_formula_chosen = "Fallback used because the requested design did not map to a specialized sample size branch."
+        references = ["Chow, Shao & Wang 2008"]
 
     # Calculate Dropout Adjustment
     valid_dropout = min(0.50, max(0.0, dropout_rate))
@@ -192,6 +238,17 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         "message": "تم حساب حجم العينة بنجاح بناءً على المعادلات السريرية المعتمدة.",
         "test_used": test_label,
         "proposed_effect_size": effect_size,
+        "effect_size_type": effect_size_type,
+        "effect_size_source": effect_size_source or "Not supplied",
+        "assumptions_sources": {
+            "alpha": assumptions_sources.get("alpha", "Not supplied"),
+            "power": assumptions_sources.get("power", "Not supplied"),
+            "ratio": assumptions_sources.get("ratio", "Not supplied"),
+            "icc": assumptions_sources.get("icc", "Not supplied"),
+        },
+        "why_formula_chosen": why_formula_chosen,
+        "outcome_type_detected": outcome_type_detected,
+        "references": references,
         "parameters": {
             "alpha": alpha,
             "power": power,

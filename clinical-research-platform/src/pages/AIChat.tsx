@@ -163,6 +163,12 @@ type KnowledgeSampleSizeResult = {
   approved: boolean;
   message: string;
   proposed_effect_size?: number | null;
+  effect_size_type?: string | null;
+  effect_size_source?: string | null;
+  assumptions_sources?: Record<string, string> | null;
+  why_formula_chosen?: string | null;
+  outcome_type_detected?: string | null;
+  references?: string[] | null;
   scenarios?: SampleSizeScenario[] | null;
   test_used?: string | null;
   parameters?: Record<string, number> | null;
@@ -443,6 +449,11 @@ type SampleSizeAutofillDraft = {
   dropoutRate?: string;
   alternative?: 'two-sided' | 'larger' | 'smaller';
   approved?: boolean;
+  effectSizeSource?: string;
+  alphaSource?: string;
+  powerSource?: string;
+  ratioSource?: string;
+  iccSource?: string;
 };
 
 const normalizeDecimalString = (value?: string | null) => {
@@ -608,12 +619,32 @@ const toOptionalNumber = (value: string) => {
 };
 
 const assistantModes = [
+  'researcher_response',
+  'sample_size',
   'protocol_understanding',
   'study_elements',
+  'pico_extraction',
+  'study_type_detection',
+  'methods_assessment',
+  'crf_variable_extraction',
+  'error_detection',
   'analysis_selection',
+  'sample_size_justification',
+  'missing_data_assessment',
+  'evaluation_form_review',
+  'missing_data_strategy',
   'results_explanation',
+  'methodological_review',
+  'statistical_review',
+  'clinical_review',
+  'regulatory_gcp_check',
+  'references_justification',
+  'prompt_library_generator',
+  'consort_strobe_checklist',
   'final_report',
-  'researcher_response',
+  'supervisor_summary',
+  'translation_en_ar',
+  'simplify_for_patient',
 ] as const;
 
 const analysisTypes = [
@@ -662,6 +693,11 @@ function AIChat() {
   const [sampleSizeAlternative, setSampleSizeAlternative] = useState<'two-sided' | 'larger' | 'smaller'>('two-sided');
   const [sampleSizeApproved, setSampleSizeApproved] = useState(false);
   const [sampleSizeDropoutRate, setSampleSizeDropoutRate] = useState('0.15');
+  const [sampleSizeEffectSizeSource, setSampleSizeEffectSizeSource] = useState('Manual / literature source');
+  const [sampleSizeAlphaSource, setSampleSizeAlphaSource] = useState('ICH E9 default');
+  const [sampleSizePowerSource, setSampleSizePowerSource] = useState('Conventional 80%');
+  const [sampleSizeRatioSource, setSampleSizeRatioSource] = useState('Balanced 1:1 allocation');
+  const [sampleSizeIccSource, setSampleSizeIccSource] = useState('Not applicable');
   const [chartType, setChartType] = useState<(typeof chartTypes)[number]>('histogram');
   const [xColumn, setXColumn] = useState('');
   const [yColumn, setYColumn] = useState('');
@@ -1508,12 +1544,19 @@ function AIChat() {
         body: JSON.stringify({
           test_type: draft.testType ?? sampleSizeTestType,
           effect_size: toOptionalNumber(draft.effectSize ?? sampleSizeEffectSize),
+          effect_size_source: draft.effectSizeSource ?? sampleSizeEffectSizeSource,
           alpha: Number((draft.alpha ?? sampleSizeAlpha) || 0.05),
           power: Number((draft.power ?? sampleSizePower) || 0.8),
           ratio: Number((draft.ratio ?? sampleSizeRatio) || 1),
           alternative: draft.alternative ?? sampleSizeAlternative,
           approved: draft.approved ?? sampleSizeApproved,
           dropout_rate: Number((draft.dropoutRate ?? sampleSizeDropoutRate) || 0.15),
+          assumptions_sources: {
+            alpha: draft.alphaSource ?? sampleSizeAlphaSource,
+            power: draft.powerSource ?? sampleSizePowerSource,
+            ratio: draft.ratioSource ?? sampleSizeRatioSource,
+            icc: draft.iccSource ?? sampleSizeIccSource,
+          },
         }),
       });
 
@@ -1953,6 +1996,10 @@ function AIChat() {
                   <label className="mb-2 block text-sm font-medium text-slate-700">Effect size</label>
                   <input value={sampleSizeEffectSize} onChange={(event) => setSampleSizeEffectSize(event.target.value)} placeholder="مثال: 0.35" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Effect size source</label>
+                  <input value={sampleSizeEffectSizeSource} onChange={(event) => setSampleSizeEffectSizeSource(event.target.value)} placeholder="Pilot study / systematic review / manual" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                </div>
                 <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">Alpha</label>
@@ -1982,6 +2029,15 @@ function AIChat() {
                     <input type="checkbox" checked={sampleSizeApproved} onChange={(event) => setSampleSizeApproved(event.target.checked)} />
                     <span>اعتماد القيم وتنفيذ الحساب النهائي</span>
                   </label>
+                </div>
+                <div className="grid gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-2">
+                  <p className="text-sm font-medium text-slate-700">Sources of assumptions</p>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <input value={sampleSizeAlphaSource} onChange={(event) => setSampleSizeAlphaSource(event.target.value)} placeholder="Alpha source" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input value={sampleSizePowerSource} onChange={(event) => setSampleSizePowerSource(event.target.value)} placeholder="Power source" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input value={sampleSizeRatioSource} onChange={(event) => setSampleSizeRatioSource(event.target.value)} placeholder="Allocation ratio source" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    <input value={sampleSizeIccSource} onChange={(event) => setSampleSizeIccSource(event.target.value)} placeholder="ICC / clustering source" className="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-2">
                   <div>
@@ -2360,8 +2416,31 @@ function AIChat() {
                   <p className="font-semibold">{sampleSizeResult.message}</p>
                   {sampleSizeResult.test_used ? <p className="mt-2">Test: {sampleSizeResult.test_used}</p> : null}
                   {typeof sampleSizeResult.proposed_effect_size === 'number' ? <p className="mt-1">Proposed effect size: {sampleSizeResult.proposed_effect_size}</p> : null}
+                  {sampleSizeResult.effect_size_type ? <p className="mt-1">Effect size type: {sampleSizeResult.effect_size_type}</p> : null}
+                  {sampleSizeResult.effect_size_source ? <p className="mt-1">Effect size source: {sampleSizeResult.effect_size_source}</p> : null}
+                  {sampleSizeResult.outcome_type_detected ? <p className="mt-1">Outcome type detected: {sampleSizeResult.outcome_type_detected}</p> : null}
                   {typeof sampleSizeResult.total_sample_size === 'number' ? <p className="mt-1">Total sample size: {sampleSizeResult.total_sample_size}</p> : null}
+                  {sampleSizeResult.why_formula_chosen ? <p className="mt-3 whitespace-pre-wrap"><strong>Why this formula:</strong> {sampleSizeResult.why_formula_chosen}</p> : null}
                   {sampleSizeResult.interpretation ? <p className="mt-3 whitespace-pre-wrap">{sampleSizeResult.interpretation}</p> : null}
+                  {sampleSizeResult.assumptions_sources ? (
+                    <div className="mt-3 rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                      <p className="font-semibold text-slate-800">Assumption sources</p>
+                      <p className="mt-1">Alpha: {sampleSizeResult.assumptions_sources.alpha ?? '—'}</p>
+                      <p className="mt-1">Power: {sampleSizeResult.assumptions_sources.power ?? '—'}</p>
+                      <p className="mt-1">Ratio: {sampleSizeResult.assumptions_sources.ratio ?? '—'}</p>
+                      <p className="mt-1">ICC: {sampleSizeResult.assumptions_sources.icc ?? '—'}</p>
+                    </div>
+                  ) : null}
+                  {sampleSizeResult.references?.length ? (
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-slate-800">References</p>
+                      <ul className="mt-2 list-disc space-y-1 ps-5 text-xs text-slate-600">
+                        {sampleSizeResult.references.map((reference) => (
+                          <li key={reference}>{reference}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
                 {sampleSizeResult.scenarios?.length ? (
                   <div className="mt-4 grid gap-3 md:grid-cols-3">

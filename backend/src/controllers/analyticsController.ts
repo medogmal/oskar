@@ -477,6 +477,17 @@ export const runAnalysis = async (req: MulterRequest, res: Response) => {
   }
 };
 
+export const analyzeMissingData = async (req: MulterRequest, res: Response) => {
+  try {
+    const payload = await forwardMultipartRequest(req.file, '/dataset/missing-data');
+    return res.json(payload);
+  } catch (error) {
+    return res.status(400).json({
+      message: error instanceof Error ? error.message : 'Unable to analyze missing data',
+    });
+  }
+};
+
 export const runOcrExtraction = async (req: MulterRequest, res: Response) => {
   try {
     const payload = await forwardMultipartRequest(req.file, '/ocr/extract');
@@ -599,6 +610,17 @@ export const ingestKnowledgeDocument = async (req: MulterRequest, res: Response)
   } catch (error) {
     return res.status(400).json({
       message: error instanceof Error ? error.message : 'Unable to ingest document into the knowledge engine',
+    });
+  }
+};
+
+export const reindexKnowledgeReferences = async (_req: Request, res: Response) => {
+  try {
+    const payload = await forwardJsonRequest(knowledgeBaseUrl, '/api/v1/reindex-reference-library', {});
+    return res.json(payload);
+  } catch (error) {
+    return res.status(400).json({
+      message: error instanceof Error ? error.message : 'Unable to reindex the reference library',
     });
   }
 };

@@ -6,8 +6,8 @@
 
 ## 🗺️ المرحلة الأولى: حوكمة المراجع وهيكلة قاعدة المعرفة (Knowledge Base & RAG Setup)
 
-### 1. حوكمة وتنظيم المراجع (126 مرجعاً)
-تم دمج وتفصيل **126 مرجعاً أكاديمياً** معتمداً داخل النظام في ملف البرمجة `backend/python_analytics/app/knowledge_catalog.py`. 
+### 1. حوكمة وتنظيم المراجع (130 مرجعاً)
+تم دمج وتفصيل **130 مرجعاً أكاديمياً** معتمداً داخل النظام في ملف البرمجة `backend/python_analytics/app/knowledge_catalog.py`. 
 * **نوع الدراسة (Study Type):** تم ربط كل مرجع بنوع الدراسة الخاص به (RCT, Prospective, Retrospective, Cross-Sectional, In Vitro, Systematic Review).
 * **عزل المراجع (Reference Isolation):** يلتزم محرك الـ RAG والذكاء الاصطناعي برفض استدعاء أي مرجع خارج تصنيفه المحدد لضمان دقة الاسترجاع ومنع تداخل المنهجيات (على سبيل المثال: لا يمكن استخدام معايير STROBE الخاصة بالدراسات الاسترجاعية عند مراجعة تجربة سريرية عشوائية RCT التي تلتزم بمعايير CONSORT).
 
@@ -86,7 +86,7 @@
 ## 📦 المخرجات الفنية الجاهزة للتسليم والاستخدام
 
 جميع الملفات البرمجية جاهزة للعمل ومدمجة في مسار المشروع، بالإضافة إلى توليد **الملفات التقنية المنظمة (JSON Data Seeds)** داخل مجلد [deliverables_json](file:///d:/Mostaql/oskar/deliverables_json) لتغذية قاعدة البيانات مباشرة:
-1. [knowledge_catalog.json](file:///d:/Mostaql/oskar/deliverables_json/knowledge_catalog.json): المراجع الأكاديمية الـ 126 مع وسوم التصنيف.
+1. [knowledge_catalog.json](file:///d:/Mostaql/oskar/deliverables_json/knowledge_catalog.json): المراجع الأكاديمية الـ 130 مع وسوم التصنيف.
 2. [clinical_rules_severity.json](file:///d:/Mostaql/oskar/deliverables_json/clinical_rules_severity.json): مصفوفة القياسات الطبية واللثوية المعتمدة ونسب الخطورة.
 3. [prompt_library.json](file:///d:/Mostaql/oskar/deliverables_json/prompt_library.json): مكتبة المحثات الحاكمة الموجهة للـ AI.
 4. [decision_trees.json](file:///d:/Mostaql/oskar/deliverables_json/decision_trees.json): أشجار قرارات حجم العينة وتصميم الاختبارات الإحصائية.

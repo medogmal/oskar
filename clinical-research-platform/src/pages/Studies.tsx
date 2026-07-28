@@ -25,17 +25,18 @@ import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components
 import { useAuth } from '../context/useAuth';
 import { clearAutofillSnapshot, loadAutofillSnapshot } from '../lib/aiAutofill';
 import { apiBaseUrl, type AccountType } from '../lib/auth';
-import { STUDY_TYPE_OPTIONS, getStudyTypeInfo } from '../lib/studyTypes';
+import { CREATE_STUDY_TYPE_OPTIONS, getStudyTypeInfo } from '../lib/studyTypes';
 
 
 type RandomizationMethod = 'simple' | 'block';
-type BlindedParty = 'patient' | 'researcher' | 'assessor' | 'statistician';
+type BlindedParty = 'participant' | 'patient' | 'researcher' | 'supervisor' | 'assessor' | 'statistician';
 type BlindingScope = 'material_type' | 'treatment_procedure' | 'split_mouth_side';
 type BlindingType = 'open-label' | 'single-blind' | 'double-blind' | 'triple-blind' | 'quadruple-blind';
 
 type BlindingSettings = {
   blindedParties: BlindedParty[];
   scope: BlindingScope[];
+  targetVariables?: string[];
   blindingType: BlindingType;
   protocolText?: string;
   permissions: {
@@ -134,6 +135,7 @@ type CreateStudyForm = {
   groupsInput: string;
   blindedParties: BlindedParty[];
   blindingScope: BlindingScope[];
+  blindingTargetVariablesInput: string;
   blindingProtocolText: string;
   requiresClinicalEvaluation: boolean;
 };
@@ -153,6 +155,7 @@ const initialFormState: CreateStudyForm = {
   groupsInput: 'Experimental, Control',
   blindedParties: [],
   blindingScope: [],
+  blindingTargetVariablesInput: 'Treatment group, intervention type',
   blindingProtocolText: '',
   requiresClinicalEvaluation: false,
 };
@@ -164,6 +167,7 @@ type StudyDesignForm = {
   hasBlinding: boolean;
   blindedParties: BlindedParty[];
   blindingScope: BlindingScope[];
+  blindingTargetVariablesInput: string;
   blindingProtocolText: string;
   coResearcherUserId: string;
   assistantSupervisorUserId: string;
@@ -181,24 +185,37 @@ const normalizeGroups = (value: string) =>
     ),
   );
 
+const normalizeTargetVariables = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+const normalizeBlindedParties = (parties: BlindedParty[]) =>
+  Array.from(new Set(parties.map((party) => (party === 'patient' ? 'participant' : party)))) as BlindedParty[];
+
 const inferBlindingType = (parties: BlindedParty[]): BlindingType => {
-  const sorted = ['patient', 'researcher', 'assessor', 'statistician'].filter((party) =>
-    parties.includes(party as BlindedParty),
+  const sorted = ['participant', 'researcher', 'supervisor', 'assessor', 'statistician'].filter((party) =>
+    normalizeBlindedParties(parties).includes(party as BlindedParty),
   ) as BlindedParty[];
 
   if (sorted.length === 0) {
     return 'open-label';
   }
 
-  if (sorted.length === 1 && sorted.includes('patient')) {
+  if (sorted.length === 1) {
     return 'single-blind';
   }
 
-  if (sorted.includes('patient') && sorted.includes('assessor') && sorted.length === 2) {
+  if (sorted.length === 2) {
     return 'double-blind';
   }
 
-  if (sorted.includes('patient') && sorted.includes('assessor') && sorted.includes('statistician') && sorted.length === 3) {
+  if (sorted.length === 3) {
     return 'triple-blind';
   }
 
@@ -212,13 +229,18 @@ const generateBlindingProtocolText = (input: {
   groupsInput: string;
   blindedParties: BlindedParty[];
   blindingScope: BlindingScope[];
+  blindingTargetVariablesInput: string;
 }) => {
   const groups = normalizeGroups(input.groupsInput);
   const normalizedGroups = groups.length > 0 ? groups : ['Experimental', 'Control'];
-  const blindingType = inferBlindingType(input.blindedParties);
+  const normalizedParties = normalizeBlindedParties(input.blindedParties);
+  const targetVariables = normalizeTargetVariables(input.blindingTargetVariablesInput);
+  const blindingType = inferBlindingType(normalizedParties);
   const blindedPartyNarratives: Record<BlindedParty, string> = {
+    participant: 'the participant throughout the intervention period',
     patient: 'the participant throughout the intervention period',
     researcher: 'the treating researcher or operator during intervention delivery',
+    supervisor: 'the academic supervisor during oversight and review',
     assessor: 'the external outcome assessor during evaluation',
     statistician: 'the statistician during the final analysis stage',
   };
@@ -228,13 +250,14 @@ const generateBlindingProtocolText = (input: {
     split_mouth_side: 'the treated side in split-mouth allocation',
   };
   const blindedPartyText =
-    input.blindedParties.length > 0
-      ? input.blindedParties.map((party) => blindedPartyNarratives[party]).join(', ')
+    normalizedParties.length > 0
+      ? normalizedParties.map((party) => blindedPartyNarratives[party]).join(', ')
       : 'no trial party';
   const scopeText =
     input.blindingScope.length > 0
       ? input.blindingScope.map((item) => scopeNarratives[item]).join(', ')
       : 'the intervention identity';
+  const targetVariableText = targetVariables.length > 0 ? targetVariables.join(', ') : 'group allocation and intervention identity';
   const concealmentText = normalizedGroups
     .map((group, index) => `${group} was coded as ${getMaskedGroupCode(index)}`)
     .join('; ');
@@ -243,11 +266,63 @@ const generateBlindingProtocolText = (input: {
     `Blinding procedures were predefined for the study "${input.studyTitle?.trim() || 'the study'}" as a ${blindingType} design.`,
     `The blinded parties included ${blindedPartyText}.`,
     `Blinding was applied to ${scopeText}.`,
+    `The blinded variables included ${targetVariableText}.`,
     `Allocation concealment was maintained by using coded study labels, where ${concealmentText}.`,
     'The randomization list and treatment code key were stored separately from the clinical assessment workflow and were not available to blinded personnel.',
     'Outcome assessors accessed a restricted interface that omitted intervention-identifying material fields whenever assessor blinding was enabled.',
     'For statistical analysis, masked group codes were preserved until the analysis dataset was finalized when statistician blinding was requested.',
   ].join(' ');
+};
+
+const applyStudyTypePreset = (
+  nextStudyType: string,
+): Pick<
+  CreateStudyForm,
+  'studyType' | 'hasRandomization' | 'hasBlinding' | 'groupsInput' | 'blindedParties' | 'blindingScope' | 'blindingTargetVariablesInput'
+> => {
+  const info = getStudyTypeInfo(nextStudyType);
+  if (info.id === 'rct') {
+    return {
+      studyType: nextStudyType,
+      hasRandomization: true,
+      hasBlinding: true,
+      groupsInput: info.defaultGroups.join(', '),
+      blindedParties: ['participant', 'assessor'] as BlindedParty[],
+      blindingScope: ['treatment_procedure'] as BlindingScope[],
+      blindingTargetVariablesInput: 'Treatment group, intervention type',
+    };
+  }
+  if (info.id === 'prospective') {
+    return {
+      studyType: nextStudyType,
+      hasRandomization: false,
+      hasBlinding: false,
+      groupsInput: info.defaultGroups.join(', '),
+      blindedParties: [] as BlindedParty[],
+      blindingScope: [] as BlindingScope[],
+      blindingTargetVariablesInput: 'Exposure status, follow-up code',
+    };
+  }
+  if (info.id === 'retrospective') {
+    return {
+      studyType: nextStudyType,
+      hasRandomization: false,
+      hasBlinding: false,
+      groupsInput: info.defaultGroups.join(', '),
+      blindedParties: [] as BlindedParty[],
+      blindingScope: [] as BlindingScope[],
+      blindingTargetVariablesInput: 'Historical treatment code',
+    };
+  }
+  return {
+    studyType: nextStudyType,
+    hasRandomization: false,
+    hasBlinding: false,
+    groupsInput: info.defaultGroups.join(', '),
+    blindedParties: [] as BlindedParty[],
+    blindingScope: [] as BlindingScope[],
+    blindingTargetVariablesInput: 'Questionnaire version, examiner code',
+  };
 };
 
 function Studies() {
@@ -267,6 +342,7 @@ function Studies() {
     hasBlinding: false,
     blindedParties: [],
     blindingScope: [],
+    blindingTargetVariablesInput: 'Treatment group, intervention type',
     blindingProtocolText: '',
     coResearcherUserId: '',
     assistantSupervisorUserId: '',
@@ -289,6 +365,7 @@ function Studies() {
   const supervisors = roleDirectory.filter((entry) => entry.accountType === 'supervisor');
   const assistantSupervisors = roleDirectory.filter((entry) => entry.accountType === 'assistant_supervisor');
   const clinicalEvaluators = roleDirectory.filter((entry) => entry.accountType === 'clinical_evaluator');
+  const selectedStudyTypeInfo = getStudyTypeInfo(formState.studyType);
 
   const replaceStudy = useCallback((nextStudy: Study) => {
     setStudies((prev) => prev.map((study) => (study.id === nextStudy.id ? nextStudy : study)));
@@ -355,7 +432,7 @@ function Studies() {
     setFormState((prev) => ({
       ...prev,
       title: snapshot.studyTitle || prev.title,
-      studyType: snapshot.studyTypeGuess || prev.studyType,
+      ...applyStudyTypePreset(snapshot.studyTypeGuess || prev.studyType),
       targetSampleSize:
         typeof snapshot.suggestedSampleSize === 'number' && snapshot.suggestedSampleSize > 0
           ? String(snapshot.suggestedSampleSize)
@@ -409,6 +486,24 @@ function Studies() {
   };
 
   const handleChange = <K extends keyof CreateStudyForm>(field: K, value: CreateStudyForm[K]) => {
+    if (field === 'studyType' && typeof value === 'string') {
+      const preset = applyStudyTypePreset(value);
+      setFormState((prev) => ({
+        ...prev,
+        ...preset,
+        blindingProtocolText: preset.hasBlinding
+          ? generateBlindingProtocolText({
+              studyTitle: prev.title,
+              groupsInput: preset.groupsInput,
+              blindedParties: preset.blindedParties,
+              blindingScope: preset.blindingScope,
+              blindingTargetVariablesInput: preset.blindingTargetVariablesInput,
+            })
+          : '',
+      }));
+      return;
+    }
+
     setFormState((prev) => ({
       ...prev,
       [field]: value,
@@ -461,6 +556,7 @@ function Studies() {
         groupsInput: formState.groupsInput,
         blindedParties: formState.blindedParties,
         blindingScope: formState.blindingScope,
+        blindingTargetVariablesInput: formState.blindingTargetVariablesInput,
       }),
     );
   };
@@ -473,6 +569,7 @@ function Studies() {
         groupsInput: designForm.groupsInput,
         blindedParties: designForm.blindedParties,
         blindingScope: designForm.blindingScope,
+        blindingTargetVariablesInput: designForm.blindingTargetVariablesInput,
       }),
     );
   };
@@ -484,8 +581,9 @@ function Studies() {
       randomizationMethod: study.randomizationMethod ?? 'simple',
       groupsInput: (study.groups?.length ? study.groups : ['Experimental', 'Control']).join(', '),
       hasBlinding: study.hasBlinding,
-      blindedParties: study.blindingSettings?.blindedParties ?? [],
+      blindedParties: normalizeBlindedParties(study.blindingSettings?.blindedParties ?? []),
       blindingScope: study.blindingSettings?.scope ?? [],
+      blindingTargetVariablesInput: (study.blindingSettings?.targetVariables ?? []).join(', '),
       blindingProtocolText: study.blindingSettings?.protocolText ?? '',
       coResearcherUserId: study.coResearcherUserId ?? '',
       assistantSupervisorUserId: study.assistantSupervisorUserId ?? '',
@@ -573,8 +671,9 @@ function Studies() {
           randomizationMethod: formState.hasRandomization ? formState.randomizationMethod : undefined,
           groups,
           hasBlinding: formState.hasBlinding,
-          blindedParties: formState.hasBlinding ? formState.blindedParties : [],
+          blindedParties: formState.hasBlinding ? normalizeBlindedParties(formState.blindedParties) : [],
           blindingScope: formState.hasBlinding ? formState.blindingScope : [],
+          blindingTargetVariables: formState.hasBlinding ? normalizeTargetVariables(formState.blindingTargetVariablesInput) : [],
           blindingProtocolText: formState.hasBlinding ? formState.blindingProtocolText || undefined : undefined,
           requiresClinicalEvaluation: formState.requiresClinicalEvaluation,
         }),
@@ -630,8 +729,9 @@ function Studies() {
           randomizationMethod: designForm.hasRandomization ? designForm.randomizationMethod : undefined,
           groups,
           hasBlinding: designForm.hasBlinding,
-          blindedParties: designForm.hasBlinding ? designForm.blindedParties : [],
+          blindedParties: designForm.hasBlinding ? normalizeBlindedParties(designForm.blindedParties) : [],
           blindingScope: designForm.hasBlinding ? designForm.blindingScope : [],
+          blindingTargetVariables: designForm.hasBlinding ? normalizeTargetVariables(designForm.blindingTargetVariablesInput) : [],
           blindingProtocolText: designForm.hasBlinding ? designForm.blindingProtocolText || undefined : undefined,
           coResearcherUserId: designForm.coResearcherUserId || undefined,
           assistantSupervisorUserId: designForm.assistantSupervisorUserId || undefined,
@@ -1104,7 +1204,7 @@ function Studies() {
                           className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
                           required
                         >
-                          {STUDY_TYPE_OPTIONS.map((opt) => (
+                          {CREATE_STUDY_TYPE_OPTIONS.map((opt) => (
                             <option key={opt.id} value={opt.id}>
                               {opt.labelAr} ({opt.shortLabel})
                             </option>
@@ -1127,6 +1227,21 @@ function Studies() {
                           ))}
                         </select>
                       </label>
+                    </div>
+
+                    <div className={`mt-4 rounded-2xl border px-4 py-4 ${selectedStudyTypeInfo.badgeClass}`}>
+                      <p className="text-xs font-extrabold">Workflow</p>
+                      <p className="mt-1 text-sm font-black">{selectedStudyTypeInfo.labelAr}</p>
+                      <p className="mt-2 text-xs font-bold opacity-80">{selectedStudyTypeInfo.workflowSummaryAr}</p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-extrabold">
+                        <span className="rounded-full bg-white/80 px-3 py-1">{selectedStudyTypeInfo.screeningModeAr}</span>
+                        <span className="rounded-full bg-white/80 px-3 py-1">
+                          Randomization: {selectedStudyTypeInfo.supportsRandomization ? 'Supported' : 'Not required'}
+                        </span>
+                        <span className="rounded-full bg-white/80 px-3 py-1">
+                          Blinding: {selectedStudyTypeInfo.supportsBlinding ? 'Available' : 'Optional/Off'}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-5">
@@ -1165,7 +1280,12 @@ function Studies() {
                           <p className="text-[11px] font-bold text-slate-400">تخصيص العينات للمجموعات آلياً وفق خوارزمية محكومة</p>
                         </div>
                         <span className="text-[11px] font-black text-slate-400">لا</span>
-                        <button type="button" onClick={() => handleChange('hasRandomization', !formState.hasRandomization)} className={`prototype-switch ${formState.hasRandomization ? 'on' : ''}`} />
+                        <button
+                          type="button"
+                          disabled={!selectedStudyTypeInfo.supportsRandomization}
+                          onClick={() => handleChange('hasRandomization', !formState.hasRandomization)}
+                          className={`prototype-switch ${formState.hasRandomization ? 'on' : ''} ${!selectedStudyTypeInfo.supportsRandomization ? 'cursor-not-allowed opacity-50' : ''}`}
+                        />
                         <span className="text-[11px] font-black text-teal-600">نعم</span>
                       </div>
 
@@ -1178,7 +1298,12 @@ function Studies() {
                           <p className="text-[11px] font-bold text-slate-400">إخفاء التخصيص العلاجي عن الأطراف المحددة لحماية حياد التجربة</p>
                         </div>
                         <span className="text-[11px] font-black text-slate-400">لا</span>
-                        <button type="button" onClick={() => handleChange('hasBlinding', !formState.hasBlinding)} className={`prototype-switch ${formState.hasBlinding ? 'on' : ''}`} />
+                        <button
+                          type="button"
+                          disabled={!selectedStudyTypeInfo.supportsBlinding}
+                          onClick={() => handleChange('hasBlinding', !formState.hasBlinding)}
+                          className={`prototype-switch ${formState.hasBlinding ? 'on' : ''} ${!selectedStudyTypeInfo.supportsBlinding ? 'cursor-not-allowed opacity-50' : ''}`}
+                        />
                         <span className="text-[11px] font-black text-teal-600">نعم</span>
                       </div>
 
@@ -1258,8 +1383,9 @@ function Studies() {
                         <p className="mb-3 text-xs font-extrabold text-slate-600">أطراف التعمية</p>
                         <div className="grid gap-3 sm:grid-cols-2">
                           {[
-                            ['patient', 'المشارك', 'لا يعرف المادة أو المعالجة'],
+                            ['participant', 'المشارك / المريض', 'لا يعرف المعالجة أو المجموعة'],
                             ['researcher', 'الباحث / المعالج', 'لا يعرف التدخل الذي يطبقه'],
+                            ['supervisor', 'المشرف', 'يراجع دون رؤية هوية المجموعة أو التدخل'],
                             ['assessor', 'مقيّم النتائج', 'يقيّم النتائج دون معرفة المجموعة'],
                             ['statistician', 'المحلل الإحصائي', 'يستلم البيانات مرمزة'],
                           ].map(([value, label, helper]) => (
@@ -1306,6 +1432,18 @@ function Studies() {
                             ))}
                           </div>
                         </div>
+                        <label className="mt-4 block">
+                          <span className="mb-2 block text-xs font-extrabold text-slate-600">المتغيرات المطلوب تعميتها</span>
+                          <input
+                            type="text"
+                            value={formState.blindingTargetVariablesInput}
+                            onChange={(e) => handleChange('blindingTargetVariablesInput', e.target.value)}
+                            disabled={!formState.hasBlinding}
+                            className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            placeholder="Treatment group, device name, intervention type"
+                          />
+                          <p className="mt-2 text-[10px] font-bold text-slate-400">اكتبها مفصولة بفواصل مثل: المجموعة العلاجية، اسم الجهاز، نوع التدخل، النتيجة الأساسية.</p>
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -1413,7 +1551,7 @@ function Studies() {
                           <Bot className="h-3.5 w-3.5" />
                         </span>
                         <p className="rounded-xl rounded-tr-none bg-white p-2.5 text-[11px] font-bold text-slate-600 shadow-sm">
-                          هل ترغب بتعديل حجم العينة أو أسماء المجموعات قبل الاعتماد؟ يمكنك التعديل مباشرة من الحقول الحالية.
+                          هل ترغب بتعديل حجم العينة أو أسماء المجموعات قبل الاعتماد؟ نوع الدراسة الحالي يضبط الـ workflow على: {selectedStudyTypeInfo.screeningModeAr}
                         </p>
                       </div>
                       <button
@@ -1502,8 +1640,9 @@ function Studies() {
                   <p className="text-sm font-medium text-indigo-900">Step 1: Who is blinded?</p>
                   <div className="mt-2 flex flex-wrap gap-3">
                     {[
-                      ['patient', 'Patient'],
+                      ['participant', 'Participant / Patient'],
                       ['researcher', 'Researcher / Operator'],
+                      ['supervisor', 'Supervisor'],
                       ['assessor', 'Assessor'],
                       ['statistician', 'Statistician'],
                     ].map(([value, label]) => (
@@ -1542,10 +1681,22 @@ function Studies() {
                   </div>
                 </div>
 
+                <div className="mt-4">
+                  <label className="mb-1 block text-sm font-medium text-indigo-900">Step 3: Blinded variables</label>
+                  <input
+                    type="text"
+                    value={designForm.blindingTargetVariablesInput}
+                    onChange={(e) => updateDesignForm('blindingTargetVariablesInput', e.target.value)}
+                    disabled={!designForm.hasBlinding}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100"
+                    placeholder="Treatment group, device name, intervention type"
+                  />
+                </div>
+
                 <div className="mt-4 rounded-2xl border border-indigo-200 bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-indigo-900">Step 3: AI blinding protocol assistant</p>
+                      <p className="text-sm font-medium text-indigo-900">Step 4: AI blinding protocol assistant</p>
                       <p className="mt-1 text-xs text-slate-500">
                         Generates a ready-to-use English blinding paragraph and previews automatic masking behavior.
                       </p>
@@ -1751,6 +1902,11 @@ function Studies() {
                   <p className="mt-1 text-sm text-indigo-700">
                     Blinding: {selectedStudy.hasBlinding ? selectedStudy.blindingSettings?.blindingType ?? 'configured' : 'disabled'}
                   </p>
+                  {selectedStudy.blindingSettings?.targetVariables?.length ? (
+                    <p className="mt-1 text-sm text-indigo-700">
+                      Blinded variables: {selectedStudy.blindingSettings.targetVariables.join(' / ')}
+                    </p>
+                  ) : null}
                   {selectedStudy.blindingSettings?.protocolText ? (
                     <p className="mt-3 text-sm text-indigo-800">{selectedStudy.blindingSettings.protocolText}</p>
                   ) : null}

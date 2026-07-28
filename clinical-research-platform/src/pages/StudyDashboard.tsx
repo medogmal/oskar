@@ -33,6 +33,7 @@ import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components
 import { useAuth } from '../context/useAuth';
 import { clearAutofillSnapshot, loadAutofillSnapshot } from '../lib/aiAutofill';
 import { apiBaseUrl, getDashboardPath } from '../lib/auth';
+import { getStudyTypeInfo } from '../lib/studyTypes';
 
 type Study = {
   id: string;
@@ -57,8 +58,9 @@ type Study = {
   groups?: string[];
   blindingSettings?: {
     blindingType?: string;
-    blindedParties?: Array<'patient' | 'researcher' | 'assessor' | 'statistician'>;
+    blindedParties?: Array<'participant' | 'patient' | 'researcher' | 'supervisor' | 'assessor' | 'statistician'>;
     scope?: Array<'material_type' | 'treatment_procedure' | 'split_mouth_side'>;
+    targetVariables?: string[];
     protocolText?: string;
     permissions?: {
       hideMaterialsFromAssessor?: boolean;
@@ -95,7 +97,7 @@ type StudyResources = {
   }>;
 };
 
-type BlindedParty = 'patient' | 'researcher' | 'assessor' | 'statistician';
+type BlindedParty = 'participant' | 'patient' | 'researcher' | 'supervisor' | 'assessor' | 'statistician';
 type BlindingScope = 'material_type' | 'treatment_procedure' | 'split_mouth_side';
 type RandomizationMethod = 'simple' | 'block';
 type ClinicalEvaluationDecision = 'pending' | 'accepted' | 'needs_revision' | 'not_recommended';
@@ -108,6 +110,7 @@ type MethodologyDraft = {
   hasBlinding: boolean;
   blindedParties: BlindedParty[];
   blindingScope: BlindingScope[];
+  blindingTargetVariablesInput: string;
   blindingProtocolText: string;
   requiresClinicalEvaluation: boolean;
 };
@@ -153,20 +156,34 @@ const normalizeGroups = (value: string) =>
     ),
   );
 
+const normalizeTargetVariables = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+const normalizeBlindedParties = (parties: BlindedParty[]) =>
+  Array.from(new Set(parties.map((party) => (party === 'patient' ? 'participant' : party)))) as BlindedParty[];
+
 const inferBlindingType = (parties: BlindedParty[]) => {
-  if (parties.length === 0) {
+  const normalized = normalizeBlindedParties(parties);
+  if (normalized.length === 0) {
     return 'Open-label';
   }
-  if (parties.length === 1 && parties.includes('patient')) {
+  if (normalized.length === 1) {
     return 'Single-blind';
   }
-  if (parties.includes('patient') && parties.includes('assessor') && parties.length === 2) {
+  if (normalized.length === 2) {
     return 'Double-blind';
   }
-  if (parties.includes('patient') && parties.includes('assessor') && parties.includes('statistician') && parties.length === 3) {
+  if (normalized.length === 3) {
     return 'Triple-blind';
   }
-  return parties.length >= 4 ? 'Quadruple-blind' : 'Double-blind';
+  return normalized.length >= 4 ? 'Quadruple-blind' : 'Double-blind';
 };
 
 const generateBlindingProtocolText = (input: {
@@ -174,12 +191,17 @@ const generateBlindingProtocolText = (input: {
   groupsInput: string;
   blindedParties: BlindedParty[];
   blindingScope: BlindingScope[];
+  blindingTargetVariablesInput: string;
 }) => {
   const groups = normalizeGroups(input.groupsInput);
   const normalizedGroups = groups.length > 0 ? groups : ['Experimental', 'Control'];
+  const normalizedParties = normalizeBlindedParties(input.blindedParties);
+  const targetVariables = normalizeTargetVariables(input.blindingTargetVariablesInput);
   const blindedPartyNarratives: Record<BlindedParty, string> = {
+    participant: 'the participant throughout the intervention period',
     patient: 'the participant throughout the intervention period',
     researcher: 'the treating researcher or operator during intervention delivery',
+    supervisor: 'the academic supervisor during oversight and review',
     assessor: 'the external outcome assessor during outcome evaluation',
     statistician: 'the statistician during coded data analysis',
   };
@@ -190,9 +212,10 @@ const generateBlindingProtocolText = (input: {
   };
 
   return [
-    `This study was structured as a ${inferBlindingType(input.blindedParties).toLowerCase()} clinical design.`,
-    `Blinded parties included ${input.blindedParties.length ? input.blindedParties.map((item) => blindedPartyNarratives[item]).join(', ') : 'no trial personnel'}.`,
+    `This study was structured as a ${inferBlindingType(normalizedParties).toLowerCase()} clinical design.`,
+    `Blinded parties included ${normalizedParties.length ? normalizedParties.map((item) => blindedPartyNarratives[item]).join(', ') : 'no trial personnel'}.`,
     `Blinding was applied to ${input.blindingScope.length ? input.blindingScope.map((item) => scopeNarratives[item]).join(', ') : 'the intervention identity'}.`,
+    `The blinded variables included ${targetVariables.length ? targetVariables.join(', ') : 'group allocation and intervention identity'}.`,
     `Allocation concealment was maintained through coded labels for ${normalizedGroups.join(' and ')}.`,
     'Any emergency unblinding event is documented in the audit trail together with the user, reason, and timestamp.',
   ].join(' ');
@@ -301,6 +324,7 @@ function StudyDashboard() {
     hasBlinding: false,
     blindedParties: [],
     blindingScope: [],
+    blindingTargetVariablesInput: 'Treatment group, intervention type',
     blindingProtocolText: '',
     requiresClinicalEvaluation: false,
   });
@@ -588,6 +612,7 @@ function StudyDashboard() {
     ],
     [calendarEvents.length, resources.analyses.length, resources.files.length, study?.enrolledPatients],
   );
+  const studyTypeInfo = getStudyTypeInfo(study?.studyType);
 
   const selectTab = (tab: StudyTab) => {
     setActiveTab(tab);
@@ -606,8 +631,9 @@ function StudyDashboard() {
       randomizationMethod: study.randomizationMethod ?? 'simple',
       groupsInput: (study.groups?.length ? study.groups : ['Experimental', 'Control']).join(', '),
       hasBlinding: Boolean(study.hasBlinding),
-      blindedParties: study.blindingSettings?.blindedParties ?? [],
+      blindedParties: normalizeBlindedParties(study.blindingSettings?.blindedParties ?? []),
       blindingScope: study.blindingSettings?.scope ?? [],
+      blindingTargetVariablesInput: (study.blindingSettings?.targetVariables ?? []).join(', '),
       blindingProtocolText: study.blindingSettings?.protocolText ?? '',
       requiresClinicalEvaluation: Boolean(study.requiresClinicalEvaluation),
     });
@@ -643,6 +669,7 @@ function StudyDashboard() {
         groupsInput: current.groupsInput,
         blindedParties: current.blindedParties,
         blindingScope: current.blindingScope,
+        blindingTargetVariablesInput: current.blindingTargetVariablesInput,
       }),
     }));
   };
@@ -677,8 +704,9 @@ function StudyDashboard() {
           randomizationMethod: methodologyDraft.hasRandomization ? methodologyDraft.randomizationMethod : undefined,
           groups,
           hasBlinding: methodologyDraft.hasBlinding,
-          blindedParties: methodologyDraft.hasBlinding ? methodologyDraft.blindedParties : [],
+          blindedParties: methodologyDraft.hasBlinding ? normalizeBlindedParties(methodologyDraft.blindedParties) : [],
           blindingScope: methodologyDraft.hasBlinding ? methodologyDraft.blindingScope : [],
+          blindingTargetVariables: methodologyDraft.hasBlinding ? normalizeTargetVariables(methodologyDraft.blindingTargetVariablesInput) : [],
           blindingProtocolText: methodologyDraft.hasBlinding ? methodologyDraft.blindingProtocolText || undefined : undefined,
           requiresClinicalEvaluation: methodologyDraft.requiresClinicalEvaluation,
         }),
@@ -723,6 +751,7 @@ function StudyDashboard() {
       ...current,
       groupsInput: snapshot.studyGroups?.length ? snapshot.studyGroups.join(', ') : current.groupsInput,
       blindingProtocolText: snapshot.blindingProtocolText || current.blindingProtocolText,
+      blindingTargetVariablesInput: current.blindingTargetVariablesInput || 'Treatment group, intervention type',
     }));
     setNotice({
       tone: 'info',
@@ -1172,6 +1201,11 @@ function StudyDashboard() {
                       </div>
                     ))}
                   </div>
+                  <div className={`mt-5 rounded-2xl border px-4 py-4 ${studyTypeInfo.badgeClass}`}>
+                    <p className="text-xs font-extrabold">Study Design Workflow</p>
+                    <p className="mt-1 text-sm font-black">{studyTypeInfo.labelAr}</p>
+                    <p className="mt-2 text-xs font-bold opacity-80">{studyTypeInfo.workflowSummaryAr}</p>
+                  </div>
                 </div>
 
                 {methodologyStep === 1 ? (
@@ -1302,8 +1336,9 @@ function StudyDashboard() {
                         <p className="mb-5 text-[11px] font-bold text-slate-400">حدد الأشخاص الذين لن يعرفوا التخصيص العلاجي</p>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {[
-                            ['patient', 'المشارك (المريض)', 'لا يعرف المادة أو المعالجة التي يتلقاها'],
+                            ['participant', 'المشارك (المريض)', 'لا يعرف المادة أو المعالجة التي يتلقاها'],
                             ['researcher', 'الباحث / المعالج', 'لا يعرف المادة أو التدخل الذي يطبقه سريرياً'],
+                            ['supervisor', 'المشرف', 'يُراجع الملف دون معرفة هوية المجموعة أو نوع التدخل'],
                             ['assessor', 'مقيّم النتائج', 'يقيّم النتائج دون معرفة المجموعة العلاجية'],
                             ['statistician', 'المحلل الإحصائي', 'يستلم البيانات مرمزة بالكامل'],
                           ].map(([value, label, helper]) => (
@@ -1365,6 +1400,17 @@ function StudyDashboard() {
                               {label}
                             </button>
                           ))}
+                        </div>
+                        <div className="mt-4">
+                          <label className="mb-2 block text-xs font-extrabold text-slate-600">المتغيرات المطلوب تعميتها</label>
+                          <input
+                            type="text"
+                            value={methodologyDraft.blindingTargetVariablesInput}
+                            onChange={(event) => updateMethodologyDraft('blindingTargetVariablesInput', event.target.value)}
+                            disabled={!methodologyDraft.hasBlinding}
+                            className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            placeholder="Treatment group, device name, intervention type"
+                          />
                         </div>
                       </div>
 

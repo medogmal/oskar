@@ -43,6 +43,7 @@ from .knowledge_catalog import (
     get_references_for_study_type,
     is_valid_study_type,
 )
+from .missing_data_engine import analyze_missing_data
 from .privacy import PHI_AUDIT_LOGS, redact_phi, redact_phi_with_audit
 from .prompt_library import build_system_prompt
 from .rag_engine import rag_engine
@@ -1194,10 +1195,14 @@ def text_has_any(text: str, keywords: list[str]) -> bool:
 
 def extract_value_after_label(text: str, labels: list[str], max_chars: int = 180) -> str | None:
     for label in labels:
-        pattern = re.compile(rf"{re.escape(label)}\s*[:=\-]\s*([^\n\r]{{1,{max_chars}}})", re.IGNORECASE)
-        match = pattern.search(text)
-        if match:
-            return match.group(1).strip(" .;:-")
+        patterns = [
+            re.compile(rf"(?:^|[\n\r])\s*(?:#+\s*)?{re.escape(label)}\s*[:=\-]\s*([^\n\r]{{1,{max_chars}}})", re.IGNORECASE),
+            re.compile(rf"(?:^|[\n\r])\s*(?:#+\s*)?{re.escape(label)}\s*[\n\r]+\s*([^\n\r]{{1,{max_chars}}})", re.IGNORECASE),
+        ]
+        for pattern in patterns:
+            match = pattern.search(text)
+            if match:
+                return match.group(1).strip(" .;:-")
     return None
 
 
@@ -1749,9 +1754,15 @@ def normalize_crf_result(raw_result: dict[str, Any] | None, fallback: dict[str, 
 def extract_study_elements(protocol_text: str) -> dict[str, Any]:
     lines = [line.strip("- ").strip() for line in protocol_text.splitlines() if line.strip()]
     short_text = " ".join(lines)
+    title = extract_value_after_label(protocol_text, ["Title", "Study title", "Protocol title"], max_chars=220)
+    objective = extract_value_after_label(
+        protocol_text,
+        ["Objective", "Objectives", "Aim", "Aims", "Purpose", "Primary objective", "Research question"],
+        max_chars=260,
+    )
     return {
-        "title": lines[0] if lines else "Untitled protocol",
-        "objective": lines[1] if len(lines) > 1 else short_text[:180],
+        "title": title or (lines[0] if lines else "Untitled protocol"),
+        "objective": objective or (lines[1] if len(lines) > 1 else short_text[:180]),
         "keyElements": lines[:8],
         "studyTypeGuess": "supervised clinical study" if "supervisor" in short_text.lower() else "clinical research study",
     }
@@ -2081,6 +2092,15 @@ def extract_pdf_text(file_bytes: bytes) -> tuple[str, dict[str, Any]]:
         }
 
 
+def extract_html_text(file_bytes: bytes) -> str:
+    raw_html = file_bytes.decode("utf-8", errors="ignore")
+    cleaned = re.sub(r"(?is)<script.*?>.*?</script>", " ", raw_html)
+    cleaned = re.sub(r"(?is)<style.*?>.*?</style>", " ", cleaned)
+    cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
+    cleaned = cleaned.replace("&nbsp;", " ")
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 def extract_document_text_from_bytes(file_name: str, file_bytes: bytes, mime_type: str | None = None) -> dict[str, Any]:
     suffix = Path(file_name.lower()).suffix
     mime = (mime_type or "").lower()
@@ -2102,6 +2122,16 @@ def extract_document_text_from_bytes(file_name: str, file_bytes: bytes, mime_typ
             "message": "DOCX text extraction completed." if text.strip() else "DOCX was readable but no text was found.",
             "text": text.strip(),
             "format": "docx",
+            "metadata": {},
+        }
+
+    if suffix in {".html", ".htm"} or "html" in mime:
+        text = extract_html_text(file_bytes)
+        return {
+            "documentReady": bool(text.strip()),
+            "message": "HTML text extraction completed." if text.strip() else "HTML was readable but no text was found.",
+            "text": text.strip(),
+            "format": "html",
             "metadata": {},
         }
 
@@ -2154,6 +2184,31 @@ def preprocess_image_for_ocr(file_bytes: bytes) -> np.ndarray:
     return thresholded
 
 
+def get_reference_library_status() -> dict[str, Any]:
+    manifest_path = Path(__file__).parent.parent / "data" / "reference_sources_manifest.json"
+    summary = get_catalog_summary()
+    metrics = rag_engine.get_reference_library_metrics()
+    if not manifest_path.exists():
+        return {
+            "ready": False,
+            "manifestPresent": False,
+            "totalReferences": summary["total_references"],
+            "indexMetrics": metrics,
+        }
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as error:
+        return {"ready": False, "manifestPresent": True, "error": str(error), "indexMetrics": metrics}
+    return {
+        "ready": True,
+        "manifestPresent": True,
+        "totalReferences": payload.get("total_references"),
+        "readyReferences": payload.get("ready_references"),
+        "generatedAt": payload.get("generated_at"),
+        "indexMetrics": metrics,
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     llm_settings = get_llm_settings()
@@ -2178,9 +2233,9 @@ def health() -> dict[str, Any]:
         "mockLLMEnabled": llm_settings["mockEnabled"],
         "mistralConfigured": llm_settings["provider"] == "mistral" and llm_settings["configured"],
         "tesseractConfigured": bool(configured_tesseract_cmd),
-
         "tesseractCommand": configured_tesseract_cmd,
         "knowledgeCatalog": get_catalog_summary(),
+        "referenceLibrary": get_reference_library_status(),
     }
 
 
@@ -2240,6 +2295,14 @@ async def run_analysis(
     result = run_analysis_dispatch(cleaned, parsed_config)
     result["profile"] = dataframe_profile(cleaned)
     return to_jsonable(result)
+
+
+@app.post("/dataset/missing-data")
+async def dataset_missing_data(file: UploadFile = File(...)) -> dict[str, Any]:
+    file_bytes = await file.read()
+    dataframe = load_dataframe(file.filename, file_bytes)
+    cleaned = clean_dataframe(dataframe, {})
+    return to_jsonable(analyze_missing_data(cleaned))
 
 
 @app.post("/document/extract-text")
@@ -2316,13 +2379,36 @@ async def ingest_knowledge_document(
     study_type: str | None = Form(default=None),
 ) -> dict[str, Any]:
     file_bytes = await file.read()
-    text_content = file_bytes.decode("utf-8", errors="ignore")
+    filename = file.filename or "uploaded_doc.txt"
+    suffix = Path(filename.lower()).suffix
+
+    if suffix == ".pdf" or "pdf" in (file.content_type or "").lower():
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(file_bytes)
+            temp_path = temp_file.name
+        try:
+            return rag_engine.ingest_pdf_file(
+                filepath=temp_path,
+                filename=filename,
+                document_type=document_type,
+                study_type=study_type,
+            )
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    extracted = extract_document_text_from_bytes(filename, file_bytes, file.content_type)
     return rag_engine.ingest_text(
-        filename=file.filename or "uploaded_doc.txt",
-        text=text_content,
+        filename=filename,
+        text=str(extracted.get("text") or ""),
         document_type=document_type,
         study_type=study_type,
     )
+
+
+@app.post("/api/v1/reindex-reference-library")
+async def reindex_reference_library() -> dict[str, Any]:
+    return rag_engine.reload_reference_library()
 
 
 @app.post("/api/v1/calculate")

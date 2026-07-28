@@ -1,7 +1,7 @@
 """
 ClinResearch AI — Knowledge Base Reference Catalog
 ===================================================
-Contains the full 126-reference catalog organized by study type.
+Contains the full 130-reference catalog organized by study type.
 Each reference carries metadata for RAG filtering, citation, and isolation.
 """
 
@@ -69,7 +69,7 @@ VALID_STUDY_TYPES: list[str] = [member.value for member in StudyType]
 _SHARED = "shared"
 
 # ---------------------------------------------------------------------------
-# Reference dataclass-like dicts — 126 total
+# Reference dataclass-like dicts — 130 total
 # ---------------------------------------------------------------------------
 
 REFERENCE_CATALOG: list[dict[str, Any]] = [

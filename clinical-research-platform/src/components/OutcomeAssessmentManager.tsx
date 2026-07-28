@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, LoaderCircle, MessageSquare, Plus, Send, ShieldCheck, UserRoundSearch } from 'lucide-react';
+import { CheckCircle2, Dice5, LoaderCircle, MessageSquare, Plus, Send, ShieldCheck, UserRoundSearch } from 'lucide-react';
 import { apiBaseUrl } from '../lib/auth';
 
 type StudyFileOption = {
@@ -77,11 +77,28 @@ type AssessmentNote = {
 };
 
 type OutcomeAssessmentOverview = {
+  study?: {
+    id: string;
+    title: string;
+    studyType: string;
+    hasRandomization?: boolean;
+    hasBlinding?: boolean;
+    randomizationMethod?: string;
+    groups?: string[];
+    blindingSettings?: {
+      blindingType?: string;
+      blindedParties?: string[];
+      scope?: string[];
+      targetVariables?: string[];
+    };
+  };
   requests: AssessmentRequestSummary[];
   samples: AssessmentSampleSummary[];
   templateVersions: AssessmentTemplateVersion[];
   approvedTemplate?: AssessmentTemplateVersion | null;
 };
+
+type AddSampleResponse = AssessmentSampleSummary[];
 
 type OutcomeAssessmentManagerProps = {
   studyId: string;
@@ -118,6 +135,8 @@ function OutcomeAssessmentManager({
   const [showEligibilityModal, setShowEligibilityModal] = useState(false);
   const [eligibilityStage, setEligibilityStage] = useState<'question' | 'fail' | 'form'>('question');
   const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [isRandomizing, setIsRandomizing] = useState(false);
+  const [latestRandomizationSample, setLatestRandomizationSample] = useState<AssessmentSampleSummary | null>(null);
   const [error, setError] = useState('');
 
   const formatDate = useCallback(
@@ -196,6 +215,10 @@ function OutcomeAssessmentManager({
     [activeSampleId, overview?.samples],
   );
 
+  const studyGroups = overview?.study?.groups?.length ? overview.study.groups : ['Experimental', 'Control'];
+  const hasRandomization = Boolean(overview?.study?.hasRandomization);
+  const hasBlinding = Boolean(overview?.study?.hasBlinding);
+
   const openEligibilityModal = () => {
     setEligibilityStage('question');
     setSubjectId('');
@@ -272,6 +295,8 @@ function OutcomeAssessmentManager({
     try {
       setError('');
       setIsSubmittingSample(true);
+      setIsRandomizing(false);
+      setLatestRandomizationSample(null);
 
       const assetLinks = linkedFileId
         ? [
@@ -302,6 +327,17 @@ function OutcomeAssessmentManager({
 
       if (!response.ok) {
         throw new Error('Unable to add sample');
+      }
+
+      const savedSamples = (await response.json()) as AddSampleResponse;
+      const savedSample =
+        savedSamples.find((sample) => sample.subjectId === subjectId && sample.visitNumber === visitNumber) ?? null;
+
+      if (savedSample && savedSample.inclusionEligible && hasRandomization) {
+        setIsRandomizing(true);
+        await new Promise((resolve) => window.setTimeout(resolve, 1400));
+        setIsRandomizing(false);
+        setLatestRandomizationSample(savedSample);
       }
 
       setSubjectId('');
@@ -418,6 +454,27 @@ function OutcomeAssessmentManager({
               <Plus className="h-4 w-4" />
               تسجيل عينة جديدة
             </button>
+          </div>
+
+          <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-indigo-900">Screening / Examination Form Linkage</p>
+                <p className="mt-1 text-xs font-bold text-indigo-700">
+                  عند حفظ استمارة الفحص يتم تفعيل الفرز ثم التوزيع العشوائي تلقائيًا حسب تصميم الدراسة الحالي.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[11px] font-extrabold">
+                <span className="rounded-full bg-white px-3 py-1 text-indigo-700">Design: {overview?.study?.studyType || studyType}</span>
+                <span className="rounded-full bg-white px-3 py-1 text-indigo-700">Randomization: {hasRandomization ? overview?.study?.randomizationMethod || 'simple' : 'off'}</span>
+                <span className="rounded-full bg-white px-3 py-1 text-indigo-700">Blinding: {hasBlinding ? overview?.study?.blindingSettings?.blindingType || 'configured' : 'off'}</span>
+              </div>
+            </div>
+            {hasBlinding && overview?.study?.blindingSettings?.targetVariables?.length ? (
+              <p className="mt-3 text-xs font-bold text-indigo-700">
+                المتغيرات المعماة: {overview.study.blindingSettings.targetVariables.join(' / ')}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-white px-5 py-3.5 shadow-card">
@@ -759,7 +816,15 @@ function OutcomeAssessmentManager({
 
                 {eligibilityStage === 'form' ? (
                   <div>
-                    <h4 className="mb-4 text-lg font-black text-slate-800">تسجيل عينة جديدة</h4>
+                    <h4 className="mb-2 text-lg font-black text-slate-800">استمارة الفحص / Screening Form</h4>
+                    <p className="mb-4 text-xs font-bold text-slate-500">
+                      سيؤدي الحفظ إلى إنشاء سجل المريض/العينة، ثم تفعيل العشوائية تلقائيًا إذا كانت مفعلة في تصميم الدراسة.
+                    </p>
+                    <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-bold text-slate-600">
+                      <p>المجموعات الحالية: {studyGroups.join(' / ')}</p>
+                      <p className="mt-1">العشوائية: {hasRandomization ? overview?.study?.randomizationMethod || 'simple' : 'غير مفعلة'}</p>
+                      <p className="mt-1">التعمية: {hasBlinding ? overview?.study?.blindingSettings?.blindingType || 'configured' : 'غير مفعلة'}</p>
+                    </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <input
                         type="text"
@@ -811,11 +876,62 @@ function OutcomeAssessmentManager({
                         disabled={isSubmittingSample}
                         className="flex-1 rounded-xl bg-teal-600 py-3 text-sm font-extrabold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 disabled:opacity-70"
                       >
-                        {isSubmittingSample ? 'Saving sample...' : 'حفظ العينة'}
+                        {isSubmittingSample ? 'Saving screening form...' : 'حفظ استمارة الفحص'}
                       </button>
                     </div>
                   </div>
                 ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {isRandomizing ? (
+            <div className="fixed inset-0 z-[81] flex items-center justify-center bg-slate-950/70 p-4">
+              <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
+                <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-teal-600">
+                  <Dice5 className="h-10 w-10 animate-spin" />
+                </span>
+                <h4 className="mt-5 text-xl font-black text-slate-900">جارٍ تنفيذ Randomization</h4>
+                <p className="mt-2 text-sm font-bold text-slate-500">يتم الآن توزيع المريض تلقائيًا على إحدى المجموعات بتكافؤ فرص.</p>
+              </div>
+            </div>
+          ) : null}
+
+          {latestRandomizationSample ? (
+            <div className="fixed inset-0 z-[82] flex items-center justify-center bg-slate-950/70 p-4">
+              <div className="w-full max-w-xl rounded-3xl bg-white p-7 shadow-2xl">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-black text-emerald-600">Randomization Result</p>
+                    <h4 className="mt-1 text-xl font-black text-slate-900">{latestRandomizationSample.subjectId}</h4>
+                    <p className="text-sm font-bold text-slate-500">Visit {latestRandomizationSample.visitNumber}</p>
+                  </div>
+                  <button type="button" onClick={() => setLatestRandomizationSample(null)} className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500">
+                    إغلاق
+                  </button>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="prototype-field-box">
+                    <p className="mb-1 text-[10px] font-bold text-slate-400">رمز المريض</p>
+                    <p>{latestRandomizationSample.subjectId}</p>
+                  </div>
+                  <div className="prototype-field-box">
+                    <p className="mb-1 text-[10px] font-bold text-slate-400">المجموعة المختارة</p>
+                    <p>{latestRandomizationSample.allocatedGroup || '—'}</p>
+                  </div>
+                  <div className="prototype-field-box md:col-span-2">
+                    <p className="mb-1 text-[10px] font-bold text-slate-400">المجموعات المشاركة في الدراسة</p>
+                    <p>{studyGroups.join(' / ')}</p>
+                  </div>
+                  <div className="prototype-field-box">
+                    <p className="mb-1 text-[10px] font-bold text-slate-400">التخصيص الفعلي</p>
+                    <p>{latestRandomizationSample.allocatedGroup || '—'}</p>
+                  </div>
+                  <div className="prototype-field-box">
+                    <p className="mb-1 text-[10px] font-bold text-slate-400">الكود المعمّى</p>
+                    <p>{latestRandomizationSample.maskedGroupCode || 'غير مطبق'}</p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}

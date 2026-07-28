@@ -4,6 +4,7 @@ import {
   createStudy,
   evaluateStudyClinically,
   findStudyByIdForUser,
+  findStudyByIdForSupervisor,
   lockStudyForExternalEvaluation,
   listPendingStudiesForClinicalEvaluator,
   listPendingStudiesForSupervisor,
@@ -14,6 +15,8 @@ import {
   type ClinicalEvaluationDecision,
   type ReviewDecision,
 } from '../models/Study.js';
+import { getVariableMatrixByStudy, saveVariableMatrixByStudy } from '../models/VariableMatrix.js';
+import { getGovernanceByStudy, saveGovernanceByStudy } from '../models/Governance.js';
 import {
   buildBlindingSettings,
   normalizeStudyGroups,
@@ -65,6 +68,46 @@ const ensureClinicalEvaluator = (req: AuthRequest, res: Response) => {
   return true;
 };
 
+const resolveGovernanceStudyAccess = async (req: AuthRequest, res: Response, studyId: string) => {
+  if (!req.user) {
+    res.status(401).json({ message: 'Not authorized' });
+    return null;
+  }
+
+  if (['student', 'co_researcher'].includes(req.user.accountType)) {
+    const study = await findStudyByIdForUser(req.user.id, studyId);
+    if (!study) {
+      res.status(404).json({ message: 'Study not found' });
+      return null;
+    }
+    return study;
+  }
+
+  const study = await findStudyByIdForSupervisor(studyId);
+  if (!study) {
+    res.status(404).json({ message: 'Study not found' });
+    return null;
+  }
+
+  if (req.user.accountType === 'institution') {
+    return study;
+  }
+
+  if (
+    ['supervisor', 'assistant_supervisor'].includes(req.user.accountType) &&
+    (study.supervisorUserId === req.user.id || study.assistantSupervisorUserId === req.user.id)
+  ) {
+    return study;
+  }
+
+  if (req.user.accountType === 'clinical_evaluator' && study.assignedClinicalEvaluatorUserId === req.user.id) {
+    return study;
+  }
+
+  res.status(403).json({ message: 'This account cannot access governance data for the selected study' });
+  return null;
+};
+
 export const getStudies = async (req: AuthRequest, res: Response) => {
   if (!ensureResearcher(req, res)) {
     return;
@@ -87,6 +130,59 @@ export const getStudyById = async (req: AuthRequest, res: Response) => {
   }
 
   return res.json(study);
+};
+
+export const getStudyVariableMatrixRecord = async (req: AuthRequest, res: Response) => {
+  if (!ensureResearcher(req, res)) {
+    return;
+  }
+
+  const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const study = await findStudyByIdForUser(req.user!.id, studyId);
+  if (!study) {
+    return res.status(404).json({ message: 'Study not found' });
+  }
+
+  const matrix = await getVariableMatrixByStudy(studyId);
+  return res.json(matrix);
+};
+
+export const saveStudyVariableMatrixRecord = async (req: AuthRequest, res: Response) => {
+  if (!ensureResearcher(req, res)) {
+    return;
+  }
+
+  const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const study = await findStudyByIdForUser(req.user!.id, studyId);
+  if (!study) {
+    return res.status(404).json({ message: 'Study not found' });
+  }
+
+  const variables = Array.isArray(req.body.variables) ? req.body.variables : [];
+  const matrix = await saveVariableMatrixByStudy(studyId, req.user!.id, variables);
+  return res.json(matrix);
+};
+
+export const getStudyGovernanceRecord = async (req: AuthRequest, res: Response) => {
+  const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const study = await resolveGovernanceStudyAccess(req, res, studyId);
+  if (!study) {
+    return;
+  }
+
+  const snapshot = await getGovernanceByStudy(studyId);
+  return res.json(snapshot);
+};
+
+export const saveStudyGovernanceRecord = async (req: AuthRequest, res: Response) => {
+  const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const study = await resolveGovernanceStudyAccess(req, res, studyId);
+  if (!study) {
+    return;
+  }
+
+  const snapshot = await saveGovernanceByStudy(studyId, req.user!.id, req.body);
+  return res.json(snapshot);
 };
 
 export const createStudyRecord = async (req: AuthRequest, res: Response) => {
@@ -148,6 +244,9 @@ export const createStudyRecord = async (req: AuthRequest, res: Response) => {
               ? (req.body.blindedParties as BlindedParty[])
               : undefined,
             scope: Array.isArray(req.body.blindingScope) ? (req.body.blindingScope as BlindingScope[]) : undefined,
+            targetVariables: Array.isArray(req.body.blindingTargetVariables)
+              ? req.body.blindingTargetVariables.map((item: unknown) => String(item))
+              : undefined,
             protocolText:
               typeof req.body.blindingProtocolText === 'string' ? req.body.blindingProtocolText : undefined,
           })
@@ -240,6 +339,9 @@ export const updateStudyDesignRecord = async (req: AuthRequest, res: Response) =
               ? (req.body.blindedParties as BlindedParty[])
               : undefined,
             scope: Array.isArray(req.body.blindingScope) ? (req.body.blindingScope as BlindingScope[]) : undefined,
+            targetVariables: Array.isArray(req.body.blindingTargetVariables)
+              ? req.body.blindingTargetVariables.map((item: unknown) => String(item))
+              : undefined,
             protocolText:
               typeof req.body.blindingProtocolText === 'string' ? req.body.blindingProtocolText : undefined,
           })

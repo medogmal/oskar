@@ -2,7 +2,7 @@ import { body } from 'express-validator';
 
 const workflowTypes = ['supervised', 'migration'] as const;
 const randomizationMethods = ['simple', 'block'] as const;
-const blindedParties = ['patient', 'researcher', 'assessor', 'statistician'] as const;
+const blindedParties = ['participant', 'patient', 'researcher', 'supervisor', 'assessor', 'statistician'] as const;
 const blindingScopes = ['material_type', 'treatment_procedure', 'split_mouth_side'] as const;
 const reviewDecisions = ['approved', 'changes_requested', 'rejected'] as const;
 const clinicalEvaluationDecisions = ['accepted', 'needs_revision', 'not_recommended'] as const;
@@ -34,6 +34,8 @@ export const createStudyValidator = [
   body('blindedParties.*').optional().isIn(blindedParties).withMessage('Blinded party selection is invalid'),
   body('blindingScope').optional().isArray().withMessage('Blinding scope must be an array'),
   body('blindingScope.*').optional().isIn(blindingScopes).withMessage('Blinding scope selection is invalid'),
+  body('blindingTargetVariables').optional().isArray().withMessage('Blinding target variables must be an array'),
+  body('blindingTargetVariables.*').optional().trim().notEmpty().withMessage('Blinding target variable is invalid'),
   body('blindingProtocolText').optional({ values: 'falsy' }).trim(),
   body('requiresClinicalEvaluation')
     .optional()
@@ -65,6 +67,8 @@ export const updateStudyDesignValidator = [
   body('blindedParties.*').optional().isIn(blindedParties).withMessage('Blinded party selection is invalid'),
   body('blindingScope').optional().isArray().withMessage('Blinding scope must be an array'),
   body('blindingScope.*').optional().isIn(blindingScopes).withMessage('Blinding scope selection is invalid'),
+  body('blindingTargetVariables').optional().isArray().withMessage('Blinding target variables must be an array'),
+  body('blindingTargetVariables.*').optional().trim().notEmpty().withMessage('Blinding target variable is invalid'),
   body('blindingProtocolText').optional({ values: 'falsy' }).trim(),
   body('coResearcherUserId').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('Co-researcher selection is invalid'),
   body('assistantSupervisorUserId')
@@ -169,6 +173,38 @@ export const reviewStudyValidator = [
 
     return true;
   }),
+];
+
+export const saveVariableMatrixValidator = [
+  body('variables').isArray().withMessage('Variable matrix payload must be an array'),
+  body('variables.*.id').trim().notEmpty().withMessage('Variable ID is required'),
+  body('variables.*.label').trim().notEmpty().withMessage('Variable label is required'),
+  body('variables.*.definition').optional().isString().withMessage('Variable definition must be text'),
+  body('variables.*.role').trim().notEmpty().withMessage('Variable role is required'),
+  body('variables.*.scale').trim().notEmpty().withMessage('Variable scale is required'),
+  body('variables.*.source').trim().notEmpty().withMessage('Variable source is required'),
+  body('variables.*.measurementMethod').optional().isString().withMessage('Measurement method must be text'),
+  body('variables.*.unit').optional().isString().withMessage('Unit must be text'),
+  body('variables.*.linkedOutcomeIds').optional().isArray().withMessage('Outcome links must be an array'),
+  body('variables.*.linkedResearchQuestionIds').optional().isArray().withMessage('Research question links must be an array'),
+  body('variables.*.linkedReferenceIds').optional().isArray().withMessage('Reference links must be an array'),
+  body('variables.*.recommendedStatisticalTest').optional().isString().withMessage('Recommended test must be text'),
+];
+
+export const saveGovernanceValidator = [
+  body('phases').isArray({ min: 1 }).withMessage('Governance phases payload must be an array'),
+  body('phases.*.phase').isInt({ min: 1, max: 3 }).withMessage('Phase number must be between 1 and 3'),
+  body('phases.*.title').trim().notEmpty().withMessage('Phase title is required'),
+  body('phases.*.description').trim().notEmpty().withMessage('Phase description is required'),
+  body('phases.*.status')
+    .isIn(['not_submitted', 'pending', 'approved', 'rejected', 'needs_revision'])
+    .withMessage('Phase status is invalid'),
+  body('phases.*.deliverables').isArray().withMessage('Phase deliverables must be an array'),
+  body('phases.*.deliverables.*.id').trim().notEmpty().withMessage('Deliverable ID is required'),
+  body('phases.*.deliverables.*.label').trim().notEmpty().withMessage('Deliverable label is required'),
+  body('phases.*.deliverables.*.completed').isBoolean().withMessage('Deliverable completion flag must be boolean'),
+  body('auditLogs').optional().isArray().withMessage('Audit log payload must be an array'),
+  body('notifications').optional().isArray().withMessage('Notification payload must be an array'),
 ];
 
 export const clinicalEvaluationValidator = [

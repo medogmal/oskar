@@ -19,6 +19,15 @@ const OutcomeAssessmentWorkspace = lazy(() => import('./pages/OutcomeAssessmentW
 const StudyDashboard = lazy(() => import('./pages/StudyDashboard'));
 const AssessmentFormBuilder = lazy(() => import('./pages/AssessmentFormBuilder'));
 const AIChat = lazy(() => import('./pages/AIChat'));
+const VariableMappingMatrix = lazy(() => import('./pages/VariableMappingMatrix'));
+const ErrorSeverityDashboard = lazy(() => import('./pages/ErrorSeverityDashboard'));
+const AnalyticsWorkspace = lazy(() => import('./pages/AnalyticsWorkspace'));
+const StudyStructureBuilder = lazy(() => import('./pages/StudyStructureBuilder'));
+const ProjectGovernance = lazy(() => import('./pages/ProjectGovernance'));
+const ReferencesWorkspace = lazy(() => import('./pages/KnowledgeReferences'));
+const ExampleCasesWorkspace = lazy(() => import('./pages/ReferencesAndExtras').then(m => ({ default: m.ExampleCasesWorkspace })));
+const DeveloperToolsWorkspace = lazy(() => import('./pages/ReferencesAndExtras').then(m => ({ default: m.DeveloperToolsWorkspace })));
+const enableDevTools = import.meta.env.VITE_ENABLE_DEV_TOOLS === 'true';
 
 function App() {
   return (
@@ -43,11 +52,19 @@ function App() {
               <Route path="/co-researcher-dashboard" element={<CoResearcherDashboard />} />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['student', 'co_researcher', 'supervisor', 'assistant_supervisor']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator', 'institution']} />}>
               <Route path="/studies" element={<Studies />} />
               <Route path="/studies/:id" element={<StudyDashboard />} />
               <Route path="/studies/:id/assessment-form" element={<AssessmentFormBuilder />} />
+              <Route path="/studies/:id/variable-matrix" element={<VariableMappingMatrix />} />
+              <Route path="/studies/:id/issues" element={<ErrorSeverityDashboard />} />
+              <Route path="/studies/:id/analytics" element={<AnalyticsWorkspace />} />
+              <Route path="/studies/:id/structure-builder" element={<StudyStructureBuilder />} />
+              <Route path="/studies/:id/governance" element={<ProjectGovernance />} />
               <Route path="/ai-chat" element={<AIChat />} />
+              <Route path="/knowledge/references" element={<ReferencesWorkspace />} />
+              <Route path="/knowledge/example-cases" element={<ExampleCasesWorkspace />} />
+              {enableDevTools ? <Route path="/dev/schema-and-trees" element={<DeveloperToolsWorkspace />} /> : null}
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={['supervisor']} />}>

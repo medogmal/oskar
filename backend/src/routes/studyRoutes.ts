@@ -3,12 +3,16 @@ import multer from 'multer';
 import {
   createStudyRecord,
   evaluateStudyClinicallyRecord,
+  getStudyVariableMatrixRecord,
+  getStudyGovernanceRecord,
   getClinicalEvaluationQueue,
   getStudies,
   getStudyById,
   lockStudyRecord,
   getSupervisorReviewQueue,
   resubmitStudyRecord,
+  saveStudyVariableMatrixRecord,
+  saveStudyGovernanceRecord,
   reviewStudyRecord,
   updateStudyDesignRecord,
 } from '../controllers/studyController.js';
@@ -49,6 +53,8 @@ import {
   proposeOutcomeAssessmentTemplateValidator,
   respondToOutcomeAssessmentRequestValidator,
   reviewStudyValidator,
+  saveGovernanceValidator,
+  saveVariableMatrixValidator,
   updateStudyDesignValidator,
   updateOutcomeAssessmentEntryValidator,
   upsertOutcomeAssessmentSamplesValidator,
@@ -120,6 +126,10 @@ router.post(
   upsertOutcomeAssessmentSamplesRecord,
 );
 router.get('/:id/outcome-assessment/requests/:requestId/notes', listOutcomeAssessmentNotesRecord);
+router.get('/:id/variable-matrix', getStudyVariableMatrixRecord);
+router.put('/:id/variable-matrix', saveVariableMatrixValidator, validateRequest, saveStudyVariableMatrixRecord);
+router.get('/:id/governance', getStudyGovernanceRecord);
+router.put('/:id/governance', saveGovernanceValidator, validateRequest, saveStudyGovernanceRecord);
 router.post(
   '/:id/outcome-assessment/requests/:requestId/notes',
   createOutcomeAssessmentNoteValidator,
