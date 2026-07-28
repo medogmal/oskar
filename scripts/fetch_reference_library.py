@@ -40,6 +40,14 @@ def html_to_text(raw_html: str) -> str:
     return cleaned.strip()
 
 
+def extract_html_title(raw_html: str) -> str:
+    match = re.search(r"(?is)<title[^>]*>(.*?)</title>", raw_html)
+    if not match:
+        return ""
+    title = html_to_text(match.group(1))
+    return title[:500].strip()
+
+
 def fetch_url(url: str) -> tuple[bytes, str, str]:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=40) as response:
@@ -180,6 +188,29 @@ def build_crossref_text(ref: dict[str, Any], item: dict[str, Any]) -> str:
     return "\n".join(part for part in parts if part).strip()
 
 
+def build_source_extracted_metadata(
+    ref: dict[str, Any],
+    source_url: str,
+    resolved_url: str,
+    raw_html: str,
+    source_label: str | None,
+) -> dict[str, Any]:
+    page_title = extract_html_title(raw_html) or ref["title"]
+    page_excerpt = html_to_text(raw_html)[:4000]
+    return {
+        "title": page_title,
+        "container-title": [str(ref.get("category") or "Clinical Research Reference")],
+        "publisher": "Source Extracted Metadata",
+        "URL": resolved_url or source_url,
+        "DOI": "",
+        "subject": [str(ref.get("subcategory") or ""), *[str(item) for item in ref.get("study_types") or []]],
+        "abstract": page_excerpt,
+        "source_label": source_label or "source-extracted",
+        "artifact_origin": "source_extracted",
+        "reference_id": ref["id"],
+    }
+
+
 def build_synthetic_metadata(ref: dict[str, Any], existing_entry: dict[str, Any] | None = None) -> dict[str, Any]:
     source_url = ""
     resolved_url = ""
@@ -282,6 +313,47 @@ def ensure_reference_artifacts(ref: dict[str, Any], entry: dict[str, Any]) -> di
     return resolved
 
 
+def read_json_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def entry_uses_synthetic_backfill(entry: dict[str, Any]) -> bool:
+    metadata_path = entry.get("metadata_path")
+    if isinstance(metadata_path, str) and metadata_path:
+        metadata_payload = read_json_file(DATA_DIR / metadata_path)
+        if metadata_payload and metadata_payload.get("artifact_origin") == "synthetic_backfill":
+            return True
+
+    page_path = entry.get("page_path")
+    if isinstance(page_path, str) and page_path:
+        candidate = DATA_DIR / page_path
+        if candidate.exists() and candidate.suffix.lower() == ".html":
+            html = candidate.read_text(encoding="utf-8", errors="ignore")
+            if "Artifact Origin:</strong> synthetic_backfill" in html:
+                return True
+
+    return False
+
+
+def merge_entries(primary: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(fallback)
+    for key, value in primary.items():
+        if key == "errors":
+            primary_errors = value if isinstance(value, list) else []
+            fallback_errors = fallback.get("errors") if isinstance(fallback.get("errors"), list) else []
+            merged["errors"] = [*fallback_errors, *primary_errors]
+            continue
+        if value not in (None, "", [], {}):
+            merged[key] = value
+    return merged
+
+
 def download_reference(ref: dict[str, Any]) -> dict[str, Any]:
     ref_id = ref["id"]
     entry: dict[str, Any] = {
@@ -306,6 +378,7 @@ def download_reference(ref: dict[str, Any]) -> dict[str, Any]:
     except Exception as error:  # noqa: BLE001
         entry["errors"].append(f"crossref: {error}")
 
+    raw_source_html = ""
     if crossref_item:
         metadata_path = LIBRARY_DIR / f"{ref_id}.crossref.json"
         save_file(metadata_path, json.dumps(crossref_item, ensure_ascii=False, indent=2))
@@ -327,7 +400,8 @@ def download_reference(ref: dict[str, Any]) -> dict[str, Any]:
             save_file(page_path, body)
             entry["page_path"] = str(page_path.relative_to(DATA_DIR)).replace("\\", "/")
             if suffix == ".html":
-                page_text = html_to_text(body.decode("utf-8", errors="ignore"))
+                raw_source_html = body.decode("utf-8", errors="ignore")
+                page_text = html_to_text(raw_source_html)
             elif "text" in content_type:
                 page_text = body.decode("utf-8", errors="ignore").strip()
             time.sleep(0.12)
@@ -345,12 +419,25 @@ def download_reference(ref: dict[str, Any]) -> dict[str, Any]:
                     save_file(page_path, body)
                     entry["page_path"] = str(page_path.relative_to(DATA_DIR)).replace("\\", "/")
                     if suffix == ".html":
-                        page_text = html_to_text(body.decode("utf-8", errors="ignore"))
+                        raw_source_html = body.decode("utf-8", errors="ignore")
+                        page_text = html_to_text(raw_source_html)
                     elif "text" in content_type:
                         page_text = body.decode("utf-8", errors="ignore").strip()
                     time.sleep(0.12)
                 except Exception as fallback_error:  # noqa: BLE001
                     entry["errors"].append(f"fallback-source: {fallback_error}")
+
+    if not entry["metadata_path"] and raw_source_html and entry["source_url"]:
+        metadata_path = LIBRARY_DIR / f"{ref_id}.source-metadata.json"
+        source_metadata = build_source_extracted_metadata(
+            ref,
+            str(entry["source_url"]),
+            str(entry.get("resolved_url") or entry["source_url"]),
+            raw_source_html,
+            str(entry.get("source_label") or "source-extracted"),
+        )
+        save_file(metadata_path, json.dumps(source_metadata, ensure_ascii=False, indent=2))
+        entry["metadata_path"] = str(metadata_path.relative_to(DATA_DIR)).replace("\\", "/")
 
     reference_text = ""
     if crossref_item:
@@ -382,7 +469,19 @@ def main() -> None:
         if isinstance(entry, dict) and entry.get("id")
     }
 
-    entries = [ensure_reference_artifacts(ref, download_reference(ref) if not existing_index.get(ref["id"]) else existing_index[ref["id"]]) for ref in REFERENCE_CATALOG]
+    entries = []
+    for ref in REFERENCE_CATALOG:
+        existing_entry = existing_index.get(ref["id"])
+        if not existing_entry:
+            resolved_entry = download_reference(ref)
+        elif entry_uses_synthetic_backfill(existing_entry):
+            refreshed_entry = download_reference(ref)
+            resolved_entry = merge_entries(refreshed_entry, existing_entry)
+        else:
+            resolved_entry = existing_entry
+
+        entries.append(ensure_reference_artifacts(ref, resolved_entry))
+
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_references": len(REFERENCE_CATALOG),
