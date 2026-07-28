@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "purpose": "Auditable variable classification tree for CRF and SAP linkage.",
+  "rootQuestion": "What role does this variable play in the research question?",
+  "nodes": [
+    {
+      "id": "identifier",
+      "label": "Identifier / administrative key",
+      "role": "identifier",
+      "requiresResearchQuestionLink": false,
+      "requiresObjectiveLink": false,
+      "requiresUnit": false,
+      "examples": ["participant_id", "sample_id", "site_code"]
+    },
+    {
+      "id": "outcome_primary",
+      "label": "Primary outcome",
+      "role": "primary_outcome",
+      "requiresResearchQuestionLink": true,
+      "requiresObjectiveLink": true,
+      "requiresStatisticalTest": true,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "unit_if_numeric", "linked_research_question", "linked_objective", "recommended_statistical_test"]
+    },
+    {
+      "id": "outcome_secondary",
+      "label": "Secondary outcome",
+      "role": "secondary_outcome",
+      "requiresResearchQuestionLink": true,
+      "requiresObjectiveLink": true,
+      "requiresStatisticalTest": true,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "unit_if_numeric", "linked_research_question", "linked_objective", "recommended_statistical_test"]
+    },
+    {
+      "id": "predictor",
+      "label": "Independent predictor / exposure",
+      "role": "independent",
+      "requiresResearchQuestionLink": true,
+      "requiresObjectiveLink": false,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "exposure_definition"]
+    },
+    {
+      "id": "covariate",
+      "label": "Adjustment covariate",
+      "role": "covariate",
+      "requiresResearchQuestionLink": false,
+      "requiresObjectiveLink": false,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "confounding_rationale"]
+    },
+    {
+      "id": "confounder",
+      "label": "Confounder",
+      "role": "confounder",
+      "requiresResearchQuestionLink": false,
+      "requiresObjectiveLink": false,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "causal_rationale"]
+    },
+    {
+      "id": "effect_modifier",
+      "label": "Effect modifier / subgroup variable",
+      "role": "effect_modifier",
+      "requiresResearchQuestionLink": false,
+      "requiresObjectiveLink": false,
+      "requiresUnitWhenNumeric": true,
+      "metadataRequired": ["source", "measurement_method", "scale", "interaction_or_subgroup_plan"]
+    },
+    {
+      "id": "evidence_synthesis_extraction",
+      "label": "Systematic review / meta-analysis extraction item",
+      "studyType": ["systematic_review", "meta_analysis"],
+      "role": "covariate",
+      "requiresResearchQuestionLink": true,
+      "requiresObjectiveLink": true,
+      "requiresUnitWhenNumeric": true,
+      "examples": ["effect_size", "standard_error", "risk_of_bias_domain", "included_study_design"]
+    }
+  ]
+}

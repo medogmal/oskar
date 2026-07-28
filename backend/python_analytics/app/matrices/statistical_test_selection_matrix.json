@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "purpose": "Auditable statistical test selection rules used by ClinResearch AI.",
+  "rules": [
+    {
+      "id": "continuous_two_independent_groups_parametric",
+      "outcomeScale": ["interval", "ratio"],
+      "groupCount": 2,
+      "paired": false,
+      "assumptions": ["independence", "approximate_normality", "homogeneity_or_welch_adjustment"],
+      "recommendedTest": "independent_t_test",
+      "fallbackTests": ["welch_t_test", "mann_whitney_u"],
+      "metadataRequired": ["unit", "measurement_method", "group_variable", "normality_assessment"]
+    },
+    {
+      "id": "continuous_two_paired_measurements_parametric",
+      "outcomeScale": ["interval", "ratio"],
+      "groupCount": 2,
+      "paired": true,
+      "assumptions": ["paired_observations", "normality_of_differences"],
+      "recommendedTest": "paired_t_test",
+      "fallbackTests": ["wilcoxon_signed_rank"],
+      "metadataRequired": ["unit", "measurement_method", "timepoint_or_pairing_key"]
+    },
+    {
+      "id": "continuous_three_or_more_groups_parametric",
+      "outcomeScale": ["interval", "ratio"],
+      "groupCount": ">=3",
+      "paired": false,
+      "assumptions": ["independence", "approximate_normality", "homogeneity_of_variance"],
+      "recommendedTest": "anova",
+      "fallbackTests": ["welch_anova", "kruskal_wallis"],
+      "metadataRequired": ["unit", "measurement_method", "group_variable", "post_hoc_plan"]
+    },
+    {
+      "id": "binary_two_or_more_groups",
+      "outcomeScale": ["binary", "nominal"],
+      "groupCount": ">=2",
+      "paired": false,
+      "assumptions": ["independence", "expected_cell_counts"],
+      "recommendedTest": "chi_square",
+      "fallbackTests": ["fishers_exact", "logistic_regression"],
+      "metadataRequired": ["event_definition", "denominator", "group_variable"]
+    },
+    {
+      "id": "ordinal_two_groups",
+      "outcomeScale": ["ordinal"],
+      "groupCount": 2,
+      "paired": false,
+      "assumptions": ["independence", "ordered_categories"],
+      "recommendedTest": "mann_whitney_u",
+      "fallbackTests": ["ordinal_logistic_regression"],
+      "metadataRequired": ["category_order", "measurement_method", "group_variable"]
+    },
+    {
+      "id": "time_to_event_outcome",
+      "outcomeScale": ["time_to_event"],
+      "groupCount": ">=1",
+      "paired": false,
+      "assumptions": ["time_origin_defined", "event_defined", "censoring_defined"],
+      "recommendedTest": "survival_analysis",
+      "fallbackTests": ["kaplan_meier", "cox_proportional_hazards"],
+      "metadataRequired": ["time_unit", "event_variable", "censoring_rule"]
+    },
+    {
+      "id": "continuous_outcome_with_covariates",
+      "outcomeScale": ["interval", "ratio"],
+      "predictors": ">=1",
+      "covariates": ">=1",
+      "assumptions": ["linearity", "residual_diagnostics", "independent_errors"],
+      "recommendedTest": "linear_regression_or_ancova",
+      "fallbackTests": ["robust_regression", "mixed_effects_model"],
+      "metadataRequired": ["outcome_unit", "covariate_definitions", "model_formula"]
+    },
+    {
+      "id": "meta_analysis_effect_pooling",
+      "studyType": ["meta_analysis"],
+      "outcomeScale": ["effect_size"],
+      "assumptions": ["effect_measure_defined", "heterogeneity_assessed", "model_pre_specified"],
+      "recommendedTest": "random_effects_meta_analysis",
+      "fallbackTests": ["fixed_effect_meta_analysis", "sensitivity_analysis"],
+      "metadataRequired": ["effect_measure", "standard_error_or_ci", "heterogeneity_plan", "publication_bias_plan"]
+    }
+  ]
+}

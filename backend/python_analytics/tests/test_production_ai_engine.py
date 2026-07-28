@@ -24,11 +24,29 @@ def test_rag_engine_retrieval_and_citations():
     res = rag.query(question="How to report randomized trials according to CONSORT?", study_type="rct")
 
     assert res["answer"] is not None
+    assert res["retrieval"]["strategy"] == "semantic_hybrid_vector_ranked"
+    assert res["retrieval"]["embeddingModel"] == "local_hashing_embedding_v1"
     assert len(res["citations"]) > 0
     first_citation = res["citations"][0]
+    assert "doc_id" in first_citation
+    assert "title" in first_citation
     assert "source_file" in first_citation
     assert "quoted_text" in first_citation
+    assert "study_types" in first_citation
+    assert "source_backed" in first_citation
     assert "CONSORT" in first_citation["source_file"] or "CONSORT" in first_citation["quoted_text"]
+
+
+def test_rag_engine_systematic_review_retrieval_isolated():
+    """Verify evidence-synthesis RAG queries retrieve systematic-review references."""
+    rag = LocalRAGEngine()
+    res = rag.query(question="PRISMA protocol registration and risk of bias for systematic review", study_type="systematic_review")
+
+    assert len(res["citations"]) > 0
+    citation_ids = {citation["doc_id"] for citation in res["citations"]}
+    citation_titles = " ".join(citation["title"] for citation in res["citations"])
+    assert "PRISMA_2020" in citation_ids or "PRISMA" in citation_titles
+    assert all("in_vitro" not in citation["study_types"] for citation in res["citations"])
 
 
 def test_rag_engine_ingest_and_query():

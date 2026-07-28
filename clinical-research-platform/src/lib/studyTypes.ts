@@ -1,9 +1,16 @@
 /**
  * ClinResearch AI — Study Types Standard Library
- * Defines the 5 canonical clinical study types and metadata.
+ * Defines the canonical clinical study types and metadata.
  */
 
-export type StudyTypeId = 'rct' | 'prospective' | 'retrospective' | 'cross_sectional' | 'in_vitro';
+export type StudyTypeId =
+  | 'rct'
+  | 'prospective'
+  | 'retrospective'
+  | 'cross_sectional'
+  | 'in_vitro'
+  | 'systematic_review'
+  | 'meta_analysis';
 
 export interface StudyTypeInfo {
   id: StudyTypeId;
@@ -103,15 +110,47 @@ export const STUDY_TYPES: Record<StudyTypeId, StudyTypeInfo> = {
     supportsRandomization: true,
     supportsBlinding: true,
   },
+  systematic_review: {
+    id: 'systematic_review',
+    labelEn: 'Systematic Review',
+    labelAr: 'Systematic Review',
+    shortLabel: 'Systematic Review',
+    descriptionEn: 'Evidence synthesis study with protocol registration, search strategy, screening, extraction, and risk-of-bias workflow.',
+    descriptionAr: 'Evidence synthesis workflow with protocol registration, search strategy, screening, extraction, and risk-of-bias assessment.',
+    primaryGuideline: 'PRISMA 2020 / PRISMA-P / PROSPERO / AMSTAR 2 / ROBIS',
+    color: 'sky',
+    badgeClass: 'bg-sky-100 text-sky-800 border-sky-200',
+    workflowSummaryAr: 'Review workflow for protocol registration, eligibility criteria, screening, extraction, and risk-of-bias mapping.',
+    screeningModeAr: 'Search strategy + screening + extraction',
+    defaultGroups: ['Included Studies'],
+    supportsRandomization: false,
+    supportsBlinding: false,
+  },
+  meta_analysis: {
+    id: 'meta_analysis',
+    labelEn: 'Meta-Analysis',
+    labelAr: 'Meta-Analysis',
+    shortLabel: 'Meta-Analysis',
+    descriptionEn: 'Quantitative evidence synthesis with effect-size extraction, heterogeneity, publication-bias, and sensitivity analyses.',
+    descriptionAr: 'Quantitative evidence synthesis with pooling, heterogeneity, publication-bias, and sensitivity analysis.',
+    primaryGuideline: 'PRISMA 2020 / PRISMA-NMA / MOOSE / Cochrane Handbook',
+    color: 'rose',
+    badgeClass: 'bg-rose-100 text-rose-800 border-rose-200',
+    workflowSummaryAr: 'Meta-analysis workflow for effect extraction, pooling model choice, heterogeneity, and publication-bias checks.',
+    screeningModeAr: 'Effect extraction + pooling + bias checks',
+    defaultGroups: ['Included Studies'],
+    supportsRandomization: false,
+    supportsBlinding: false,
+  },
 };
 
 export const STUDY_TYPE_OPTIONS = Object.values(STUDY_TYPES);
 export const CREATE_STUDY_TYPE_OPTIONS = STUDY_TYPE_OPTIONS.filter((item) =>
-  ['rct', 'prospective', 'retrospective', 'cross_sectional'].includes(item.id),
+  ['rct', 'prospective', 'retrospective', 'cross_sectional', 'systematic_review', 'meta_analysis'].includes(item.id),
 );
 
 /**
- * Normalizes legacy free-text study type values into one of the 5 canonical keys.
+ * Normalizes legacy free-text study type values into one of the canonical keys.
  */
 export function normalizeStudyType(rawType?: string | null): StudyTypeId {
   if (!rawType) return 'rct';
@@ -129,6 +168,12 @@ export function normalizeStudyType(rawType?: string | null): StudyTypeId {
   }
   if (clean.includes('cross') || clean.includes('sectional') || clean.includes('مقطع') || clean.includes('مسح')) {
     return 'cross_sectional';
+  }
+  if (clean.includes('systematic') || clean.includes('review') || clean.includes('prisma') || clean.includes('prospero')) {
+    return 'systematic_review';
+  }
+  if (clean.includes('meta') || clean.includes('metaanalysis') || clean.includes('pooled') || clean.includes('heterogeneity')) {
+    return 'meta_analysis';
   }
   if (clean.includes('vitro') || clean.includes('مخبر') || clean.includes('معمل')) {
     return 'in_vitro';

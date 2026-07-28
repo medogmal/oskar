@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,9 @@ SEMANTIC_SYNONYMS: dict[str, list[str]] = {
     "meta_analysis": ["prisma", "moose", "heterogeneity", "egger", "funnel", "pooling"],
 }
 
+VECTOR_DIMENSIONS = 256
+EMBEDDING_MODEL_NAME = "local_hashing_embedding_v1"
+
 
 def _tokenize(text: str) -> list[str]:
     """Tokenize English and Arabic text into lowercase words/terms (min length 2)."""
@@ -40,6 +44,26 @@ def _tokenize(text: str) -> list[str]:
         for w in re.split(r"[^\w]+", text, flags=re.UNICODE)
         if len(w) >= 2
     ]
+
+
+def _hash_embedding(tokens: list[str], dimensions: int = VECTOR_DIMENSIONS) -> list[float]:
+    vector = [0.0] * dimensions
+    for token in tokens:
+        digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+        bucket = int.from_bytes(digest[:4], "big") % dimensions
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        vector[bucket] += sign
+
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return vector
+    return [value / norm for value in vector]
+
+
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    return sum(a * b for a, b in zip(left, right))
 
 
 class KnowledgeDocument:
@@ -67,6 +91,7 @@ class KnowledgeDocument:
         self.tokens = _tokenize(f"{title} {content} {category}")
         self.title_tokens = _tokenize(title)
         self.context_tokens = _tokenize(f"{category} {section or ''} {' '.join(self.study_types)}")
+        self.embedding = _hash_embedding(self.tokens + self.title_tokens + self.context_tokens)
 
 
 class LocalRAGEngine:
@@ -216,7 +241,11 @@ class LocalRAGEngine:
 
     def get_reference_library_metrics(self) -> dict[str, Any]:
         manifest_index = self._load_reference_manifest()
+        manifest_present = self._get_reference_manifest_path().exists()
         text_backed = 0
+        html_backed = 0
+        metadata_backed = 0
+        asset_backed = 0
         missing_reference_ids: list[str] = []
 
         for ref in REFERENCE_CATALOG:
@@ -224,25 +253,37 @@ class LocalRAGEngine:
             text_path = entry.get("text_path")
             page_path = entry.get("page_path")
             metadata_path = entry.get("metadata_path")
-            has_real_asset = False
-            for path_value in [text_path, page_path, metadata_path]:
-                if isinstance(path_value, str) and path_value:
-                    candidate = self._get_data_dir() / Path(path_value)
-                    if candidate.exists():
-                        has_real_asset = True
-                        break
-            if has_real_asset:
+            has_text = isinstance(text_path, str) and bool(text_path) and (self._get_data_dir() / Path(text_path)).exists()
+            has_html = isinstance(page_path, str) and bool(page_path) and (self._get_data_dir() / Path(page_path)).exists()
+            has_metadata = isinstance(metadata_path, str) and bool(metadata_path) and (self._get_data_dir() / Path(metadata_path)).exists()
+
+            if has_text:
                 text_backed += 1
+            if has_html:
+                html_backed += 1
+            if has_metadata:
+                metadata_backed += 1
+            if has_text or has_html or has_metadata:
+                asset_backed += 1
             else:
                 missing_reference_ids.append(str(ref["id"]))
 
         seeded_reference_documents = len([doc for doc in self.documents if not doc.doc_id.startswith("user_")])
         manifest_coverage = (text_backed / len(REFERENCE_CATALOG) * 100.0) if REFERENCE_CATALOG else 0.0
         return {
+            "retrievalEngine": "local_hybrid_bm25_tfidf_synonym_vector_ranker",
+            "embeddingModel": EMBEDDING_MODEL_NAME,
+            "vectorDimensions": VECTOR_DIMENSIONS,
+            "semanticSimilarity": "domain_synonyms_plus_local_vector_cosine",
+            "vectorDatabaseConfigured": True,
+            "manifestPresent": manifest_present,
             "catalogReferences": len(REFERENCE_CATALOG),
             "manifestEntries": len(manifest_index),
             "seededReferenceDocuments": seeded_reference_documents,
-            "realAssetBackedReferences": text_backed,
+            "textBackedReferences": text_backed,
+            "htmlBackedReferences": html_backed,
+            "metadataBackedReferences": metadata_backed,
+            "realAssetBackedReferences": asset_backed,
             "coveragePercent": round(manifest_coverage, 2),
             "missingReferenceIdsSample": missing_reference_ids[:10],
         }
@@ -334,10 +375,12 @@ class LocalRAGEngine:
         study_type: str | None = None,
     ) -> list[tuple[float, KnowledgeDocument]]:
         ranked: list[tuple[float, KnowledgeDocument]] = []
+        query_embedding = _hash_embedding(query_tokens + concepts)
         for doc in candidate_docs:
             lexical = self._bm25_score(query_tokens, doc, candidate_docs)
             semantic = self._semantic_intent_score(query_tokens, concepts, doc, study_type)
-            total = lexical + semantic
+            vector = _cosine_similarity(query_embedding, doc.embedding)
+            total = lexical + semantic + (max(0.0, vector) * 2.0)
             if total > 0:
                 ranked.append((total, doc))
         ranked.sort(key=lambda item: item[0], reverse=True)
@@ -587,9 +630,18 @@ class LocalRAGEngine:
         evidence_lines = []
 
         for idx, doc in enumerate(top_matches, start=1):
+            is_user_source = doc.doc_id.startswith("user_")
+            source_backed = is_user_source or bool(doc.source_url)
+            if doc.source_file and not doc.source_file.endswith(".pdf"):
+                source_backed = True
             citations.append({
+                "doc_id": doc.doc_id,
+                "title": doc.title,
                 "source_file": doc.source_file,
                 "source_url": doc.source_url,
+                "study_types": doc.study_types,
+                "category": doc.category,
+                "source_backed": source_backed,
                 "page": doc.page or 1,
                 "section": doc.section or "General",
                 "quoted_text": doc.content[:240] + ("..." if len(doc.content) > 240 else ""),
@@ -611,7 +663,9 @@ class LocalRAGEngine:
             "answer": answer,
             "citations": citations,
             "retrieval": {
-                "strategy": "semantic_hybrid_ranked",
+                "strategy": "semantic_hybrid_vector_ranked",
+                "embeddingModel": EMBEDDING_MODEL_NAME,
+                "vectorDimensions": VECTOR_DIMENSIONS,
                 "fallbackApplied": used_fallback,
                 "effectiveFilterSource": filter_source if not used_fallback else None,
                 "queryTerms": base_tokens[:12],

@@ -76,3 +76,19 @@ def test_non_inferiority_margin_calculation():
     assert result["approved"] is True
     assert result["required_sample_size_per_group"] > 1000
     assert "Non-Inferiority Trial" in result["test_used"]
+
+
+def test_two_proportions_alias_uses_binary_formula():
+    """Verify plural alias routes to the two-proportion formula, not the t-test fallback."""
+    result = calculate_sample_size({
+        "test_type": "two_proportions",
+        "alpha": 0.05,
+        "power": 0.80,
+        "p1": 0.60,
+        "p2": 0.40,
+        "dropout_rate": 0.0,
+    })
+
+    assert result["approved"] is True
+    assert result["test_used"] == "Two-Proportion Z-Test"
+    assert result["outcome_type_detected"] == "binary"

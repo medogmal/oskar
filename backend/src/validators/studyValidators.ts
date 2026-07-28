@@ -7,6 +7,33 @@ const blindingScopes = ['material_type', 'treatment_procedure', 'split_mouth_sid
 const reviewDecisions = ['approved', 'changes_requested', 'rejected'] as const;
 const clinicalEvaluationDecisions = ['accepted', 'needs_revision', 'not_recommended'] as const;
 const assessmentRequestActions = ['accept', 'reject'] as const;
+const variableRoles = [
+  'primary_outcome',
+  'secondary_outcome',
+  'independent',
+  'dependent',
+  'confounder',
+  'covariate',
+  'effect_modifier',
+  'mediator',
+  'baseline',
+  'demographic',
+  'identifier',
+] as const;
+const measurementScales = ['nominal', 'ordinal', 'interval', 'ratio', 'binary', 'count', 'time_to_event'] as const;
+const variableSources = [
+  'patient_self_report',
+  'clinical_examination',
+  'medical_record',
+  'laboratory',
+  'imaging',
+  'questionnaire',
+  'physician_assessment',
+  'study_device',
+  'administrative',
+] as const;
+const outcomeVariableRoles = ['primary_outcome', 'secondary_outcome', 'dependent'] as const;
+const numericMeasurementScales = ['interval', 'ratio', 'count', 'time_to_event'] as const;
 
 export const createStudyValidator = [
   body('title').trim().notEmpty().withMessage('Study title is required'),
@@ -179,16 +206,62 @@ export const saveVariableMatrixValidator = [
   body('variables').isArray().withMessage('Variable matrix payload must be an array'),
   body('variables.*.id').trim().notEmpty().withMessage('Variable ID is required'),
   body('variables.*.label').trim().notEmpty().withMessage('Variable label is required'),
-  body('variables.*.definition').optional().isString().withMessage('Variable definition must be text'),
-  body('variables.*.role').trim().notEmpty().withMessage('Variable role is required'),
-  body('variables.*.scale').trim().notEmpty().withMessage('Variable scale is required'),
-  body('variables.*.source').trim().notEmpty().withMessage('Variable source is required'),
-  body('variables.*.measurementMethod').optional().isString().withMessage('Measurement method must be text'),
+  body('variables.*.definition').trim().notEmpty().withMessage('Variable operational definition is required'),
+  body('variables.*.role').isIn(variableRoles).withMessage('Variable role is invalid'),
+  body('variables.*.scale').isIn(measurementScales).withMessage('Variable measurement scale is invalid'),
+  body('variables.*.source').isIn(variableSources).withMessage('Variable source is invalid'),
+  body('variables.*.measurementMethod').trim().notEmpty().withMessage('Measurement method is required'),
   body('variables.*.unit').optional().isString().withMessage('Unit must be text'),
   body('variables.*.linkedOutcomeIds').optional().isArray().withMessage('Outcome links must be an array'),
+  body('variables.*.linkedObjectiveIds').optional().isArray().withMessage('Objective links must be an array'),
   body('variables.*.linkedResearchQuestionIds').optional().isArray().withMessage('Research question links must be an array'),
   body('variables.*.linkedReferenceIds').optional().isArray().withMessage('Reference links must be an array'),
   body('variables.*.recommendedStatisticalTest').optional().isString().withMessage('Recommended test must be text'),
+  body('variables').custom((variables) => {
+    if (!Array.isArray(variables)) {
+      return true;
+    }
+
+    const normalizedLabels = new Map<string, string>();
+    for (const variable of variables as Array<Record<string, unknown>>) {
+      const label = String(variable.label ?? '').trim();
+      const normalizedLabel = label.toLowerCase().replace(/[^a-z0-9\u0621-\u064a]+/gi, '');
+      if (normalizedLabel) {
+        const existing = normalizedLabels.get(normalizedLabel);
+        if (existing) {
+          throw new Error(`Duplicate variable label detected: ${label} duplicates ${existing}`);
+        }
+        normalizedLabels.set(normalizedLabel, label);
+      }
+
+      const role = String(variable.role ?? '');
+      const scale = String(variable.scale ?? '');
+      const unit = String(variable.unit ?? '').trim();
+      const recommendedTest = String(variable.recommendedStatisticalTest ?? '').trim();
+      const linkedResearchQuestionIds = Array.isArray(variable.linkedResearchQuestionIds)
+        ? variable.linkedResearchQuestionIds
+        : [];
+      const linkedObjectiveIds = Array.isArray(variable.linkedObjectiveIds) ? variable.linkedObjectiveIds : [];
+
+      if (numericMeasurementScales.includes(scale as (typeof numericMeasurementScales)[number]) && !unit) {
+        throw new Error(`Numeric/time variable "${label}" must include a measurement unit`);
+      }
+
+      if (outcomeVariableRoles.includes(role as (typeof outcomeVariableRoles)[number])) {
+        if (linkedResearchQuestionIds.length === 0) {
+          throw new Error(`Outcome variable "${label}" must link to at least one research question`);
+        }
+        if (linkedObjectiveIds.length === 0) {
+          throw new Error(`Outcome variable "${label}" must link to at least one study objective`);
+        }
+        if (!recommendedTest) {
+          throw new Error(`Outcome variable "${label}" must include a recommended statistical test`);
+        }
+      }
+    }
+
+    return true;
+  }),
 ];
 
 export const saveGovernanceValidator = [

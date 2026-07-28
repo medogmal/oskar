@@ -71,6 +71,8 @@ const STUDY_TYPES = [
   { value: 'retrospective', label: 'Retrospective' },
   { value: 'cross_sectional', label: 'Cross-Sectional' },
   { value: 'in_vitro', label: 'In Vitro' },
+  { value: 'systematic_review', label: 'Systematic Review' },
+  { value: 'meta_analysis', label: 'Meta-Analysis' },
 ];
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

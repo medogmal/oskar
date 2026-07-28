@@ -37,6 +37,7 @@ else:
 
 from .clinical_validation import validate_clinical_parameters, validate_crf_template
 from .knowledge_catalog import (
+    REFERENCE_CATALOG,
     STUDY_TYPE_LABELS,
     VALID_STUDY_TYPES,
     get_catalog_summary,
@@ -2241,6 +2242,11 @@ def get_reference_library_status() -> dict[str, Any]:
             "ready": False,
             "manifestPresent": False,
             "totalReferences": summary["total_references"],
+            "readyReferences": 0,
+            "catalogReferences": metrics.get("catalogReferences", summary["total_references"]),
+            "assetBackedReferences": metrics.get("realAssetBackedReferences", 0),
+            "retrievalEngine": metrics.get("retrievalEngine"),
+            "vectorDatabaseConfigured": metrics.get("vectorDatabaseConfigured", False),
             "indexMetrics": metrics,
         }
     try:
@@ -2260,16 +2266,37 @@ def get_reference_library_status() -> dict[str, Any]:
 def get_reference_library_detail() -> dict[str, Any]:
     manifest_path = Path(__file__).parent.parent / "data" / "reference_sources_manifest.json"
     if not manifest_path.exists():
+        entries = [
+            {
+                "id": str(ref.get("id") or ""),
+                "title": str(ref.get("title") or ""),
+                "studyTypes": ref.get("study_types") if isinstance(ref.get("study_types"), list) else [],
+                "category": str(ref.get("category") or ""),
+                "status": "metadata_only_manifest_missing",
+                "sourceLabel": "Built-in catalog metadata",
+                "sourceUrl": "",
+                "hasText": False,
+                "hasHtml": False,
+                "hasMetadata": False,
+                "artifactOrigin": "catalog_metadata",
+                "textPath": None,
+                "htmlPath": None,
+                "metadataPath": None,
+                "errors": ["reference_sources_manifest.json is missing; no local PDF/text artifact is linked for this reference."],
+            }
+            for ref in REFERENCE_CATALOG
+        ]
         return {
             "ready": False,
-            "entries": [],
+            "manifestPresent": False,
             "summary": {
-                "total": 0,
+                "total": len(entries),
                 "complete": 0,
                 "textBacked": 0,
                 "htmlBacked": 0,
                 "metadataBacked": 0,
             },
+            "entries": entries,
         }
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
