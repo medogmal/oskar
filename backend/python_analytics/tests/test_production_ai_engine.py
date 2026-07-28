@@ -13,6 +13,9 @@ from app.knowledge_catalog import REFERENCE_CATALOG
 from app.privacy import redact_phi
 from app.rag_engine import LocalRAGEngine
 from app.sample_size_engine import calculate_sample_size
+from app.main import handle_missing_data
+import pandas as pd
+import numpy as np
 
 
 def test_rag_engine_retrieval_and_citations():
@@ -322,3 +325,30 @@ def test_assistant_chat_reports_placeholder_key_with_privacy_audit():
         assert body["usedLLM"] is False
         assert "placeholder" in body["error"]
         assert body["privacyAudit"]["redactions_count"] >= 3
+
+
+def test_missing_data_imputation():
+    """Verify different missing data handling strategies."""
+    data = {
+        "score": [10.0, 20.0, np.nan, 40.0],
+        "group": ["A", "B", "A", np.nan]
+    }
+    df = pd.DataFrame(data)
+    
+    # 1. Complete Case (Listwise deletion)
+    res_cc = handle_missing_data(df, "complete_case")
+    assert len(res_cc) == 2  # Only row 0 and 1 have no NaNs
+    
+    # 2. Mean Imputation
+    res_mean = handle_missing_data(df, "mean_imputation")
+    assert len(res_mean) == 4
+    assert res_mean["score"].iloc[2] == 23.333333333333332  # Mean of 10, 20, 40
+    
+    # 3. Median Imputation
+    res_median = handle_missing_data(df, "median_imputation")
+    assert res_median["score"].iloc[2] == 20.0  # Median of 10, 20, 40
+    
+    # 4. Mode Imputation
+    res_mode = handle_missing_data(df, "mode_imputation")
+    assert res_mode["group"].iloc[3] == "A"  # Mode of group is "A"
+

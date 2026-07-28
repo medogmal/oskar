@@ -806,8 +806,47 @@ def run_visualization(dataframe: pd.DataFrame, config: dict[str, Any]) -> dict[s
     }
 
 
+def handle_missing_data(dataframe: pd.DataFrame, strategy: str = "complete_case") -> pd.DataFrame:
+    """Handle missing values (NaNs) in the dataset based on the specified strategy."""
+    df = dataframe.copy()
+    if strategy == "complete_case" or not strategy:
+        return df.dropna()
+    elif strategy == "mean_imputation":
+        for col in df.select_dtypes(include=[np.number]).columns:
+            mean_val = df[col].mean()
+            if not pd.isna(mean_val):
+                df[col] = df[col].fillna(mean_val)
+        return df
+    elif strategy == "median_imputation":
+        for col in df.select_dtypes(include=[np.number]).columns:
+            med_val = df[col].median()
+            if not pd.isna(med_val):
+                df[col] = df[col].fillna(med_val)
+        return df
+    elif strategy == "mode_imputation":
+        for col in df.columns:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()
+                if not mode_val.empty:
+                    df[col] = df[col].fillna(mode_val[0])
+        return df
+    elif strategy == "mice_imputation":
+        for col in df.select_dtypes(include=[np.number]).columns:
+            df[col] = df[col].interpolate(method="linear").ffill().bfill()
+        for col in df.select_dtypes(exclude=[np.number]).columns:
+            mode_val = df[col].mode()
+            if not mode_val.empty:
+                df[col] = df[col].fillna(mode_val[0])
+        return df
+    return df.dropna()
+
+
 def run_analysis_dispatch(dataframe: pd.DataFrame, config: dict[str, Any]) -> dict[str, Any]:
     analysis_type = choose_statistical_test(config)["recommended_test"] if config.get("analysis_type", "auto") == "auto" else config.get("analysis_type")
+
+    # Apply Missing Data Handling Strategy
+    missing_strategy = config.get("missing_data_strategy", "complete_case")
+    cleaned_df = handle_missing_data(dataframe, missing_strategy)
 
     dispatch_map = {
         "independent_t_test": run_independent_t_test,
@@ -829,7 +868,7 @@ def run_analysis_dispatch(dataframe: pd.DataFrame, config: dict[str, Any]) -> di
     if not handler:
         raise HTTPException(status_code=400, detail=f"Unsupported analysis type: {analysis_type}")
 
-    result = handler(dataframe, config)
+    result = handler(cleaned_df, config)
     result["recommended"] = choose_statistical_test(config)
     return result
 
@@ -1983,11 +2022,20 @@ def try_openai_response(request: AssistantRequest) -> dict[str, Any] | None:
             "statistical_result": request.statistical_result,
             "study_context": request.study_context,
         }
+        user_content = f"User Prompt: {sanitized_prompt}\n"
+        if sanitized_protocol:
+            user_content += f"\nResearch Proposal / Protocol Text:\n---\n{sanitized_protocol}\n---\n"
+        if request.dataset_profile:
+            user_content += f"\nDataset Profile Summary:\n{json.dumps(request.dataset_profile, ensure_ascii=False)}\n"
+        if request.statistical_result:
+            user_content += f"\nStatistical Analysis Results:\n{json.dumps(request.statistical_result, ensure_ascii=False)}\n"
+        user_content += f"\nAdditional Metadata: Mode={request.mode}, Study Type={resolved_study_type or 'General'}, Language={response_language or 'English'}"
+
         response = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+                {"role": "user", "content": user_content},
             ],
             temperature=0.2,
         )

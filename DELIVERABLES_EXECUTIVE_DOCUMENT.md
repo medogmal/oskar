@@ -83,6 +83,28 @@
 
 ---
 
+## 🔒 حوكمة الوصول وقاعدة البيانات (Database & Access Governance)
+
+### 1. مخطط قاعدة البيانات (PostgreSQL Schema)
+يعتمد النظام على قاعدة بيانات **PostgreSQL** مهيكلة من خلال الجداول الأساسية التالية:
+* **users**: لتخزين بيانات الباحثين والمشرفين والمقيمين.
+* **studies**: تخزين تصميم الدراسة، الحجم المستهدف، التعمية، والعشوائية وحالة الاعتماد.
+* **study_files**: إدارة الملفات المرفوعة للبروتوكولات والداتا السريرية والتقارير.
+* **study_analyses**: تخزين نتائج تشغيل التحليلات الإحصائية وصور ورسوم Plotly التفاعلية ومخرجات الذكاء الاصطناعي.
+* **study_outcome_assessment_requests**: طلبات جمع البيانات وإرسالها للمقيّمين.
+* **study_outcome_assessment_samples**: عينات الفحص وتوزيع المجموعات المعماة.
+* **study_outcome_assessment_template_versions**: تتبع إصدارات وتصميمات استمارات الـ CRFs المعتمدة.
+* **study_outcome_assessment_entries**: قيم تعبئة الاستمارات الفعلية من قبل المقيمين السريريين.
+
+### 2. نظام الصلاحيات المبني على الأدوار (RBAC - Role-Based Access Control)
+يتم فرض حوكمة الصلاحيات في النظام عبر الأدوار التالية:
+* **Principal Investigator (PI - الباحث الرئيسي):** صلاحيات كاملة لإنشاء الدراسة، تعديل الـ CRF، رفع البيانات، تشغيل التحليل الإحصائي، وإرسالها للمشرف.
+* **Supervisor / Assistant Supervisor (المشرف / المشرف المساعد):** مراجعة الدراسة والموافقة على تصميمها أو طلب تعديلات، ولا يمكنه تعديل البيانات المباشرة للباحث.
+* **Clinical Evaluator (المقيّم السريري):** استقبال طلبات التقييم وتعبئة استمارات CRF الخاصة بكل مريض فقط، دون الوصول للتحليل الإحصائي أو المخطط العام للدراسة.
+* **Institution (المؤسسة الأكاديمية):** مراقبة الإحصاءات العامة وإدارة الاشتراكات والتحقق من التزام الباحثين بمعايير الأمان الأكاديمي.
+
+---
+
 ## 📦 المخرجات الفنية الجاهزة للتسليم والاستخدام
 
 جميع الملفات البرمجية جاهزة للعمل ومدمجة في مسار المشروع، بالإضافة إلى توليد **الملفات التقنية المنظمة (JSON Data Seeds)** داخل مجلد [deliverables_json](file:///d:/Mostaql/oskar/deliverables_json) لتغذية قاعدة البيانات مباشرة:
@@ -90,3 +112,8 @@
 2. [clinical_rules_severity.json](file:///d:/Mostaql/oskar/deliverables_json/clinical_rules_severity.json): مصفوفة القياسات الطبية واللثوية المعتمدة ونسب الخطورة.
 3. [prompt_library.json](file:///d:/Mostaql/oskar/deliverables_json/prompt_library.json): مكتبة المحثات الحاكمة الموجهة للـ AI.
 4. [decision_trees.json](file:///d:/Mostaql/oskar/deliverables_json/decision_trees.json): أشجار قرارات حجم العينة وتصميم الاختبارات الإحصائية.
+5. [statistical_test_matrix.json](file:///d:/Mostaql/oskar/deliverables_json/statistical_test_matrix.json): مصفوفة اختيار الاختبار الإحصائي وبدائله والتحقق من التوزيع.
+6. [variable_classification_tree.json](file:///d:/Mostaql/oskar/deliverables_json/variable_classification_tree.json): تصنيفات المتغيرات السريرية والرياضية.
+7. [variable_mapping_matrix.json](file:///d:/Mostaql/oskar/deliverables_json/variable_mapping_matrix.json): مصفوفة المتغيرات السنية وربطها إحصائياً ومنهجياً.
+8. [error_severity_catalog.json](file:///d:/Mostaql/oskar/deliverables_json/error_severity_catalog.json): تصنيف الأخطاء المنهجية والسريرية والبيانات ونسب الخطورة.
+
