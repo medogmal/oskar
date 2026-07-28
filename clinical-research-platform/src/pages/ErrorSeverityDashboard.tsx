@@ -24,7 +24,7 @@ import { CategoryBadge, SeverityBadge } from '../components/SeverityBadges';
 import type { ValidationItem, SeverityLevel, ErrorCategory } from '../types/clinresearch';
 type ValidationStatus = 'open' | 'resolved' | 'dismissed' | 'pending';
 import { ERROR_CATALOG } from '../lib/studyStore';
-import { exportErrorsCsv, openReportForPrint, buildBlankReport } from '../lib/exportLib';
+import { exportErrorsCsv, exportReportPdf, exportReportXlsx, buildBlankReport } from '../lib/exportLib';
 import { SEVERITY_STYLES } from '../lib/severityHelpers';
 import { loadWorkspaceData, uploadWorkspaceData } from '../lib/studyWorkspaceFiles';
 
@@ -144,7 +144,7 @@ export default function ErrorSeverityDashboard() {
   };
 
   const exportCsv = () => exportErrorsCsv(items, 'validation-issues-' + studyId);
-  const printReport = () => {
+  const buildIssuesReport = () => {
     const report = buildBlankReport('errors_deficiencies', studyId, 'Deficiencies & Issues Audit Report', user?.fullName ?? 'Research Platform');
     report.sections = [
       {
@@ -177,7 +177,21 @@ export default function ErrorSeverityDashboard() {
         ],
       },
     ];
-    openReportForPrint(report);
+    return report;
+  };
+
+  const exportIssuesReportPdf = async () => {
+    if (!token) {
+      return;
+    }
+    await exportReportPdf(buildIssuesReport(), token);
+  };
+
+  const exportIssuesReportXlsx = async () => {
+    if (!token) {
+      return;
+    }
+    await exportReportXlsx(buildIssuesReport(), token);
   };
 
   return (
@@ -202,8 +216,11 @@ export default function ErrorSeverityDashboard() {
             <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/20">
               <FileSpreadsheet className="h-4 w-4" /> Export CSV
             </button>
-            <button onClick={printReport} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-300 hover:bg-sky-500/20">
-              <Printer className="h-4 w-4" /> Report / PDF
+            <button onClick={() => void exportIssuesReportPdf()} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-300 hover:bg-sky-500/20">
+              <Printer className="h-4 w-4" /> Export PDF
+            </button>
+            <button onClick={() => void exportIssuesReportXlsx()} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-300 hover:bg-cyan-500/20">
+              <FileSpreadsheet className="h-4 w-4" /> Export XLSX
             </button>
           </div>
         </header>

@@ -65,6 +65,8 @@ class KnowledgeDocument:
         self.page = page
         self.section = section
         self.tokens = _tokenize(f"{title} {content} {category}")
+        self.title_tokens = _tokenize(title)
+        self.context_tokens = _tokenize(f"{category} {section or ''} {' '.join(self.study_types)}")
 
 
 class LocalRAGEngine:
@@ -245,6 +247,138 @@ class LocalRAGEngine:
             "missingReferenceIdsSample": missing_reference_ids[:10],
         }
 
+    def _detect_query_concepts(self, query_tokens: list[str], study_type: str | None = None) -> list[str]:
+        concepts: set[str] = set()
+        normalized_study_type = (study_type or "").strip().lower()
+        if normalized_study_type:
+            concepts.add(normalized_study_type)
+
+        for token in query_tokens:
+            if token in SEMANTIC_SYNONYMS:
+                concepts.add(token)
+                continue
+            for concept, synonyms in SEMANTIC_SYNONYMS.items():
+                if token == concept or token in synonyms:
+                    concepts.add(concept)
+
+        return sorted(concepts)
+
+    def _bm25_score(self, query_tokens: list[str], doc: KnowledgeDocument, candidate_docs: list[KnowledgeDocument]) -> float:
+        if not doc.tokens:
+            return 0.0
+
+        avg_doc_len = sum(len(item.tokens) for item in candidate_docs if item.tokens) / max(1, len(candidate_docs))
+        doc_len = len(doc.tokens)
+        k1 = 1.5
+        b = 0.75
+        score = 0.0
+
+        for token in query_tokens:
+            tf = doc.tokens.count(token)
+            if tf == 0:
+                continue
+            df = sum(1 for candidate in candidate_docs if token in candidate.tokens)
+            idf = math.log(1 + ((len(candidate_docs) - df + 0.5) / (df + 0.5)))
+            numerator = tf * (k1 + 1)
+            denominator = tf + k1 * (1 - b + b * (doc_len / max(avg_doc_len, 1.0)))
+            score += idf * (numerator / max(denominator, 1e-9))
+
+        return score
+
+    def _semantic_intent_score(
+        self,
+        query_tokens: list[str],
+        concepts: list[str],
+        doc: KnowledgeDocument,
+        study_type: str | None = None,
+    ) -> float:
+        score = 0.0
+        overlap = len(set(query_tokens) & set(doc.tokens))
+        if query_tokens:
+            score += (overlap / len(set(query_tokens))) * 2.2
+
+        title_overlap = len(set(query_tokens) & set(doc.title_tokens))
+        if title_overlap:
+            score += title_overlap * 1.4
+
+        context_overlap = len(set(query_tokens) & set(doc.context_tokens))
+        if context_overlap:
+            score += context_overlap * 0.85
+
+        for concept in concepts:
+            synonyms = SEMANTIC_SYNONYMS.get(concept, [])
+            if concept in doc.context_tokens:
+                score += 1.8
+            if concept in doc.title_tokens:
+                score += 1.2
+            synonym_hits = sum(1 for synonym in synonyms if synonym in doc.tokens or synonym in doc.title_tokens)
+            if synonym_hits:
+                score += min(2.4, synonym_hits * 0.4)
+
+        normalized_study_type = (study_type or "").strip().lower()
+        if normalized_study_type and normalized_study_type in doc.study_types:
+            score += 1.3
+        elif normalized_study_type and "shared" in doc.study_types:
+            score += 0.45
+
+        if doc.source_url:
+            score += 0.2
+
+        return score
+
+    def _rank_documents(
+        self,
+        query_tokens: list[str],
+        concepts: list[str],
+        candidate_docs: list[KnowledgeDocument],
+        study_type: str | None = None,
+    ) -> list[tuple[float, KnowledgeDocument]]:
+        ranked: list[tuple[float, KnowledgeDocument]] = []
+        for doc in candidate_docs:
+            lexical = self._bm25_score(query_tokens, doc, candidate_docs)
+            semantic = self._semantic_intent_score(query_tokens, concepts, doc, study_type)
+            total = lexical + semantic
+            if total > 0:
+                ranked.append((total, doc))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        return ranked
+
+    def _select_diverse_top_matches(
+        self,
+        ranked_docs: list[tuple[float, KnowledgeDocument]],
+        limit: int,
+        lambda_weight: float = 0.78,
+    ) -> list[KnowledgeDocument]:
+        if not ranked_docs or limit <= 0:
+            return []
+
+        selected: list[KnowledgeDocument] = []
+        remaining = ranked_docs[:]
+
+        while remaining and len(selected) < limit:
+            best_idx = 0
+            best_score = -float("inf")
+
+            for idx, (base_score, candidate) in enumerate(remaining):
+                novelty_penalty = 0.0
+                for chosen in selected:
+                    token_overlap = len(set(candidate.tokens) & set(chosen.tokens)) / max(
+                        1,
+                        len(set(candidate.tokens) | set(chosen.tokens)),
+                    )
+                    same_category = 0.2 if candidate.category == chosen.category else 0.0
+                    novelty_penalty = max(novelty_penalty, token_overlap + same_category)
+
+                mmr_score = lambda_weight * base_score - (1 - lambda_weight) * novelty_penalty
+                if mmr_score > best_score:
+                    best_score = mmr_score
+                    best_idx = idx
+
+            _, picked = remaining.pop(best_idx)
+            selected.append(picked)
+
+        return selected
+
     def _get_db_path(self) -> Path:
         return self._get_data_dir() / "rag_index_db.json"
 
@@ -402,7 +536,9 @@ class LocalRAGEngine:
         limit: int = 5,
     ) -> dict[str, Any]:
         """Perform grounded RAG search with study-type isolation and citations."""
+        base_tokens = _tokenize(question)
         q_tokens = self._expand_query_tokens(question, study_type)
+        concepts = self._detect_query_concepts(q_tokens, study_type)
         if not q_tokens:
             return {
                 "answer": "الرجاء تقديم استفسار بحثي محدد للبحث في المكتبة المعرفية.",
@@ -438,76 +574,14 @@ class LocalRAGEngine:
                 used_fallback = True
                 attempts.append({"label": "filtered_source", "citationCount": 0, "useful": False})
 
-        # Calculate scores using semantic-boosted TF-IDF, title boosts, and metadata/category overlap.
-        doc_count = max(1, len(candidate_docs))
-        scores: list[tuple[float, KnowledgeDocument]] = []
-
-        for doc in effective_docs:
-            if not doc.tokens:
-                continue
-            score = 0.0
-            title_tokens = _tokenize(doc.title)
-            category_tokens = _tokenize(f"{doc.category} {doc.section or ''} {' '.join(doc.study_types)}")
-            for qt in q_tokens:
-                # Direct term match (TF-IDF)
-                tf = doc.tokens.count(qt) / len(doc.tokens)
-                df = sum(1 for d in candidate_docs if qt in d.tokens)
-                idf = math.log((doc_count + 1) / (df + 1)) + 1.0
-                
-                if tf > 0:
-                    score += tf * idf
-
-                if qt in title_tokens:
-                    score += idf * 1.4
-
-                if qt in category_tokens:
-                    score += idf * 0.65
-
-                # Semantic boosting via synonym match
-                for key, syns in SEMANTIC_SYNONYMS.items():
-                    if qt in syns or qt == key:
-                        # Check if document belongs to this category or contains the synonyms
-                        matches_syn = sum(1 for s in syns if s in doc.tokens)
-                        if matches_syn > 0:
-                            score += (matches_syn / len(doc.tokens)) * idf * 0.5
-
-            if score > 0:
-                scores.append((score, doc))
+        ranked_scores = self._rank_documents(q_tokens, concepts, effective_docs, study_type)
 
         # If filtered search gave no matches, fallback to broader candidate docs
-        if not scores and filter_source and not used_fallback:
+        if not ranked_scores and filter_source and not used_fallback:
             used_fallback = True
-            for doc in candidate_docs:
-                if not doc.tokens:
-                    continue
-                score = 0.0
-                for qt in q_tokens:
-                    tf = doc.tokens.count(qt) / len(doc.tokens)
-                    df = sum(1 for d in candidate_docs if qt in d.tokens)
-                    idf = math.log((doc_count + 1) / (df + 1)) + 1.0
-                    title_tokens = _tokenize(doc.title)
-                    category_tokens = _tokenize(f"{doc.category} {doc.section or ''} {' '.join(doc.study_types)}")
+            ranked_scores = self._rank_documents(q_tokens, concepts, candidate_docs, study_type)
 
-                    if tf > 0:
-                        score += tf * idf
-
-                    if qt in title_tokens:
-                        score += idf * 1.4
-
-                    if qt in category_tokens:
-                        score += idf * 0.65
-
-                    for key, syns in SEMANTIC_SYNONYMS.items():
-                        if qt in syns or qt == key:
-                            matches_syn = sum(1 for s in syns if s in doc.tokens)
-                            if matches_syn > 0:
-                                score += (matches_syn / len(doc.tokens)) * idf * 0.5
-                                
-                if score > 0:
-                    scores.append((score, doc))
-
-        scores.sort(key=lambda x: x[0], reverse=True)
-        top_matches = [doc for _sc, doc in scores[:limit]]
+        top_matches = self._select_diverse_top_matches(ranked_scores, limit)
 
         citations = []
         evidence_lines = []
@@ -537,9 +611,12 @@ class LocalRAGEngine:
             "answer": answer,
             "citations": citations,
             "retrieval": {
-                "strategy": "filtered_then_broadened" if used_fallback else ("filtered_only" if filter_source else "broadened_only"),
+                "strategy": "semantic_hybrid_ranked",
                 "fallbackApplied": used_fallback,
                 "effectiveFilterSource": filter_source if not used_fallback else None,
+                "queryTerms": base_tokens[:12],
+                "expandedTerms": q_tokens[:20],
+                "concepts": concepts,
                 "attempts": attempts or [{"label": "search_executed", "citationCount": len(citations), "useful": len(citations) > 0}],
             },
         }

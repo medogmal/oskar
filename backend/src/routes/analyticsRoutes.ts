@@ -3,9 +3,12 @@ import multer from 'multer';
 import {
   calculateKnowledgeSampleSize,
   extractDocumentText,
+  exportReportPdf,
+  exportReportXlsx,
   getAnalyticsHealth,
   analyzeMissingData,
   getKnowledgeHealth,
+  getKnowledgeReferenceLibraryStatus,
   getKnowledgeReferences,
   getKnowledgeStudyTypes,
   ingestKnowledgeDocument,
@@ -31,6 +34,7 @@ const upload = multer({
 router.use(protect);
 router.get('/health', getAnalyticsHealth);
 router.get('/knowledge/health', getKnowledgeHealth);
+router.get('/knowledge/reference-library-status', getKnowledgeReferenceLibraryStatus);
 router.get('/knowledge/study-types', getKnowledgeStudyTypes);
 router.get('/knowledge/references', getKnowledgeReferences);
 router.get('/knowledge/references/:studyType', getKnowledgeReferences);
@@ -46,6 +50,8 @@ router.post('/knowledge/reindex', reindexKnowledgeReferences);
 router.post('/knowledge/query', queryKnowledgeBase);
 router.post('/knowledge/sample-size', calculateKnowledgeSampleSize);
 router.post('/knowledge/validate-clinical', validateKnowledgeClinicalParameters);
+router.post('/exports/report.pdf', exportReportPdf);
+router.post('/exports/report.xlsx', exportReportXlsx);
 
 
 export default router;

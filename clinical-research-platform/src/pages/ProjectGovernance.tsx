@@ -13,7 +13,7 @@ import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components
 import { useAuth } from '../context/useAuth';
 import { SeverityBadge } from '../components/SeverityBadges';
 import type { AppNotification, AuditLogEntry, PhaseApproval, PhaseApprovalStatus, PhaseNumber } from '../types/clinresearch';
-import { buildBlankReport, openReportForPrint } from '../lib/exportLib';
+import { buildBlankReport, exportReportPdf, exportReportXlsx } from '../lib/exportLib';
 import { apiBaseUrl, getDashboardPath } from '../lib/auth';
 import { loadWorkspaceData, uploadWorkspaceData } from '../lib/studyWorkspaceFiles';
 
@@ -393,7 +393,7 @@ export default function ProjectGovernance() {
     }));
   };
 
-  const exportReport = () => {
+  const buildGovernanceReport = () => {
     const report = buildBlankReport('final_supervisor', studyId, 'Project Governance Report', user?.fullName ?? 'Research Platform');
     report.studyTitle = studyTitle;
     report.sections = governance.phases.map((phase) => ({
@@ -409,7 +409,31 @@ export default function ProjectGovernance() {
         },
       ],
     }));
-    openReportForPrint(report);
+    return report;
+  };
+
+  const exportReportAsPdf = async () => {
+    if (!token) {
+      return;
+    }
+    try {
+      setSaveError('');
+      await exportReportPdf(buildGovernanceReport(), token);
+    } catch {
+      setSaveError('تعذر تصدير تقرير الحوكمة بصيغة PDF.');
+    }
+  };
+
+  const exportReportAsXlsx = async () => {
+    if (!token) {
+      return;
+    }
+    try {
+      setSaveError('');
+      await exportReportXlsx(buildGovernanceReport(), token);
+    } catch {
+      setSaveError('تعذر تصدير تقرير الحوكمة بصيغة XLSX.');
+    }
   };
 
   const leftVersion = templateVersions.find((version) => String(version.id) === leftVersionId);
@@ -450,8 +474,11 @@ export default function ProjectGovernance() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={exportReport} className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100">
-              <Printer className="h-4 w-4" /> Export Report
+            <button onClick={() => void exportReportAsPdf()} className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100">
+              <Printer className="h-4 w-4" /> Export PDF
+            </button>
+            <button onClick={() => void exportReportAsXlsx()} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100">
+              <UploadCloud className="h-4 w-4" /> Export XLSX
             </button>
             <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
               {(['phases', 'audit', 'notifications', 'versions'] as TabKey[]).map((entry) => (

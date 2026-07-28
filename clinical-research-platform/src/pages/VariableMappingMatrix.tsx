@@ -26,7 +26,7 @@ import type {
   SeverityLevel,
   ErrorCategory,
 } from '../types/clinresearch';
-import { exportVariablesMatrixCsv, openReportForPrint, buildBlankReport } from '../lib/exportLib';
+import { exportVariablesMatrixCsv, exportReportPdf, exportReportXlsx, buildBlankReport } from '../lib/exportLib';
 import { SEVERITY_STYLES } from '../lib/severityHelpers';
 import { apiBaseUrl } from '../lib/auth';
 import { loadWorkspaceData, uploadWorkspaceData } from '../lib/studyWorkspaceFiles';
@@ -323,7 +323,7 @@ export default function VariableMappingMatrix() {
   };
 
   const exportMatrix = () => exportVariablesMatrixCsv(variables, 'variable-matrix-' + studyId);
-  const printReport = () => {
+  const buildMatrixReport = () => {
     const report = buildBlankReport('crf_review', studyId, 'Variable Mapping Matrix Report', user?.fullName ?? 'Research Platform');
     report.sections = [
       {
@@ -359,7 +359,21 @@ export default function VariableMappingMatrix() {
         ],
       },
     ];
-    openReportForPrint(report);
+    return report;
+  };
+
+  const exportMatrixReportPdf = async () => {
+    if (!token) {
+      return;
+    }
+    await exportReportPdf(buildMatrixReport(), token);
+  };
+
+  const exportMatrixReportXlsx = async () => {
+    if (!token) {
+      return;
+    }
+    await exportReportXlsx(buildMatrixReport(), token);
   };
 
   return (
@@ -399,8 +413,11 @@ export default function VariableMappingMatrix() {
             <button onClick={exportMatrix} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/20">
               <FileSpreadsheet className="h-4 w-4" /> Export CSV
             </button>
-            <button onClick={printReport} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-300 hover:bg-sky-500/20">
-              <Printer className="h-4 w-4" /> Report / PDF
+            <button onClick={() => void exportMatrixReportPdf()} className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sm text-sky-300 hover:bg-sky-500/20">
+              <Printer className="h-4 w-4" /> Export PDF
+            </button>
+            <button onClick={() => void exportMatrixReportXlsx()} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-300 hover:bg-cyan-500/20">
+              <FileSpreadsheet className="h-4 w-4" /> Export XLSX
             </button>
             <button onClick={addNewVariable} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-2 text-sm font-medium text-white shadow-sm shadow-indigo-900 hover:bg-indigo-400">
               <Plus className="h-4 w-4" /> Add Variable

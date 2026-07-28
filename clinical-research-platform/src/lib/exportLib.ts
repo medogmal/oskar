@@ -1,4 +1,5 @@
 import type { ReportTemplate, VariableMapping, ValidationItem, PhaseApproval } from '../types/clinresearch';
+import { apiBaseUrl } from './auth';
 
 const toCsvCell = (value: string | number | boolean | undefined | null) => {
   if (value === undefined || value === null) return '';
@@ -77,6 +78,26 @@ const triggerDownload = (blob: Blob, filename: string) => {
 };
 
 const ensureExt = (name: string, ext: string) => (name.toLowerCase().endsWith(ext) ? name : name + ext);
+
+const downloadProtectedExport = async (url: string, token: string, report: ReportTemplate, fallbackFilename: string) => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ report }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Unable to export report');
+  }
+
+  const blob = await response.blob();
+  const header = response.headers.get('content-disposition') ?? '';
+  const filenameMatch = /filename="([^"]+)"/i.exec(header);
+  triggerDownload(blob, filenameMatch?.[1] ?? fallbackFilename);
+};
 
 const buildReportHtml = (report: ReportTemplate): string => {
   const sectionsHtml = report.sections
@@ -192,6 +213,24 @@ export const openReportForPrint = (report: ReportTemplate) => {
   win.document.write(html);
   win.document.close();
   win.focus();
+};
+
+export const exportReportPdf = async (report: ReportTemplate, token: string) => {
+  await downloadProtectedExport(
+    `${apiBaseUrl}/analytics/exports/report.pdf`,
+    token,
+    report,
+    ensureExt(`${report.studyTitle}-${report.title}`, '.pdf'),
+  );
+};
+
+export const exportReportXlsx = async (report: ReportTemplate, token: string) => {
+  await downloadProtectedExport(
+    `${apiBaseUrl}/analytics/exports/report.xlsx`,
+    token,
+    report,
+    ensureExt(`${report.studyTitle}-${report.title}`, '.xlsx'),
+  );
 };
 
 export const buildBlankReport = (

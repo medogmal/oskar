@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import PDFDocument from 'pdfkit';
 import type { Request, Response } from 'express';
+import * as XLSX from 'xlsx';
 
 const analyticsBaseUrl = (process.env.PYTHON_ANALYTICS_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
 const analyticsTimeoutMs = Number(process.env.PYTHON_ANALYTICS_TIMEOUT_MS ?? 120000);
@@ -32,6 +35,40 @@ type KnowledgeQueryResponse = {
       useful: boolean;
     }>;
   };
+};
+
+type ExportReportReference = {
+  id: string;
+  citationText: string;
+};
+
+type ExportReportTable = {
+  caption: string;
+  columns: string[];
+  rows: Array<Array<string | number | boolean>>;
+};
+
+type ExportReportSection = {
+  id: string;
+  heading: string;
+  level: 1 | 2 | 3 | 4;
+  body: string;
+  highlights?: string[];
+  references?: string[];
+  tables?: ExportReportTable[];
+};
+
+type ExportReportTemplate = {
+  id: string;
+  type: string;
+  title: string;
+  version: string;
+  issuedAt: string;
+  studyId: string;
+  studyTitle: string;
+  authorName: string;
+  sections: ExportReportSection[];
+  references: ExportReportReference[];
 };
 
 const normalizeWhitespace = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -74,6 +111,203 @@ const getKeywordCandidates = (value: string, maxKeywords = 8) =>
 
 const getRecord = (value: unknown) =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+
+const sanitizeFileBaseName = (value: string) =>
+  value
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'report';
+
+const normalizeReportTemplate = (value: unknown): ExportReportTemplate | null => {
+  const report = getRecord(value);
+  if (!report) {
+    return null;
+  }
+
+  const sections: ExportReportSection[] = [];
+  if (Array.isArray(report.sections)) {
+    for (const item of report.sections) {
+      const section = getRecord(item);
+      if (!section) {
+        continue;
+      }
+
+      const tables: ExportReportTable[] = [];
+      if (Array.isArray(section.tables)) {
+        for (const tableItem of section.tables) {
+          const table = getRecord(tableItem);
+          if (!table || !Array.isArray(table.columns) || !Array.isArray(table.rows)) {
+            continue;
+          }
+          tables.push({
+            caption: String(table.caption ?? 'Untitled Table'),
+            columns: table.columns.map((column) => String(column)),
+            rows: table.rows.map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : [])),
+          });
+        }
+      }
+
+      sections.push({
+        id: String(section.id ?? randomUUID()),
+        heading: String(section.heading ?? 'Section'),
+        level: ([1, 2, 3, 4].includes(Number(section.level)) ? Number(section.level) : 2) as 1 | 2 | 3 | 4,
+        body: String(section.body ?? ''),
+        highlights: Array.isArray(section.highlights) ? section.highlights.map((entry) => String(entry)) : undefined,
+        references: Array.isArray(section.references) ? section.references.map((entry) => String(entry)) : undefined,
+        tables: tables.length ? tables : undefined,
+      });
+    }
+  }
+
+  const references: ExportReportReference[] = [];
+  if (Array.isArray(report.references)) {
+    for (const item of report.references) {
+      const reference = getRecord(item);
+      if (!reference) {
+        continue;
+      }
+      references.push({
+        id: String(reference.id ?? ''),
+        citationText: String(reference.citationText ?? ''),
+      });
+    }
+  }
+
+  return {
+    id: String(report.id ?? randomUUID()),
+    type: String(report.type ?? 'report'),
+    title: String(report.title ?? 'Research Report'),
+    version: String(report.version ?? '1.0'),
+    issuedAt: String(report.issuedAt ?? new Date().toISOString()),
+    studyId: String(report.studyId ?? 'unknown'),
+    studyTitle: String(report.studyTitle ?? 'Untitled Study'),
+    authorName: String(report.authorName ?? 'ClinResearch AI'),
+    sections,
+    references,
+  };
+};
+
+const createPdfBufferFromReport = async (report: ExportReportTemplate) => {
+  const document = new PDFDocument({ margin: 42, size: 'A4' });
+  const chunks: Buffer[] = [];
+
+  document.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+  const endPromise = new Promise<Buffer>((resolve) => {
+    document.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+
+  document.fontSize(20).text(report.title, { align: 'left' });
+  document.moveDown(0.25);
+  document.fontSize(10).fillColor('#475569');
+  document.text(`Study: ${report.studyTitle} (ID: ${report.studyId})`);
+  document.text(`Version: ${report.version}`);
+  document.text(`Author: ${report.authorName}`);
+  document.text(`Issued At: ${new Date(report.issuedAt).toLocaleString()}`);
+  document.fillColor('#111827');
+  document.moveDown();
+
+  for (const section of report.sections) {
+    document.fontSize(section.level === 1 ? 16 : section.level === 2 ? 14 : 12).text(section.heading);
+    document.moveDown(0.25);
+    document.fontSize(10).text(section.body || 'No narrative supplied.', {
+      align: 'left',
+      lineGap: 2,
+    });
+    document.moveDown(0.35);
+
+    if (section.highlights?.length) {
+      for (const highlight of section.highlights) {
+        document.fontSize(10).text(`- ${highlight}`);
+      }
+      document.moveDown(0.35);
+    }
+
+    if (section.tables?.length) {
+      for (const table of section.tables) {
+        document.fontSize(11).text(table.caption || 'Table');
+        document.moveDown(0.2);
+        document.fontSize(9).text(table.columns.join(' | '));
+        for (const row of table.rows.slice(0, 30)) {
+          document.text(row.map((cell) => String(cell ?? '')).join(' | '));
+        }
+        if (table.rows.length > 30) {
+          document.text(`... ${table.rows.length - 30} more rows omitted in PDF view`);
+        }
+        document.moveDown(0.35);
+      }
+    }
+  }
+
+  if (report.references.length) {
+    document.addPage();
+    document.fontSize(16).text('References');
+    document.moveDown(0.35);
+    for (const reference of report.references) {
+      document.fontSize(10).text(`[${reference.id}] ${reference.citationText}`);
+      document.moveDown(0.2);
+    }
+  }
+
+  document.end();
+  return endPromise;
+};
+
+const createXlsxBufferFromReport = (report: ExportReportTemplate) => {
+  const workbook = XLSX.utils.book_new();
+  const summarySheet = XLSX.utils.aoa_to_sheet([
+    ['Report Title', report.title],
+    ['Report Type', report.type],
+    ['Study Title', report.studyTitle],
+    ['Study ID', report.studyId],
+    ['Version', report.version],
+    ['Author', report.authorName],
+    ['Issued At', report.issuedAt],
+    ['Sections', String(report.sections.length)],
+    ['References', String(report.references.length)],
+  ]);
+
+  const sectionRows = report.sections.map((section) => ({
+    id: section.id,
+    heading: section.heading,
+    level: section.level,
+    body: section.body,
+    highlights: (section.highlights ?? []).join(' | '),
+    references: (section.references ?? []).join(' | '),
+  }));
+
+  const tablesRows = report.sections.flatMap((section) =>
+    (section.tables ?? []).flatMap((table) =>
+      table.rows.map((row, index) => ({
+        section_heading: section.heading,
+        table_caption: table.caption,
+        row_number: index + 1,
+        ...Object.fromEntries(table.columns.map((column, columnIndex) => [column, String(row[columnIndex] ?? '')])),
+      })),
+    ),
+  );
+
+  const referencesRows = report.references.map((reference) => ({
+    id: reference.id,
+    citation: reference.citationText,
+  }));
+
+  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(sectionRows), 'Sections');
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(tablesRows.length ? tablesRows : [{ note: 'No tables supplied in this report' }]),
+    'Tables',
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(referencesRows.length ? referencesRows : [{ note: 'No references supplied in this report' }]),
+    'References',
+  );
+
+  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+};
 
 const normalizeStudyType = (value: unknown) => {
   const normalized = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
@@ -625,6 +859,32 @@ export const reindexKnowledgeReferences = async (_req: Request, res: Response) =
   }
 };
 
+export const exportReportPdf = async (req: Request, res: Response) => {
+  const report = normalizeReportTemplate(req.body?.report);
+  if (!report) {
+    return res.status(400).json({ message: 'Valid report payload is required' });
+  }
+
+  const buffer = await createPdfBufferFromReport(report);
+  const fileName = `${sanitizeFileBaseName(report.studyTitle)}-${sanitizeFileBaseName(report.title)}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  return res.send(buffer);
+};
+
+export const exportReportXlsx = async (req: Request, res: Response) => {
+  const report = normalizeReportTemplate(req.body?.report);
+  if (!report) {
+    return res.status(400).json({ message: 'Valid report payload is required' });
+  }
+
+  const buffer = createXlsxBufferFromReport(report);
+  const fileName = `${sanitizeFileBaseName(report.studyTitle)}-${sanitizeFileBaseName(report.title)}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  return res.send(buffer);
+};
+
 export const queryKnowledgeBase = async (req: Request, res: Response) => {
   try {
     const payload = await queryKnowledgeEngineWithFallback({
@@ -711,6 +971,25 @@ export const getKnowledgeReferences = async (req: Request, res: Response) => {
   } catch (error) {
     return res.status(502).json({
       message: error instanceof Error ? error.message : 'Knowledge references unavailable',
+    });
+  }
+};
+
+export const getKnowledgeReferenceLibraryStatus = async (_req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${analyticsBaseUrl}/knowledge/reference-library-status`, {
+      signal: AbortSignal.timeout(analyticsTimeoutMs),
+    });
+
+    if (!response.ok) {
+      const payload = await getErrorPayload(response);
+      return res.status(response.status).json(payload);
+    }
+
+    return res.json(await response.json());
+  } catch (error) {
+    return res.status(502).json({
+      message: error instanceof Error ? error.message : 'Reference library status unavailable',
     });
   }
 };

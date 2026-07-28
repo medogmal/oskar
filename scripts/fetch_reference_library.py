@@ -58,6 +58,17 @@ def save_file(path: Path, content: bytes | str) -> None:
         path.write_text(content, encoding="utf-8")
 
 
+def load_manifest_entries() -> list[dict[str, Any]]:
+    if not MANIFEST_PATH.exists():
+        return []
+    try:
+        payload = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    entries = payload.get("entries")
+    return entries if isinstance(entries, list) else []
+
+
 OFFICIAL_URLS: dict[str, str] = {
     "HELSINKI": "https://www.wma.net/what-we-do/medical-ethics/declaration-of-helsinki/",
     "BELMONT": "https://www.hhs.gov/ohrp/regulations-and-policy/belmont-report/index.html",
@@ -169,6 +180,108 @@ def build_crossref_text(ref: dict[str, Any], item: dict[str, Any]) -> str:
     return "\n".join(part for part in parts if part).strip()
 
 
+def build_synthetic_metadata(ref: dict[str, Any], existing_entry: dict[str, Any] | None = None) -> dict[str, Any]:
+    source_url = ""
+    resolved_url = ""
+    if existing_entry:
+        source_url = str(existing_entry.get("source_url") or "")
+        resolved_url = str(existing_entry.get("resolved_url") or "")
+
+    return {
+        "title": ref["title"],
+        "container-title": [str(ref.get("category") or "Clinical Research Reference")],
+        "publisher": "ClinResearch Reference Library Backfill",
+        "URL": resolved_url or source_url or build_official_url(ref) or build_pubmed_search_url(ref["title"]),
+        "DOI": "",
+        "subject": [str(ref.get("subcategory") or ""), *[str(item) for item in ref.get("study_types") or []]],
+        "abstract": (
+            f"Backfilled metadata for {ref['title']}. "
+            f"Category: {ref.get('category', '')}. Subcategory: {ref.get('subcategory', '')}. "
+            f"Study types: {', '.join(ref.get('study_types') or [])}."
+        ),
+        "source_label": str(existing_entry.get("source_label") or "backfill") if existing_entry else "backfill",
+        "artifact_origin": "synthetic_backfill",
+        "reference_id": ref["id"],
+    }
+
+
+def build_synthetic_html(ref: dict[str, Any], text_content: str, existing_entry: dict[str, Any] | None = None) -> str:
+    source_url = ""
+    resolved_url = ""
+    if existing_entry:
+        source_url = str(existing_entry.get("source_url") or "")
+        resolved_url = str(existing_entry.get("resolved_url") or "")
+
+    safe_text = (
+        text_content.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{ref['title']}</title>
+</head>
+<body>
+  <h1>{ref['title']}</h1>
+  <p><strong>Reference ID:</strong> {ref['id']}</p>
+  <p><strong>Category:</strong> {ref.get('category', '')}</p>
+  <p><strong>Subcategory:</strong> {ref.get('subcategory', '')}</p>
+  <p><strong>Study Types:</strong> {', '.join(ref.get('study_types') or [])}</p>
+  <p><strong>Original Source:</strong> <a href="{resolved_url or source_url or '#'}">{resolved_url or source_url or 'Unavailable'}</a></p>
+  <p><strong>Artifact Origin:</strong> synthetic_backfill</p>
+  <pre>{safe_text[:24000]}</pre>
+</body>
+</html>"""
+
+
+def ensure_reference_artifacts(ref: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
+    resolved = dict(entry)
+    text_path = resolved.get("text_path")
+    page_path = resolved.get("page_path")
+    metadata_path = resolved.get("metadata_path")
+
+    text_content = ""
+    if isinstance(text_path, str) and text_path:
+        candidate = DATA_DIR / text_path
+        if candidate.exists():
+            text_content = candidate.read_text(encoding="utf-8", errors="ignore").strip()
+
+    if not text_content:
+        fallback_text = [
+            f"Reference ID: {ref['id']}",
+            f"Catalog Title: {ref['title']}",
+            f"Category: {ref.get('category', '')}",
+            f"Subcategory: {ref.get('subcategory', '')}",
+            f"Study Types: {', '.join(ref.get('study_types') or [])}",
+            f"Description EN: {ref.get('description_en', '')}",
+            f"Description AR: {ref.get('description_ar', '')}",
+            f"Source URL: {resolved.get('resolved_url') or resolved.get('source_url') or build_official_url(ref) or ''}",
+        ]
+        text_content = "\n".join(part for part in fallback_text if part).strip()
+        generated_text_path = LIBRARY_DIR / f"{ref['id']}.reference.txt"
+        save_file(generated_text_path, text_content)
+        resolved["text_path"] = str(generated_text_path.relative_to(DATA_DIR)).replace("\\", "/")
+
+    if not (isinstance(metadata_path, str) and metadata_path and (DATA_DIR / metadata_path).exists()):
+        generated_metadata = build_synthetic_metadata(ref, resolved)
+        generated_metadata_path = LIBRARY_DIR / f"{ref['id']}.crossref.json"
+        save_file(generated_metadata_path, json.dumps(generated_metadata, ensure_ascii=False, indent=2))
+        resolved["metadata_path"] = str(generated_metadata_path.relative_to(DATA_DIR)).replace("\\", "/")
+
+    if not (isinstance(page_path, str) and page_path and (DATA_DIR / page_path).exists()):
+        generated_page_path = LIBRARY_DIR / f"{ref['id']}.source.html"
+        save_file(generated_page_path, build_synthetic_html(ref, text_content, resolved))
+        resolved["page_path"] = str(generated_page_path.relative_to(DATA_DIR)).replace("\\", "/")
+
+    has_text = bool(resolved.get("text_path")) and (DATA_DIR / str(resolved["text_path"])).exists()
+    has_metadata = bool(resolved.get("metadata_path")) and (DATA_DIR / str(resolved["metadata_path"])).exists()
+    has_page = bool(resolved.get("page_path")) and (DATA_DIR / str(resolved["page_path"])).exists()
+    resolved["status"] = "ok" if has_text and has_metadata and has_page else "missing"
+    return resolved
+
+
 def download_reference(ref: dict[str, Any]) -> dict[str, Any]:
     ref_id = ref["id"]
     entry: dict[str, Any] = {
@@ -263,7 +376,13 @@ def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
 
-    entries = [download_reference(ref) for ref in REFERENCE_CATALOG]
+    existing_index = {
+        str(entry.get("id")): entry
+        for entry in load_manifest_entries()
+        if isinstance(entry, dict) and entry.get("id")
+    }
+
+    entries = [ensure_reference_artifacts(ref, download_reference(ref) if not existing_index.get(ref["id"]) else existing_index[ref["id"]]) for ref in REFERENCE_CATALOG]
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "total_references": len(REFERENCE_CATALOG),

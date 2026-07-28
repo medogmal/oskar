@@ -2209,6 +2209,90 @@ def get_reference_library_status() -> dict[str, Any]:
     }
 
 
+def get_reference_library_detail() -> dict[str, Any]:
+    manifest_path = Path(__file__).parent.parent / "data" / "reference_sources_manifest.json"
+    if not manifest_path.exists():
+        return {
+            "ready": False,
+            "entries": [],
+            "summary": {
+                "total": 0,
+                "complete": 0,
+                "textBacked": 0,
+                "htmlBacked": 0,
+                "metadataBacked": 0,
+            },
+        }
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    raw_entries = payload.get("entries") if isinstance(payload.get("entries"), list) else []
+    data_dir = Path(__file__).parent.parent / "data"
+    detail_entries: list[dict[str, Any]] = []
+    counts = {
+        "complete": 0,
+        "textBacked": 0,
+        "htmlBacked": 0,
+        "metadataBacked": 0,
+    }
+
+    for entry in raw_entries:
+        if not isinstance(entry, dict):
+            continue
+        text_path = entry.get("text_path")
+        page_path = entry.get("page_path")
+        metadata_path = entry.get("metadata_path")
+        has_text = isinstance(text_path, str) and (data_dir / text_path).exists()
+        has_html = isinstance(page_path, str) and (data_dir / page_path).exists()
+        has_metadata = isinstance(metadata_path, str) and (data_dir / metadata_path).exists()
+        artifact_origin = "original"
+        if has_metadata and isinstance(metadata_path, str):
+            try:
+                metadata_payload = json.loads((data_dir / metadata_path).read_text(encoding="utf-8"))
+                if isinstance(metadata_payload, dict) and metadata_payload.get("artifact_origin") == "synthetic_backfill":
+                    artifact_origin = "synthetic_backfill"
+            except Exception:
+                pass
+
+        if has_text:
+            counts["textBacked"] += 1
+        if has_html:
+            counts["htmlBacked"] += 1
+        if has_metadata:
+            counts["metadataBacked"] += 1
+        if has_text and has_html and has_metadata:
+            counts["complete"] += 1
+
+        detail_entries.append(
+            {
+                "id": str(entry.get("id") or ""),
+                "title": str(entry.get("title") or ""),
+                "studyTypes": entry.get("study_types") if isinstance(entry.get("study_types"), list) else [],
+                "category": str(entry.get("category") or ""),
+                "status": str(entry.get("status") or "unknown"),
+                "sourceLabel": str(entry.get("source_label") or ""),
+                "sourceUrl": str(entry.get("resolved_url") or entry.get("source_url") or ""),
+                "hasText": has_text,
+                "hasHtml": has_html,
+                "hasMetadata": has_metadata,
+                "artifactOrigin": artifact_origin,
+                "textPath": text_path,
+                "htmlPath": page_path,
+                "metadataPath": metadata_path,
+                "errors": entry.get("errors") if isinstance(entry.get("errors"), list) else [],
+            }
+        )
+
+    return {
+        "ready": True,
+        "generatedAt": payload.get("generated_at"),
+        "summary": {
+            "total": len(detail_entries),
+            **counts,
+        },
+        "entries": detail_entries,
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     llm_settings = get_llm_settings()
@@ -2261,6 +2345,11 @@ def list_knowledge_references(study_type: str = Query(default="rct")) -> dict[st
         "referenceCount": len(refs),
         "references": refs,
     }
+
+
+@app.get("/knowledge/reference-library-status")
+def reference_library_status_detail() -> dict[str, Any]:
+    return get_reference_library_detail()
 
 
 @app.post("/dataset/profile")

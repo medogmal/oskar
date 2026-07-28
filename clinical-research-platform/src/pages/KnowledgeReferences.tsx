@@ -35,6 +35,36 @@ type KnowledgeReferencesResponse = {
   references: KnowledgeReference[];
 };
 
+type ReferenceArtifactStatus = {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  hasText: boolean;
+  hasHtml: boolean;
+  hasMetadata: boolean;
+  artifactOrigin: 'original' | 'synthetic_backfill' | string;
+  textPath?: string;
+  htmlPath?: string;
+  metadataPath?: string;
+  errors: string[];
+};
+
+type ReferenceLibraryStatusResponse = {
+  ready: boolean;
+  generatedAt?: string;
+  summary: {
+    total: number;
+    complete: number;
+    textBacked: number;
+    htmlBacked: number;
+    metadataBacked: number;
+  };
+  entries: ReferenceArtifactStatus[];
+};
+
 const STUDY_TYPES = [
   { value: 'rct', label: 'RCT' },
   { value: 'prospective', label: 'Prospective' },
@@ -90,6 +120,9 @@ export default function KnowledgeReferences() {
   const [category, setCategory] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [references, setReferences] = useState<KnowledgeReference[]>([]);
+  const [referenceStatusIndex, setReferenceStatusIndex] = useState<Record<string, ReferenceArtifactStatus>>({});
+  const [librarySummary, setLibrarySummary] = useState<ReferenceLibraryStatusResponse['summary'] | null>(null);
+  const [libraryGeneratedAt, setLibraryGeneratedAt] = useState('');
   const [studyFiles, setStudyFiles] = useState<StudyResourceFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -107,8 +140,13 @@ export default function KnowledgeReferences() {
         setLoading(true);
         setError('');
 
-        const [referencesResponse, files] = await Promise.all([
+        const [referencesResponse, libraryStatusResponse, files] = await Promise.all([
           fetch(`${apiBaseUrl}/analytics/knowledge/references/${encodeURIComponent(studyType)}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          fetch(`${apiBaseUrl}/analytics/knowledge/reference-library-status`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -116,21 +154,30 @@ export default function KnowledgeReferences() {
           studyId ? listStudyFiles(studyId, token) : Promise.resolve([]),
         ]);
 
-        if (!referencesResponse.ok) {
+        if (!referencesResponse.ok || !libraryStatusResponse.ok) {
           throw new Error('Unable to load knowledge references');
         }
 
         const payload = (await referencesResponse.json()) as KnowledgeReferencesResponse;
+        const libraryPayload = (await libraryStatusResponse.json()) as ReferenceLibraryStatusResponse;
         if (cancelled) {
           return;
         }
 
         setReferences(payload.references ?? []);
+        setLibrarySummary(libraryPayload.summary ?? null);
+        setLibraryGeneratedAt(libraryPayload.generatedAt ?? '');
+        setReferenceStatusIndex(
+          Object.fromEntries((libraryPayload.entries ?? []).map((entry) => [entry.id, entry])),
+        );
         setStudyFiles(files);
       } catch {
         if (!cancelled) {
           setError('تعذر تحميل مكتبة المراجع الحالية.');
           setReferences([]);
+          setLibrarySummary(null);
+          setLibraryGeneratedAt('');
+          setReferenceStatusIndex({});
           setStudyFiles([]);
         }
       } finally {
@@ -245,6 +292,31 @@ export default function KnowledgeReferences() {
         <div className="mx-auto max-w-7xl px-6 py-5">
           {error ? <div className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</div> : null}
 
+          {librarySummary ? (
+            <div className="mb-5 grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">Complete References</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-300">{librarySummary.complete} / {librarySummary.total}</div>
+                <div className="mt-1 text-xs text-slate-400">Text + HTML + Metadata</div>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">Text Files</div>
+                <div className="mt-2 text-2xl font-bold text-sky-300">{librarySummary.textBacked}</div>
+                <div className="mt-1 text-xs text-slate-400">Ready for retrieval</div>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">HTML Pages</div>
+                <div className="mt-2 text-2xl font-bold text-violet-300">{librarySummary.htmlBacked}</div>
+                <div className="mt-1 text-xs text-slate-400">Landing/source artifacts</div>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                <div className="text-[11px] uppercase tracking-wider text-slate-500">Metadata Files</div>
+                <div className="mt-2 text-2xl font-bold text-amber-300">{librarySummary.metadataBacked}</div>
+                <div className="mt-1 text-xs text-slate-400">{libraryGeneratedAt ? `Updated ${new Date(libraryGeneratedAt).toLocaleString()}` : 'Manifest summary'}</div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative min-w-[280px] flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -304,6 +376,7 @@ export default function KnowledgeReferences() {
               {filtered.map((reference) => {
                 const isOpen = expandedId === reference.id;
                 const linkedFiles = matchedFiles(reference);
+                const status = referenceStatusIndex[reference.id];
                 return (
                   <div
                     key={reference.id}
@@ -320,6 +393,16 @@ export default function KnowledgeReferences() {
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-slate-300">{reference.id}</span>
                           <span className="rounded-md bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400">{reference.category}</span>
+                          {status ? (
+                            <>
+                              <span className={`rounded-md px-2 py-0.5 text-[10px] ${status.hasText ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>Text</span>
+                              <span className={`rounded-md px-2 py-0.5 text-[10px] ${status.hasHtml ? 'bg-sky-500/15 text-sky-300' : 'bg-rose-500/15 text-rose-300'}`}>HTML</span>
+                              <span className={`rounded-md px-2 py-0.5 text-[10px] ${status.hasMetadata ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>Metadata</span>
+                              <span className={`rounded-md px-2 py-0.5 text-[10px] ${status.artifactOrigin === 'synthetic_backfill' ? 'bg-violet-500/15 text-violet-300' : 'bg-slate-800/70 text-slate-300'}`}>
+                                {status.artifactOrigin === 'synthetic_backfill' ? 'Backfill' : 'Original'}
+                              </span>
+                            </>
+                          ) : null}
                           {reference.study_types.map((type) => (
                             <span key={type} className="rounded-md bg-slate-800/60 px-2 py-0.5 text-[10px] text-slate-400">
                               {type}
@@ -349,6 +432,28 @@ export default function KnowledgeReferences() {
                         </div>
 
                         <div className="space-y-3">
+                          <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                            <div className="mb-2 text-[10px] uppercase tracking-wider text-slate-500">Artifact Health</div>
+                            {status ? (
+                              <div className="space-y-2 text-xs text-slate-300">
+                                <div className="flex flex-wrap gap-2">
+                                  <span className={`rounded-md px-2 py-1 ${status.hasText ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>Text: {status.hasText ? 'Ready' : 'Missing'}</span>
+                                  <span className={`rounded-md px-2 py-1 ${status.hasHtml ? 'bg-sky-500/15 text-sky-300' : 'bg-rose-500/15 text-rose-300'}`}>HTML: {status.hasHtml ? 'Ready' : 'Missing'}</span>
+                                  <span className={`rounded-md px-2 py-1 ${status.hasMetadata ? 'bg-amber-500/15 text-amber-300' : 'bg-rose-500/15 text-rose-300'}`}>Metadata: {status.hasMetadata ? 'Ready' : 'Missing'}</span>
+                                </div>
+                                <div className="text-slate-400">Source label: {status.sourceLabel || 'Not specified'}</div>
+                                <div className="text-slate-400">Artifact origin: {status.artifactOrigin === 'synthetic_backfill' ? 'Synthetic backfill' : 'Original source-backed'}</div>
+                                {status.sourceUrl ? (
+                                  <a href={status.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sky-300 hover:text-sky-200">
+                                    <ExternalLink className="h-3.5 w-3.5" /> Open resolved source
+                                  </a>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400">No artifact health data available for this reference.</p>
+                            )}
+                          </div>
+
                           <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3">
                             <div className="mb-2 text-[10px] uppercase tracking-wider text-slate-500">Reference Actions</div>
                             <div className="flex flex-wrap gap-2">
