@@ -11,6 +11,8 @@ This microservice powers the advanced AI, statistical analytics, RAG knowledge e
 - `pyreadstat` for native SPSS (.sav) dataset ingestion
 - `OpenCV + pytesseract` for image preprocessing (denoising, thresholding, deskewing) and OCR extraction
 - `OpenAI` for GPT-4o powered clinical protocol copilot and evidence-grounded result synthesis
+- `ChromaDB` for persistent vector storage of the indexed reference library and uploaded protocol documents
+- `sentence-transformers` for clinical/biomedical embedding models used by semantic retrieval
 
 ## Installation & Setup
 
@@ -46,3 +48,11 @@ The service runs on `http://127.0.0.1:8001` by default.
 - `OPENAI_API_KEY`: Your OpenAI secret key (e.g. `sk-...`).
 - `OPENAI_MODEL`: Model name (Default: `gpt-4o`).
 - `TESSERACT_CMD`: Path to Tesseract executable (e.g., `C:\Program Files\Tesseract-OCR\tesseract.exe`).
+- `RAG_VECTOR_BACKEND`: Vector database backend. Default: `chroma`.
+- `RAG_VECTOR_COLLECTION`: Optional Chroma collection name override.
+- `CLINICAL_EMBEDDING_MODEL`: Clinical embedding model. Default: `pritamdeka/S-PubMedBert-MS-MARCO`.
+- `CLINICAL_EMBEDDING_DEVICE`: Optional runtime device, such as `cpu` or `cuda`.
+- `RAG_EMBEDDING_PROVIDER`: Use `sentence_transformers` in production. Use `local` only for offline development or CI fallback.
+- `RAG_EMBEDDING_BATCH_SIZE`: Embedding batch size. Default: `16`.
+
+The RAG engine returns `retrieval.embeddingFallbackApplied` and `retrieval.vectorDatabaseBackend` on each query, so production monitoring can detect whether the service is using Chroma + the configured clinical embedding model or the local deterministic fallback.

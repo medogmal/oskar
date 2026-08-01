@@ -1,23 +1,21 @@
 """
-ClinResearch AI — Built-in Local RAG Engine
-=============================================
-Provides grounded RAG retrieval, document chunking, indexing, and citation generation
-filtered by clinical study_type and isolated reference sets.
+ClinResearch AI - Clinical vector-backed RAG engine
+===================================================
+Provides grounded retrieval, document chunking, Chroma vector indexing, hybrid
+BM25 + clinical embedding ranking, study-type isolation, and citation metadata.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import os
 import re
-import hashlib
 from pathlib import Path
 from typing import Any
 
-from .knowledge_catalog import (
-    REFERENCE_CATALOG,
-    get_references_for_study_type,
-)
+from .knowledge_catalog import REFERENCE_CATALOG
 
 SEMANTIC_SYNONYMS: dict[str, list[str]] = {
     "rct": ["randomized", "controlled", "trial", "randomisation", "randomization", "spirit", "consort"],
@@ -34,11 +32,14 @@ SEMANTIC_SYNONYMS: dict[str, list[str]] = {
 }
 
 VECTOR_DIMENSIONS = 256
-EMBEDDING_MODEL_NAME = "local_hashing_embedding_v1"
+LOCAL_FALLBACK_EMBEDDING_MODEL = "local_hashing_embedding_v1"
+DEFAULT_CLINICAL_EMBEDDING_MODEL = "pritamdeka/S-PubMedBert-MS-MARCO"
+DEFAULT_VECTOR_BACKEND = "chroma"
+VECTOR_COLLECTION_NAME = "clinresearch_reference_library"
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize English and Arabic text into lowercase words/terms (min length 2)."""
+    """Tokenize English and Arabic text into lowercase words/terms."""
     return [
         w.lower()
         for w in re.split(r"[^\w]+", text, flags=re.UNICODE)
@@ -54,6 +55,10 @@ def _hash_embedding(tokens: list[str], dimensions: int = VECTOR_DIMENSIONS) -> l
         sign = 1.0 if digest[4] % 2 == 0 else -1.0
         vector[bucket] += sign
 
+    return _normalize_embedding(vector)
+
+
+def _normalize_embedding(vector: list[float]) -> list[float]:
     norm = math.sqrt(sum(value * value for value in vector))
     if norm == 0:
         return vector
@@ -64,6 +69,107 @@ def _cosine_similarity(left: list[float], right: list[float]) -> float:
     if not left or not right or len(left) != len(right):
         return 0.0
     return sum(a * b for a, b in zip(left, right))
+
+
+def _truthy_env(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _safe_collection_suffix(value: str) -> str:
+    digest = hashlib.sha1(value.encode("utf-8")).hexdigest()[:10]
+    return digest
+
+
+class ClinicalEmbeddingProvider:
+    """Lazy clinical embedding provider with a deterministic local fallback."""
+
+    def __init__(self) -> None:
+        self.provider = (os.getenv("RAG_EMBEDDING_PROVIDER") or "sentence_transformers").strip().lower()
+        self.configured_model_name = (os.getenv("CLINICAL_EMBEDDING_MODEL") or DEFAULT_CLINICAL_EMBEDDING_MODEL).strip()
+        self.batch_size = max(1, int(os.getenv("RAG_EMBEDDING_BATCH_SIZE") or "16"))
+        self._model: Any = None
+        self._attempted_load = False
+        self._ready = False
+        self._fallback_reason: str | None = None
+        self._dimensions = VECTOR_DIMENSIONS
+
+    @property
+    def ready(self) -> bool:
+        return self._ready
+
+    @property
+    def dimensions(self) -> int:
+        return self._dimensions
+
+    @property
+    def fallback_applied(self) -> bool:
+        return not self._ready
+
+    @property
+    def fallback_reason(self) -> str | None:
+        return self._fallback_reason
+
+    @property
+    def active_model_name(self) -> str:
+        return self.configured_model_name if self._ready else LOCAL_FALLBACK_EMBEDDING_MODEL
+
+    @property
+    def provider_name(self) -> str:
+        return "sentence-transformers" if self._ready else "local-hashing-fallback"
+
+    def _load_model(self) -> None:
+        if self._attempted_load:
+            return
+        self._attempted_load = True
+
+        if self.provider in {"hash", "local", "local_hashing"}:
+            self._fallback_reason = "Clinical embedding provider disabled by RAG_EMBEDDING_PROVIDER."
+            return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception as error:
+            self._fallback_reason = f"sentence-transformers is unavailable: {error}"
+            return
+
+        try:
+            kwargs: dict[str, Any] = {}
+            device = os.getenv("CLINICAL_EMBEDDING_DEVICE")
+            if device:
+                kwargs["device"] = device
+            if _truthy_env(os.getenv("CLINICAL_EMBEDDING_TRUST_REMOTE_CODE")):
+                kwargs["trust_remote_code"] = True
+            self._model = SentenceTransformer(self.configured_model_name, **kwargs)
+            self._ready = True
+        except Exception as error:
+            self._model = None
+            self._ready = False
+            self._fallback_reason = f"Clinical embedding model could not be loaded: {error}"
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+
+        self._load_model()
+        if self._model is not None:
+            try:
+                embeddings = self._model.encode(
+                    texts,
+                    batch_size=self.batch_size,
+                    normalize_embeddings=True,
+                    convert_to_numpy=True,
+                    show_progress_bar=False,
+                )
+                result = [[float(value) for value in vector] for vector in embeddings.tolist()]
+                if result:
+                    self._dimensions = len(result[0])
+                return result
+            except Exception as error:
+                self._model = None
+                self._ready = False
+                self._fallback_reason = f"Clinical embedding encode failed: {error}"
+
+        return [_hash_embedding(_tokenize(text), VECTOR_DIMENSIONS) for text in texts]
 
 
 class KnowledgeDocument:
@@ -93,18 +199,215 @@ class KnowledgeDocument:
         self.context_tokens = _tokenize(f"{category} {section or ''} {' '.join(self.study_types)}")
         self.embedding = _hash_embedding(self.tokens + self.title_tokens + self.context_tokens)
 
+    def embedding_text(self) -> str:
+        return "\n".join(
+            [
+                f"Title: {self.title}",
+                f"Category: {self.category}",
+                f"Study types: {', '.join(self.study_types)}",
+                f"Section: {self.section or 'General'}",
+                self.content,
+            ]
+        )
+
+    def vector_metadata(self) -> dict[str, str | int | bool]:
+        return {
+            "doc_id": self.doc_id,
+            "title": self.title[:500],
+            "category": self.category,
+            "study_types": ",".join(self.study_types),
+            "source_file": self.source_file or "",
+            "source_url": self.source_url or "",
+            "page": int(self.page or 1),
+            "section": self.section or "General",
+            "is_user_source": self.doc_id.startswith("user_"),
+        }
+
+
+class ChromaVectorStore:
+    def __init__(self, data_dir: Path, collection_name: str) -> None:
+        self.backend = "chroma"
+        self.is_external_vector_database = True
+        self.ready = False
+        self.error: str | None = None
+        self._collection_name = collection_name
+        self._client: Any = None
+        self._collection: Any = None
+
+        try:
+            import chromadb
+
+            store_path = data_dir / "chroma_rag"
+            store_path.mkdir(parents=True, exist_ok=True)
+            self._client = chromadb.PersistentClient(path=str(store_path))
+            self._collection = self._client.get_or_create_collection(
+                name=collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
+            self.ready = True
+        except Exception as error:
+            self.error = str(error)
+
+    def _reset_collection(self) -> None:
+        if self._client is None:
+            return
+        try:
+            self._client.delete_collection(self._collection_name)
+        except Exception:
+            pass
+        self._collection = self._client.get_or_create_collection(
+            name=self._collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+    def upsert(self, documents: list[KnowledgeDocument], embeddings: list[list[float]]) -> None:
+        if not self.ready or self._collection is None or not documents:
+            return
+
+        ids = [doc.doc_id for doc in documents]
+        metadatas = [doc.vector_metadata() for doc in documents]
+        payload_documents = [doc.content[:12000] for doc in documents]
+
+        try:
+            self._collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=payload_documents,
+                metadatas=metadatas,
+            )
+        except Exception as error:
+            if "dimension" not in str(error).lower():
+                raise
+            self._reset_collection()
+            self._collection.upsert(
+                ids=ids,
+                embeddings=embeddings,
+                documents=payload_documents,
+                metadatas=metadatas,
+            )
+
+    def query(self, query_embedding: list[float], limit: int) -> dict[str, float]:
+        if not self.ready or self._collection is None or not query_embedding:
+            return {}
+
+        try:
+            count = max(1, int(self._collection.count()))
+            result = self._collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(max(1, limit), count),
+                include=["distances"],
+            )
+        except Exception as error:
+            self.error = str(error)
+            return {}
+
+        ids = result.get("ids", [[]])
+        distances = result.get("distances", [[]])
+        if not ids or not ids[0]:
+            return {}
+
+        scores: dict[str, float] = {}
+        for doc_id, distance in zip(ids[0], distances[0] if distances else []):
+            try:
+                score = max(0.0, 1.0 - float(distance))
+            except (TypeError, ValueError):
+                score = 0.0
+            scores[str(doc_id)] = score
+        return scores
+
+    def count(self) -> int:
+        if not self.ready or self._collection is None:
+            return 0
+        try:
+            return int(self._collection.count())
+        except Exception:
+            return 0
+
+
+class LocalJsonVectorStore:
+    """Deterministic fallback used when Chroma is not installed or unavailable."""
+
+    def __init__(self, data_dir: Path, chroma_error: str | None = None) -> None:
+        self.backend = "local_json_vector_fallback"
+        self.is_external_vector_database = False
+        self.ready = True
+        self.error = chroma_error
+        self._path = data_dir / "rag_vector_index.json"
+        self._vectors: dict[str, list[float]] = {}
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            payload = json.loads(self._path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        vectors = payload.get("vectors")
+        if isinstance(vectors, dict):
+            self._vectors = {
+                str(key): [float(value) for value in values]
+                for key, values in vectors.items()
+                if isinstance(values, list)
+            }
+
+    def upsert(self, documents: list[KnowledgeDocument], embeddings: list[list[float]]) -> None:
+        for doc, embedding in zip(documents, embeddings):
+            self._vectors[doc.doc_id] = embedding
+        try:
+            self._path.write_text(
+                json.dumps(
+                    {
+                        "backend": self.backend,
+                        "vectors": self._vectors,
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    def query(self, query_embedding: list[float], limit: int) -> dict[str, float]:
+        ranked = [
+            (doc_id, _cosine_similarity(query_embedding, embedding))
+            for doc_id, embedding in self._vectors.items()
+        ]
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        return {doc_id: score for doc_id, score in ranked[:limit] if score > 0}
+
+    def count(self) -> int:
+        return len(self._vectors)
+
 
 class LocalRAGEngine:
-    """Lightweight in-memory RAG engine with TF-IDF/BM25 scoring and study-type isolation."""
+    """Hybrid clinical vector RAG engine with study-type isolation."""
 
     def __init__(self):
         self.documents: list[KnowledgeDocument] = []
+        self.embedding_provider = ClinicalEmbeddingProvider()
+        self.vector_store = self._build_vector_store()
+        self._vector_index_signature: str | None = None
+        self._last_vector_index_error: str | None = None
         self._seed_catalog()
 
     def _get_data_dir(self) -> Path:
         data_dir = Path(__file__).parent.parent / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
         return data_dir
+
+    def _build_vector_store(self) -> ChromaVectorStore | LocalJsonVectorStore:
+        backend = (os.getenv("RAG_VECTOR_BACKEND") or DEFAULT_VECTOR_BACKEND).strip().lower()
+        collection_name = (
+            os.getenv("RAG_VECTOR_COLLECTION")
+            or f"{VECTOR_COLLECTION_NAME}_{_safe_collection_suffix(self.embedding_provider.configured_model_name)}"
+        )
+
+        if backend == "chroma":
+            chroma = ChromaVectorStore(self._get_data_dir(), collection_name)
+            if chroma.ready:
+                return chroma
+            return LocalJsonVectorStore(self._get_data_dir(), chroma.error)
+
+        return LocalJsonVectorStore(self._get_data_dir(), f"Unsupported vector backend configured: {backend}")
 
     def _get_reference_manifest_path(self) -> Path:
         return self._get_data_dir() / "reference_sources_manifest.json"
@@ -222,18 +525,43 @@ class LocalRAGEngine:
             documents.append(doc)
         return documents
 
-    def _seed_catalog(self):
-        """Seed all catalog references into the RAG index."""
+    def _seed_catalog(self) -> None:
         self.documents.extend(self._build_reference_documents())
         self._load_disk_index()
+
+    def _document_fingerprint(self) -> str:
+        hasher = hashlib.sha256()
+        hasher.update(self.embedding_provider.active_model_name.encode("utf-8"))
+        hasher.update(str(len(self.documents)).encode("utf-8"))
+        for doc in self.documents:
+            hasher.update(doc.doc_id.encode("utf-8"))
+            hasher.update(hashlib.sha1(doc.content.encode("utf-8", errors="ignore")).digest())
+        return hasher.hexdigest()
+
+    def _ensure_vector_index(self, force: bool = False) -> None:
+        signature = self._document_fingerprint()
+        if not force and self._vector_index_signature == signature:
+            return
+
+        try:
+            embeddings = self.embedding_provider.embed_texts([doc.embedding_text() for doc in self.documents])
+            for doc, embedding in zip(self.documents, embeddings):
+                doc.embedding = embedding
+            self.vector_store.upsert(self.documents, embeddings)
+            self._vector_index_signature = self._document_fingerprint()
+            self._last_vector_index_error = None
+        except Exception as error:
+            self._last_vector_index_error = str(error)
 
     def reload_reference_library(self) -> dict[str, Any]:
         user_documents = [doc for doc in self.documents if doc.doc_id.startswith("user_")]
         reference_documents = self._build_reference_documents()
         self.documents = [*reference_documents, *user_documents]
+        self._vector_index_signature = None
+        self._ensure_vector_index(force=True)
         metrics = self.get_reference_library_metrics()
         return {
-            "message": "Reference library reindexed from the current manifest.",
+            "message": "Reference library reindexed from the current manifest and vector store.",
             "referenceDocuments": len(reference_documents),
             "userDocumentsRetained": len(user_documents),
             "metrics": metrics,
@@ -271,11 +599,20 @@ class LocalRAGEngine:
         seeded_reference_documents = len([doc for doc in self.documents if not doc.doc_id.startswith("user_")])
         manifest_coverage = (text_backed / len(REFERENCE_CATALOG) * 100.0) if REFERENCE_CATALOG else 0.0
         return {
-            "retrievalEngine": "local_hybrid_bm25_tfidf_synonym_vector_ranker",
-            "embeddingModel": EMBEDDING_MODEL_NAME,
-            "vectorDimensions": VECTOR_DIMENSIONS,
-            "semanticSimilarity": "domain_synonyms_plus_local_vector_cosine",
-            "vectorDatabaseConfigured": True,
+            "retrievalEngine": "clinical_embedding_vector_db_hybrid_bm25_mmr",
+            "embeddingProvider": self.embedding_provider.provider_name,
+            "embeddingModel": self.embedding_provider.active_model_name,
+            "configuredClinicalEmbeddingModel": self.embedding_provider.configured_model_name,
+            "embeddingFallbackApplied": self.embedding_provider.fallback_applied,
+            "embeddingFallbackReason": self.embedding_provider.fallback_reason,
+            "vectorDimensions": self.embedding_provider.dimensions,
+            "semanticSimilarity": "clinical_embedding_cosine_with_bm25_and_mmr",
+            "vectorDatabaseBackend": self.vector_store.backend,
+            "vectorDatabaseConfigured": self.vector_store.is_external_vector_database,
+            "vectorDatabaseReady": self.vector_store.ready,
+            "vectorDatabaseError": self.vector_store.error,
+            "vectorIndexDocumentCount": self.vector_store.count(),
+            "lastVectorIndexError": self._last_vector_index_error,
             "manifestPresent": manifest_present,
             "catalogReferences": len(REFERENCE_CATALOG),
             "manifestEntries": len(manifest_index),
@@ -373,14 +710,24 @@ class LocalRAGEngine:
         concepts: list[str],
         candidate_docs: list[KnowledgeDocument],
         study_type: str | None = None,
+        limit: int = 5,
     ) -> list[tuple[float, KnowledgeDocument]]:
         ranked: list[tuple[float, KnowledgeDocument]] = []
-        query_embedding = _hash_embedding(query_tokens + concepts)
+        if not candidate_docs:
+            return ranked
+
+        self._ensure_vector_index()
+        query_text = " ".join([*query_tokens, *concepts])
+        query_embedding = self.embedding_provider.embed_texts([query_text])[0]
+        vector_scores = self.vector_store.query(query_embedding, max(limit * 8, 24))
+
         for doc in candidate_docs:
             lexical = self._bm25_score(query_tokens, doc, candidate_docs)
             semantic = self._semantic_intent_score(query_tokens, concepts, doc, study_type)
-            vector = _cosine_similarity(query_embedding, doc.embedding)
-            total = lexical + semantic + (max(0.0, vector) * 2.0)
+            vector = vector_scores.get(doc.doc_id)
+            if vector is None:
+                vector = _cosine_similarity(query_embedding, doc.embedding)
+            total = lexical + semantic + (max(0.0, vector) * 3.0)
             if total > 0:
                 ranked.append((total, doc))
         ranked.sort(key=lambda item: item[0], reverse=True)
@@ -425,7 +772,7 @@ class LocalRAGEngine:
     def _get_db_path(self) -> Path:
         return self._get_data_dir() / "rag_index_db.json"
 
-    def _save_disk_index(self):
+    def _save_disk_index(self) -> None:
         """Persist user-ingested documents to disk JSON database."""
         try:
             db_path = self._get_db_path()
@@ -449,7 +796,7 @@ class LocalRAGEngine:
         except Exception:
             pass
 
-    def _load_disk_index(self):
+    def _load_disk_index(self) -> None:
         """Load user-ingested documents from disk JSON database if present."""
         try:
             db_path = self._get_db_path()
@@ -472,7 +819,6 @@ class LocalRAGEngine:
                 self.documents.append(doc)
         except Exception:
             pass
-
 
     def ingest_text(
         self,
@@ -503,16 +849,22 @@ class LocalRAGEngine:
             added_chunks += 1
 
         self._save_disk_index()
+        self._vector_index_signature = None
+        self._ensure_vector_index(force=True)
 
         return {
-            "message": f"Successfully ingested '{filename}' into RAG index.",
+            "message": f"Successfully ingested '{filename}' into RAG vector index.",
             "filename": filename,
             "document_type": document_type,
             "chunks_processed": added_chunks,
             "evidence_rank": 1,
             "evidence_level_label": "User Document Source",
             "is_primary_reference": True,
-            "database_status": "indexed_locally",
+            "database_status": "indexed_in_vector_database"
+            if self.vector_store.is_external_vector_database
+            else "indexed_with_local_vector_fallback",
+            "vector_database_backend": self.vector_store.backend,
+            "embedding_model": self.embedding_provider.active_model_name,
         }
 
     def ingest_pdf_file(
@@ -522,7 +874,7 @@ class LocalRAGEngine:
         document_type: str = "protocol",
         study_type: str | None = "rct",
     ) -> dict[str, Any]:
-        """Ingest a PDF file page-by-page into the RAG index with page-level citations."""
+        """Ingest a PDF file page-by-page into the vector index with page citations."""
         path = Path(filepath)
         if not path.exists():
             return {"error": f"File not found: {filepath}", "chunks_processed": 0}
@@ -532,6 +884,7 @@ class LocalRAGEngine:
 
         try:
             import pypdf
+
             reader = pypdf.PdfReader(str(path))
             for page_idx, page in enumerate(reader.pages, start=1):
                 page_text = page.extract_text() or ""
@@ -557,19 +910,24 @@ class LocalRAGEngine:
             return {"error": f"Failed to extract PDF text: {str(e)}", "chunks_processed": 0}
 
         self._save_disk_index()
+        self._vector_index_signature = None
+        self._ensure_vector_index(force=True)
 
         return {
-            "message": f"Successfully ingested PDF '{doc_name}' ({added_chunks} chunks across pages) into RAG index.",
+            "message": f"Successfully ingested PDF '{doc_name}' ({added_chunks} chunks across pages) into RAG vector index.",
             "filename": doc_name,
             "document_type": document_type,
             "chunks_processed": added_chunks,
-            "total_pages": len(reader.pages) if 'reader' in locals() else 0,
+            "total_pages": len(reader.pages) if "reader" in locals() else 0,
             "evidence_rank": 1,
             "evidence_level_label": "User Uploaded Protocol PDF",
             "is_primary_reference": True,
-            "database_status": "indexed_locally",
+            "database_status": "indexed_in_vector_database"
+            if self.vector_store.is_external_vector_database
+            else "indexed_with_local_vector_fallback",
+            "vector_database_backend": self.vector_store.backend,
+            "embedding_model": self.embedding_provider.active_model_name,
         }
-
 
     def query(
         self,
@@ -578,22 +936,23 @@ class LocalRAGEngine:
         filter_source: str | None = None,
         limit: int = 5,
     ) -> dict[str, Any]:
-        """Perform grounded RAG search with study-type isolation and citations."""
+        """Perform grounded clinical vector RAG search with study-type isolation."""
+        safe_limit = max(1, min(int(limit or 5), 20))
         base_tokens = _tokenize(question)
         q_tokens = self._expand_query_tokens(question, study_type)
         concepts = self._detect_query_concepts(q_tokens, study_type)
         if not q_tokens:
             return {
-                "answer": "الرجاء تقديم استفسار بحثي محدد للبحث في المكتبة المعرفية.",
+                "answer": "Please provide a focused research question to search the indexed clinical references.",
                 "citations": [],
                 "retrieval": {
                     "strategy": "filtered_only",
                     "fallbackApplied": False,
                     "attempts": [{"label": "empty_query", "citationCount": 0, "useful": False}],
+                    **self._retrieval_metadata(),
                 },
             }
 
-        # Filter documents by study_type if specified
         norm_study_type = (study_type or "").strip().lower()
         if norm_study_type:
             candidate_docs = [
@@ -603,13 +962,15 @@ class LocalRAGEngine:
         else:
             candidate_docs = list(self.documents)
 
-        # First Attempt: Search with filter_source if requested
         attempts = []
         effective_docs = candidate_docs
         used_fallback = False
 
         if filter_source:
-            source_matched = [d for d in candidate_docs if filter_source.lower() in d.source_file.lower()]
+            source_matched = [
+                d for d in candidate_docs
+                if d.source_file and filter_source.lower() in d.source_file.lower()
+            ]
             if source_matched:
                 effective_docs = source_matched
                 attempts.append({"label": "filtered_source", "citationCount": len(effective_docs), "useful": True})
@@ -617,14 +978,13 @@ class LocalRAGEngine:
                 used_fallback = True
                 attempts.append({"label": "filtered_source", "citationCount": 0, "useful": False})
 
-        ranked_scores = self._rank_documents(q_tokens, concepts, effective_docs, study_type)
+        ranked_scores = self._rank_documents(q_tokens, concepts, effective_docs, study_type, safe_limit)
 
-        # If filtered search gave no matches, fallback to broader candidate docs
         if not ranked_scores and filter_source and not used_fallback:
             used_fallback = True
-            ranked_scores = self._rank_documents(q_tokens, concepts, candidate_docs, study_type)
+            ranked_scores = self._rank_documents(q_tokens, concepts, candidate_docs, study_type, safe_limit)
 
-        top_matches = self._select_diverse_top_matches(ranked_scores, limit)
+        top_matches = self._select_diverse_top_matches(ranked_scores, safe_limit)
 
         citations = []
         evidence_lines = []
@@ -650,29 +1010,44 @@ class LocalRAGEngine:
 
         if citations:
             answer = (
-                f"بناءً على مراجع المكتبة المعرفية المعتمدة لهذا المنهج:\n\n"
+                "Grounded answer from the approved indexed clinical references:\n\n"
                 + "\n\n".join(evidence_lines[:3])
             )
         else:
             answer = (
-                "لم يتم العثور على مراجع مباشرة تغطي الاستفسار المظبوط بالضبط، "
-                "ولكن تم ربط الجلسة بالمبادئ العامة للبحث العلمي والإحصاء السريري."
+                "No sufficiently grounded indexed reference matched this question. "
+                "The system should not generate a medical answer without supporting citations."
             )
 
         return {
             "answer": answer,
             "citations": citations,
             "retrieval": {
-                "strategy": "semantic_hybrid_vector_ranked",
-                "embeddingModel": EMBEDDING_MODEL_NAME,
-                "vectorDimensions": VECTOR_DIMENSIONS,
+                "strategy": "semantic_hybrid_vector_database_ranked",
                 "fallbackApplied": used_fallback,
                 "effectiveFilterSource": filter_source if not used_fallback else None,
                 "queryTerms": base_tokens[:12],
                 "expandedTerms": q_tokens[:20],
                 "concepts": concepts,
                 "attempts": attempts or [{"label": "search_executed", "citationCount": len(citations), "useful": len(citations) > 0}],
+                **self._retrieval_metadata(),
             },
+        }
+
+    def _retrieval_metadata(self) -> dict[str, Any]:
+        return {
+            "embeddingProvider": self.embedding_provider.provider_name,
+            "embeddingModel": self.embedding_provider.active_model_name,
+            "configuredClinicalEmbeddingModel": self.embedding_provider.configured_model_name,
+            "embeddingFallbackApplied": self.embedding_provider.fallback_applied,
+            "embeddingFallbackReason": self.embedding_provider.fallback_reason,
+            "vectorDimensions": self.embedding_provider.dimensions,
+            "vectorDatabaseBackend": self.vector_store.backend,
+            "vectorDatabaseConfigured": self.vector_store.is_external_vector_database,
+            "vectorDatabaseReady": self.vector_store.ready,
+            "vectorDatabaseError": self.vector_store.error,
+            "vectorIndexDocumentCount": self.vector_store.count(),
+            "lastVectorIndexError": self._last_vector_index_error,
         }
 
     def _expand_query_tokens(self, question: str, study_type: str | None = None) -> list[str]:
@@ -696,5 +1071,4 @@ class LocalRAGEngine:
         return list(expanded)
 
 
-# Global Singleton RAG Engine instance
 rag_engine = LocalRAGEngine()

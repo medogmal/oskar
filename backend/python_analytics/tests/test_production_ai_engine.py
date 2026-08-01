@@ -24,8 +24,11 @@ def test_rag_engine_retrieval_and_citations():
     res = rag.query(question="How to report randomized trials according to CONSORT?", study_type="rct")
 
     assert res["answer"] is not None
-    assert res["retrieval"]["strategy"] == "semantic_hybrid_vector_ranked"
-    assert res["retrieval"]["embeddingModel"] == "local_hashing_embedding_v1"
+    assert res["retrieval"]["strategy"] == "semantic_hybrid_vector_database_ranked"
+    assert res["retrieval"]["embeddingModel"]
+    assert res["retrieval"]["configuredClinicalEmbeddingModel"]
+    assert res["retrieval"]["vectorDatabaseBackend"] in {"chroma", "local_json_vector_fallback"}
+    assert isinstance(res["retrieval"]["embeddingFallbackApplied"], bool)
     assert len(res["citations"]) > 0
     first_citation = res["citations"][0]
     assert "doc_id" in first_citation

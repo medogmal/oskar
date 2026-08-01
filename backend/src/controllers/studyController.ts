@@ -16,7 +16,12 @@ import {
   type ReviewDecision,
 } from '../models/Study.js';
 import { getVariableMatrixByStudy, saveVariableMatrixByStudy } from '../models/VariableMatrix.js';
-import { getGovernanceByStudy, saveGovernanceByStudy } from '../models/Governance.js';
+import {
+  GovernanceValidationError,
+  PhaseApprovalError,
+  getGovernanceByStudy,
+  saveGovernanceByStudy,
+} from '../models/Governance.js';
 import {
   buildBlindingSettings,
   normalizeStudyGroups,
@@ -181,8 +186,26 @@ export const saveStudyGovernanceRecord = async (req: AuthRequest, res: Response)
     return;
   }
 
-  const snapshot = await saveGovernanceByStudy(studyId, req.user!.id, req.body);
-  return res.json(snapshot);
+  try {
+    const snapshot = await saveGovernanceByStudy(studyId, req.user!.id, req.body, req.user!.accountType);
+    return res.json(snapshot);
+  } catch (error) {
+    if (error instanceof PhaseApprovalError) {
+      return res.status(error.statusCode).json({
+        code: error.code,
+        message: error.message,
+        gate: error.details,
+      });
+    }
+    if (error instanceof GovernanceValidationError) {
+      return res.status(error.statusCode).json({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
+    }
+    throw error;
+  }
 };
 
 export const createStudyRecord = async (req: AuthRequest, res: Response) => {

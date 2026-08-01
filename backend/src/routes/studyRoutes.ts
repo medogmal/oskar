@@ -44,6 +44,7 @@ import {
   uploadStudyFile,
 } from '../controllers/studyResourceController.js';
 import { protect } from '../middleware/auth.js';
+import { requireApprovedPriorPhases } from '../middleware/phaseApproval.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   clinicalEvaluationValidator,
@@ -67,6 +68,8 @@ const upload = multer({
     fileSize: 25 * 1024 * 1024,
   },
 });
+const requirePhase2Workflow = requireApprovedPriorPhases(2, 'Phase 2 - CRF design and clinical/statistical logic');
+const requirePhase3Workflow = requireApprovedPriorPhases(3, 'Phase 3 - SAP, analysis, and external evaluation');
 
 router.use(protect);
 router.get('/outcome-assessment/assessor/requests', listOutcomeAssessmentRequestsForAssessorRecord);
@@ -106,28 +109,31 @@ router.get('/review/queue', getSupervisorReviewQueue);
 router.get('/clinical-evaluation/queue', getClinicalEvaluationQueue);
 router.get('/', getStudies);
 router.get('/:id/outcome-assessment/overview', getOutcomeAssessmentOverviewRecord);
-router.post('/:id/outcome-assessment/ai-draft', generateOutcomeAssessmentTemplateDraftRecord);
+router.post('/:id/outcome-assessment/ai-draft', requirePhase2Workflow, generateOutcomeAssessmentTemplateDraftRecord);
 router.post(
   '/:id/outcome-assessment/requests',
+  requirePhase3Workflow,
   createOutcomeAssessmentRequestValidator,
   validateRequest,
   createOutcomeAssessmentRequestsRecord,
 );
 router.post(
   '/:id/outcome-assessment/template',
+  requirePhase2Workflow,
   proposeOutcomeAssessmentTemplateValidator,
   validateRequest,
   createResearcherAssessmentTemplateVersionRecord,
 );
 router.post(
   '/:id/outcome-assessment/samples',
+  requirePhase3Workflow,
   upsertOutcomeAssessmentSamplesValidator,
   validateRequest,
   upsertOutcomeAssessmentSamplesRecord,
 );
 router.get('/:id/outcome-assessment/requests/:requestId/notes', listOutcomeAssessmentNotesRecord);
 router.get('/:id/variable-matrix', getStudyVariableMatrixRecord);
-router.put('/:id/variable-matrix', saveVariableMatrixValidator, validateRequest, saveStudyVariableMatrixRecord);
+router.put('/:id/variable-matrix', requirePhase2Workflow, saveVariableMatrixValidator, validateRequest, saveStudyVariableMatrixRecord);
 router.get('/:id/governance', getStudyGovernanceRecord);
 router.put('/:id/governance', saveGovernanceValidator, validateRequest, saveStudyGovernanceRecord);
 router.post(
@@ -136,7 +142,7 @@ router.post(
   validateRequest,
   createOutcomeAssessmentNoteRecord,
 );
-router.post('/:id/outcome-assessment/template/:versionId/approve', approveOutcomeAssessmentTemplateVersionRecord);
+router.post('/:id/outcome-assessment/template/:versionId/approve', requirePhase2Workflow, approveOutcomeAssessmentTemplateVersionRecord);
 router.get('/:id/resources', getStudyResources);
 router.get('/:id/analyses', getStudyAnalysesList);
 router.get('/:id/analyses/:analysisId/report', downloadAnalysisReportPdf);
@@ -147,11 +153,11 @@ router.get('/:id/files/:fileId/download', downloadStudyFile);
 router.get('/:id', getStudyById);
 router.post('/', createStudyValidator, validateRequest, createStudyRecord);
 router.patch('/:id/design-settings', updateStudyDesignValidator, validateRequest, updateStudyDesignRecord);
-router.post('/:id/lock', lockStudyRecord);
+router.post('/:id/lock', requirePhase3Workflow, lockStudyRecord);
 router.post('/:id/files', upload.single('file'), uploadStudyFile);
-router.post('/:id/analysis/run', upload.single('file'), runPersistedStudyAnalysis);
+router.post('/:id/analysis/run', requirePhase3Workflow, upload.single('file'), runPersistedStudyAnalysis);
 router.post('/:id/review', reviewStudyValidator, validateRequest, reviewStudyRecord);
-router.post('/:id/clinical-evaluation', clinicalEvaluationValidator, validateRequest, evaluateStudyClinicallyRecord);
+router.post('/:id/clinical-evaluation', requirePhase3Workflow, clinicalEvaluationValidator, validateRequest, evaluateStudyClinicallyRecord);
 router.post('/:id/resubmit', resubmitStudyRecord);
 
 export default router;
