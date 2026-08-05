@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Dice5, LoaderCircle, MessageSquare, Plus, Send, ShieldCheck, UserRoundSearch } from 'lucide-react';
 import { apiBaseUrl } from '../lib/auth';
+import StlViewer from './StlViewer';
 
 type StudyFileOption = {
   id: string;
@@ -214,6 +215,20 @@ function OutcomeAssessmentManager({
     () => overview?.samples.find((sample) => sample.id === activeSampleId) ?? null,
     [activeSampleId, overview?.samples],
   );
+  const stlStudyFiles = useMemo(
+    () => studyFiles.filter((file) => file.originalName.toLowerCase().endsWith('.stl')),
+    [studyFiles],
+  );
+  const availableLinkedFiles = useMemo(
+    () => (sampleAssetType === 'stl' ? stlStudyFiles : studyFiles),
+    [sampleAssetType, stlStudyFiles, studyFiles],
+  );
+  const selectedLinkedFile = useMemo(
+    () => studyFiles.find((file) => file.id === linkedFileId) ?? null,
+    [linkedFileId, studyFiles],
+  );
+  const selectedLinkedStlFile =
+    selectedLinkedFile && selectedLinkedFile.originalName.toLowerCase().endsWith('.stl') ? selectedLinkedFile : null;
 
   const studyGroups = overview?.study?.groups?.length ? overview.study.groups : ['Experimental', 'Control'];
   const hasRandomization = Boolean(overview?.study?.hasRandomization);
@@ -859,13 +874,28 @@ function OutcomeAssessmentManager({
                         className="rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">No linked file</option>
-                        {studyFiles.map((file) => (
+                        {availableLinkedFiles.map((file) => (
                           <option key={file.id} value={file.id}>
                             {file.originalName}
                           </option>
                         ))}
                       </select>
                     </div>
+                    {sampleAssetType === 'stl' && stlStudyFiles.length === 0 ? (
+                      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-700">
+                        لا توجد ملفات STL مرفوعة لهذه الدراسة بعد. ارفع ملف `.stl` أولًا من تبويب الملفات ثم اربطه باستمارة الفحص.
+                      </div>
+                    ) : null}
+                    {sampleAssetType === 'stl' && linkedFileId && selectedLinkedStlFile ? (
+                      <div className="mt-4">
+                        <StlViewer
+                          studyId={studyId}
+                          fileId={selectedLinkedStlFile.id}
+                          fileName={selectedLinkedStlFile.originalName}
+                          token={token}
+                        />
+                      </div>
+                    ) : null}
                     <div className="mt-6 flex gap-3">
                       <button type="button" onClick={() => setShowEligibilityModal(false)} className="flex-1 rounded-xl border-2 border-slate-200 py-3 text-sm font-extrabold text-slate-500 transition hover:border-slate-300">
                         إلغاء

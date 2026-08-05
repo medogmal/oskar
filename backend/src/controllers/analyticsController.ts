@@ -437,6 +437,7 @@ const buildKnowledgeQueryCandidates = (input: {
     filter_source: input.filterSource || undefined,
     study_type: input.studyType,
     limit: input.requestedLimit,
+    protocol_text: typeof input.protocolText === 'string' ? input.protocolText : undefined,
   }));
 };
 

@@ -33,7 +33,7 @@ const ensureStudyResourceUser = (req: AuthRequest, res: Response) => {
     return false;
   }
 
-  if (!['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator'].includes(req.user.accountType)) {
+  if (!['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator', 'institution'].includes(req.user.accountType)) {
     res.status(403).json({ message: 'This account cannot access study resources' });
     return false;
   }
@@ -64,6 +64,10 @@ const ensureAccessibleStudy = async (req: AuthRequest, res: Response) => {
   if (!study) {
     res.status(404).json({ message: 'Study not found' });
     return null;
+  }
+
+  if (user.accountType === 'institution') {
+    return study;
   }
 
   const canAccess =

@@ -1789,10 +1789,11 @@ def build_knowledge_evidence_lines(request: AssistantRequest) -> list[str]:
         for citation in citations[:4]:
             if not isinstance(citation, dict):
                 continue
+            title = str(citation.get("title") or citation.get("id") or "").strip()
             source_file = str(citation.get("source_file") or "Unknown source")
             page = citation.get("page")
             section = citation.get("section")
-            parts = [source_file]
+            parts = [part for part in [title, source_file] if part]
             if page not in (None, ""):
                 parts.append(f"p.{page}")
             if section:
@@ -2448,11 +2449,36 @@ class KnowledgeQueryBody(BaseModel):
     study_type: str | None = None
     filter_source: str | None = None
     limit: int = Field(default=5)
+    protocol_text: str | None = None
+    response_language: str | None = None
 
 
 @app.post("/api/v1/query")
 async def query_knowledge_base(body: KnowledgeQueryBody) -> dict[str, Any]:
     q = body.question or body.prompt or ""
+    if body.protocol_text and (
+        "لخص" in q or "تلخيص" in q or "summary" in q.lower() or "summarize" in q.lower()
+    ):
+        extracted = extract_study_elements(body.protocol_text)
+        summary_lines = [
+            "ملخص الدراسة المرسلة:",
+            f"- العنوان: {extracted.get('title') or 'غير محدد'}",
+            f"- الهدف الأساسي: {extracted.get('objective') or 'غير محدد'}",
+            f"- نوع الدراسة المتوقع: {extracted.get('studyTypeGuess') or 'غير محدد'}",
+        ]
+        key_elements = extracted.get("keyElements")
+        if isinstance(key_elements, list) and key_elements:
+            summary_lines.append("- العناصر البارزة:")
+            summary_lines.extend([f"  - {str(item)}" for item in key_elements[:5]])
+        return {
+            "answer": "\n".join(summary_lines),
+            "citations": [],
+            "retrieval": {
+                "strategy": "protocol_text_summary",
+                "fallbackApplied": False,
+                "attempts": [{"label": "direct_protocol_summary", "citationCount": 0, "useful": True}],
+            },
+        }
     return rag_engine.query(
         question=q,
         study_type=body.study_type,

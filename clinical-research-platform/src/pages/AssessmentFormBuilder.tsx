@@ -1,6 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Database, FileText, Image, LoaderCircle, LogOut, Plus, Printer, Save, Trash2, Wand2, X } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Database,
+  FileQuestion,
+  FileText,
+  Home,
+  Image,
+  LoaderCircle,
+  LogOut,
+  Plus,
+  Printer,
+  RefreshCw,
+  Save,
+  ShieldAlert,
+  Trash2,
+  Wand2,
+  Wifi,
+  X,
+} from 'lucide-react';
 import ResearchWorkspaceShell, { buildResearchWorkspaceNav } from '../components/ResearchWorkspaceShell';
 import { useAuth } from '../context/useAuth';
 import { apiBaseUrl } from '../lib/auth';
@@ -100,8 +121,104 @@ function AssessmentFormBuilder() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isApprovingId, setIsApprovingId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{
+    type: 'permission' | 'not_found' | 'locked' | 'network' | 'unknown';
+    message: string;
+    detail?: string;
+    canRetry: boolean;
+  } | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const classifyHttpError = useCallback((response: Response, fallbackMessage: string) => {
+    const status = response.status;
+    if (status === 401 || status === 403) {
+      return {
+        type: 'permission' as const,
+        message: status === 401 ? 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.' : 'ليس لديك صلاحيات إدارة استمارة الفحص لهذه الدراسة.',
+        detail: `HTTP ${status} - ${response.statusText}`,
+        canRetry: status === 401 ? false : false,
+      };
+    }
+    if (status === 404) {
+      return {
+        type: 'not_found' as const,
+        message: 'الدراسة المطلوبة غير موجودة أو تم حذفها من النظام.',
+        detail: `HTTP ${status} - ${response.statusText}`,
+        canRetry: false,
+      };
+    }
+    if (status === 409) {
+      return {
+        type: 'locked' as const,
+        message: 'الدراسة مقفولة للمراجعة الخارجية حالياً، لا يمكن تعديل استمارة الفحص.',
+        detail: `HTTP ${status} - ${response.statusText}`,
+        canRetry: false,
+      };
+    }
+    if (status === 422) {
+      return {
+        type: 'not_found' as const,
+        message: 'بيانات الدراسة غير مكتملة، لا يمكن فتح استمارة الفحص في الوقت الحالي.',
+        detail: `HTTP ${status} - ${response.statusText}`,
+        canRetry: true,
+      };
+    }
+    if (status >= 500) {
+      return {
+        type: 'network' as const,
+        message: 'تعذر الاتصال بخادم البيانات أثناء تحميل استمارة الفحص.',
+        detail: `HTTP ${status} - ${response.statusText}`,
+        canRetry: true,
+      };
+    }
+    return {
+      type: 'unknown' as const,
+      message: fallbackMessage,
+      detail: `HTTP ${status} - ${response.statusText}`,
+      canRetry: true,
+    };
+  }, []);
+
+  const getErrorDisplay = useCallback((err: NonNullable<typeof error>) => {
+    switch (err.type) {
+      case 'permission':
+        return {
+          icon: <ShieldAlert className="h-5 w-5" />,
+          containerClass: 'border-amber-300 bg-amber-50 text-amber-800',
+          iconClass: 'text-amber-600',
+          title: 'مشكلة في الصلاحيات',
+        };
+      case 'not_found':
+        return {
+          icon: <FileQuestion className="h-5 w-5" />,
+          containerClass: 'border-slate-300 bg-slate-50 text-slate-800',
+          iconClass: 'text-slate-600',
+          title: 'عنصر غير موجود',
+        };
+      case 'locked':
+        return {
+          icon: <ShieldAlert className="h-5 w-5" />,
+          containerClass: 'border-indigo-300 bg-indigo-50 text-indigo-800',
+          iconClass: 'text-indigo-600',
+          title: 'الدراسة مقفولة',
+        };
+      case 'network':
+        return {
+          icon: <Wifi className="h-5 w-5" />,
+          containerClass: 'border-sky-300 bg-sky-50 text-sky-800',
+          iconClass: 'text-sky-600',
+          title: 'مشكلة في الاتصال',
+        };
+      case 'unknown':
+      default:
+        return {
+          icon: <AlertCircle className="h-5 w-5" />,
+          containerClass: 'border-rose-300 bg-rose-50 text-rose-800',
+          iconClass: 'text-rose-600',
+          title: 'خطأ',
+        };
+    }
+  }, []);
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationSummary, setGenerationSummary] = useState('');
@@ -130,7 +247,7 @@ function AssessmentFormBuilder() {
     }
 
     try {
-      setError('');
+      setError(null);
       setIsLoading(true);
       const response = await fetch(`${apiBaseUrl}/studies/${id}/outcome-assessment/overview`, {
         headers: {
@@ -139,19 +256,32 @@ function AssessmentFormBuilder() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to load assessment form builder');
+        const fallback = 'تعذر تحميل استمارة الفحص الحالية.';
+        setError(classifyHttpError(response, fallback));
+        setOverview(null);
+        return;
       }
 
       const data = (await response.json()) as OverviewResponse;
       setOverview(data);
       setDraft(data.approvedTemplate?.template ?? data.templateVersions[0]?.template ?? []);
-    } catch {
-      setError('تعذر تحميل استمارة الفحص الحالية.');
+    } catch (loadError) {
+      const fallback = 'تعذر تحميل استمارة الفحص الحالية. يرجى التأكد من اتصالك بالإنترنت وإعادة المحاولة.';
+      if (loadError instanceof Error && /Failed to fetch|NetworkError|aborted/i.test(loadError.message)) {
+        setError({ type: 'network', message: 'لا يوجد اتصال بخادم البيانات.', detail: loadError.message, canRetry: true });
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: loadError instanceof Error ? loadError.message : 'خطأ غير معروف أثناء التحميل.',
+          canRetry: true,
+        });
+      }
       setOverview(null);
     } finally {
       setIsLoading(false);
     }
-  }, [id, token]);
+  }, [id, token, classifyHttpError]);
 
   useEffect(() => {
     void loadOverview();
@@ -203,12 +333,17 @@ function AssessmentFormBuilder() {
 
   const saveTemplate = async () => {
     if (!token || !id || draft.length === 0) {
-      setError('أضف عنصرًا واحدًا على الأقل داخل استمارة الفحص.');
+      setError({
+        type: 'unknown',
+        message: 'أضف عنصرًا واحدًا على الأقل داخل استمارة الفحص.',
+        detail: 'Validation error: empty template',
+        canRetry: false,
+      });
       return;
     }
 
     try {
-      setError('');
+      setError(null);
       setSuccessMessage('');
       setIsSaving(true);
       const response = await fetch(`${apiBaseUrl}/studies/${id}/outcome-assessment/template`, {
@@ -224,14 +359,26 @@ function AssessmentFormBuilder() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to save assessment form');
+        const fallback = 'تعذر حفظ استمارة الفحص حالياً.';
+        setError(classifyHttpError(response, fallback));
+        return;
       }
 
       setChangeNotes('');
       setSuccessMessage('تم حفظ ونشر استمارة الفحص بنجاح.');
       await loadOverview();
-    } catch {
-      setError('تعذر حفظ استمارة الفحص حالياً.');
+    } catch (saveErr) {
+      const fallback = 'تعذر حفظ استمارة الفحص حالياً. يرجى التأكد من الاتصال وإعادة المحاولة.';
+      if (saveErr instanceof Error && /Failed to fetch|NetworkError|aborted/i.test(saveErr.message)) {
+        setError({ type: 'network', message: 'لا يوجد اتصال بخادم البيانات أثناء الحفظ.', detail: saveErr.message, canRetry: true });
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: saveErr instanceof Error ? saveErr.message : 'خطأ غير معروف أثناء الحفظ.',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsSaving(false);
     }
@@ -243,7 +390,7 @@ function AssessmentFormBuilder() {
     }
 
     try {
-      setError('');
+      setError(null);
       setSuccessMessage('');
       setIsApprovingId(versionId);
       const response = await fetch(`${apiBaseUrl}/studies/${id}/outcome-assessment/template/${versionId}/approve`, {
@@ -254,13 +401,25 @@ function AssessmentFormBuilder() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to approve template version');
+        const fallback = 'تعذر اعتماد النسخة المقترحة.';
+        setError(classifyHttpError(response, fallback));
+        return;
       }
 
       setSuccessMessage('تم اعتماد النسخة المقترحة من الاستمارة.');
       await loadOverview();
-    } catch {
-      setError('تعذر اعتماد النسخة المقترحة.');
+    } catch (approveErr) {
+      const fallback = 'تعذر اعتماد النسخة المقترحة. يرجى التأكد من الاتصال وإعادة المحاولة.';
+      if (approveErr instanceof Error && /Failed to fetch|NetworkError|aborted/i.test(approveErr.message)) {
+        setError({ type: 'network', message: 'لا يوجد اتصال بخادم البيانات أثناء الاعتماد.', detail: approveErr.message, canRetry: true });
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: approveErr instanceof Error ? approveErr.message : 'خطأ غير معروف أثناء الاعتماد.',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsApprovingId(null);
     }
@@ -269,7 +428,7 @@ function AssessmentFormBuilder() {
   const generateWithAI = async () => {
     if (!token || !id) return;
     try {
-      setError('');
+      setError(null);
       setSuccessMessage('');
       setIsGenerating(true);
 
@@ -282,8 +441,19 @@ function AssessmentFormBuilder() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || 'فشل التوليد عبر الذكاء الاصطناعي');
+        const fallback = 'فشل التوليد عبر الذكاء الاصطناعي';
+        const classified = classifyHttpError(response, fallback);
+        try {
+          const payload = await response.json().catch(() => ({}));
+          if (payload.message) {
+            setError({ ...classified, message: payload.message });
+          } else {
+            setError(classified);
+          }
+        } catch {
+          setError(classified);
+        }
+        return;
       }
 
       const data = (await response.json()) as AiDraftResponse;
@@ -307,10 +477,25 @@ function AssessmentFormBuilder() {
         setShowGenerationModal(true);
         setSuccessMessage('تم توليد الاستمارة بنجاح عبر الذكاء الاصطناعي.');
       } else {
-        throw new Error('لم يتمكن الذكاء الاصطناعي من استخراج هيكل صحيح للاستمارة.');
+        setError({
+          type: 'unknown',
+          message: 'لم يتمكن الذكاء الاصطناعي من استخراج هيكل صحيح للاستمارة.',
+          detail: 'AI response does not contain valid fields array',
+          canRetry: true,
+        });
       }
     } catch (event: unknown) {
-      setError(event instanceof Error ? event.message : 'حدث خطأ غير متوقع أثناء المعالجة بالذكاء الاصطناعي.');
+      const fallback = 'حدث خطأ غير متوقع أثناء المعالجة بالذكاء الاصطناعي.';
+      if (event instanceof Error && /Failed to fetch|NetworkError|aborted/i.test(event.message)) {
+        setError({ type: 'network', message: 'لا يوجد اتصال بخادم البيانات أثناء التوليد بالذكاء الاصطناعي.', detail: event.message, canRetry: true });
+      } else {
+        setError({
+          type: 'unknown',
+          message: event instanceof Error ? event.message : fallback,
+          detail: event instanceof Error ? event.stack || event.message : 'خطأ غير معروف أثناء التوليد.',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -347,7 +532,53 @@ function AssessmentFormBuilder() {
       }
     >
       <div>
-        {error ? <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
+        {error ? (() => {
+          const display = getErrorDisplay(error);
+          return (
+            <div className={`mb-6 rounded-2xl border p-4 text-sm ${display.containerClass}`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 ${display.iconClass}`}>{display.icon}</div>
+                <div className="flex-1">
+                  <p className="font-bold">{display.title}</p>
+                  <p className="mt-1">{error.message}</p>
+                  {error.detail ? (
+                    <p className="mt-1 text-xs opacity-75">التفاصيل الفنية: {error.detail}</p>
+                  ) : null}
+                </div>
+                {error.canRetry ? (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadOverview()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-bold ring-1 ring-black/5 hover:bg-white"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      إعادة المحاولة
+                    </button>
+                    {error.type === 'permission' && (
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-bold ring-1 ring-black/5 hover:bg-white"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        تسجيل الدخول
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="rounded-lg p-1 text-current/60 hover:bg-white/50 hover:text-current"
+                  aria-label="إغلاق"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })() : null}
         {successMessage ? <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{successMessage}</div> : null}
 
         {isLoading ? (

@@ -1,7 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FileText, Home, LoaderCircle, LogOut, Save, Send, ShieldCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  FileQuestion,
+  FileText,
+  Home,
+  LoaderCircle,
+  LogOut,
+  RefreshCw,
+  Save,
+  Send,
+  ShieldAlert,
+  ShieldCheck,
+  Wifi,
+} from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import StlViewer from '../components/StlViewer';
 import { useAuth } from '../context/useAuth';
 import { apiBaseUrl } from '../lib/auth';
 
@@ -81,11 +96,58 @@ function OutcomeAssessmentWorkspace() {
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false);
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{
+    type: 'permission' | 'not_found' | 'no_template' | 'network' | 'unknown';
+    message: string;
+    detail?: string;
+    canRetry: boolean;
+  } | null>(null);
 
   const handleLogout = () => {
     signOut();
     navigate('/login');
+  };
+
+  const classifyHttpError = (response: Response, fallbackMessage: string) => {
+    const status = response.status;
+    if (status === 401 || status === 403) {
+      return {
+        type: 'permission' as const,
+        message: 'ليس لديك صلاحية الوصول إلى مساحة الفحص هذه',
+        detail: status === 401 ? 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى.' : 'تم رفض الوصول. تحقق من أنك قمت بتسجيل الدخول بالحساب الصحيح كمقيم سريري.',
+        canRetry: status === 403,
+      };
+    }
+    if (status === 404) {
+      return {
+        type: 'not_found' as const,
+        message: 'لم يتم العثور على طلب الفحص أو الدراسة',
+        detail: 'قد يكون طلب الفحص قد تم حذفه أو الرابط غير صحيح. تواصل مع فريق البحث للحصول على رابط صالح.',
+        canRetry: false,
+      };
+    }
+    if (status === 422 || status === 409) {
+      return {
+        type: 'no_template' as const,
+        message: 'نموذج الفحص غير متوفر حالياً',
+        detail: 'لم يتم تعريف نموذج التقييم لهذه الدراسة بعد. انتظر من المشرف تجهيز النموذج أو تواصل مع فريق البحث.',
+        canRetry: true,
+      };
+    }
+    if (status >= 500) {
+      return {
+        type: 'network' as const,
+        message: 'خطأ في الخادم أثناء تحميل مساحة الفحص',
+        detail: `الخادم أعاد رمز الخطأ ${status}. يحب إعادة المحاولة بعد قليل.`,
+        canRetry: true,
+      };
+    }
+    return {
+      type: 'unknown' as const,
+      message: fallbackMessage,
+      detail: `رمز الاستجابة: ${status}`,
+      canRetry: true,
+    };
   };
 
   const loadWorkspace = useCallback(async () => {
@@ -95,7 +157,7 @@ function OutcomeAssessmentWorkspace() {
     }
 
     try {
-      setError('');
+      setError(null);
       setIsLoading(true);
       const response = await fetch(`${apiBaseUrl}/studies/outcome-assessment/assessor/requests/${requestId}/workspace`, {
         headers: {
@@ -104,19 +166,47 @@ function OutcomeAssessmentWorkspace() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to load assessor workspace');
+        throw Object.assign(new Error('HTTPError'), { status: response.status, response });
       }
 
       const data = (await response.json()) as WorkspaceData;
       setWorkspace(data);
       setTemplateDraft(data.approvedTemplate?.template ?? []);
 
+      if (!data.approvedTemplate || data.approvedTemplate.template.length === 0) {
+        setError({
+          type: 'no_template',
+          message: 'لا يوجد نموذج فحص معتمد للدراسة حالياً',
+          detail: 'لم يتم اعتماد نموذج التقييم النهائي. يمكنك اقتراح نموذج بديل أدناه أو التواصل مع فريق البحث لتفعيل النموذج.',
+          canRetry: true,
+        });
+      }
+
       if (!selectedSampleId && data.samples[0]) {
         setSelectedSampleId(data.samples[0].id);
       }
-    } catch {
-      setError('Unable to load assessor workspace.');
+    } catch (loadError) {
       setWorkspace(null);
+      if (loadError instanceof Error && loadError.message === 'HTTPError' && 'status' in loadError && 'response' in loadError) {
+        const status = Number(loadError.status);
+        const fallback = 'تعذر تحميل مساحة عمل المقيم السريري.';
+        const fakeResponse = { status } as Response;
+        setError(classifyHttpError(fakeResponse, fallback));
+      } else if (loadError instanceof TypeError && /failed to fetch|networkerror/i.test(loadError.message)) {
+        setError({
+          type: 'network',
+          message: 'تعذر الاتصال بالخادم',
+          detail: 'تحقق من اتصال الإنترنت الخاص بك أو إعادة المحاولة بعد قليل.',
+          canRetry: true,
+        });
+      } else {
+        setError({
+          type: 'unknown',
+          message: 'تعذر تحميل مساحة عمل المقيم السريري.',
+          detail: loadError instanceof Error ? loadError.message : 'خطأ غير معروف',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -154,7 +244,7 @@ function OutcomeAssessmentWorkspace() {
     }
 
     try {
-      setError('');
+      setError(null);
       if (submit) {
         setIsSubmittingEntry(true);
       } else {
@@ -177,12 +267,23 @@ function OutcomeAssessmentWorkspace() {
       );
 
       if (!response.ok) {
-        throw new Error('Unable to update assessment entry');
+        throw Object.assign(new Error('HTTPError'), { status: response.status });
       }
 
       await loadWorkspace();
-    } catch {
-      setError(submit ? 'Unable to submit assessment.' : 'Unable to save assessment draft.');
+    } catch (saveError) {
+      const fallback = submit ? 'تعذر إرسال التقييم.' : 'تعذر حفظ مسودة التقييم.';
+      if (saveError instanceof Error && saveError.message === 'HTTPError' && 'status' in saveError) {
+        const fakeResponse = { status: Number(saveError.status) } as Response;
+        setError(classifyHttpError(fakeResponse, fallback));
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: saveError instanceof Error ? saveError.message : 'خطأ غير معروف',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsSavingEntry(false);
       setIsSubmittingEntry(false);
@@ -220,7 +321,7 @@ function OutcomeAssessmentWorkspace() {
     }
 
     try {
-      setError('');
+      setError(null);
       setIsSubmittingTemplate(true);
       const response = await fetch(`${apiBaseUrl}/studies/outcome-assessment/assessor/requests/${requestId}/template`, {
         method: 'POST',
@@ -235,13 +336,24 @@ function OutcomeAssessmentWorkspace() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to propose assessment template');
+        throw Object.assign(new Error('HTTPError'), { status: response.status });
       }
 
       setTemplateChangeNotes('');
       await loadWorkspace();
-    } catch {
-      setError('Unable to submit template changes for approval.');
+    } catch (templateError) {
+      const fallback = 'تعذر إرسال تعديلات النموذج للموافقة.';
+      if (templateError instanceof Error && templateError.message === 'HTTPError' && 'status' in templateError) {
+        const fakeResponse = { status: Number(templateError.status) } as Response;
+        setError(classifyHttpError(fakeResponse, fallback));
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: templateError instanceof Error ? templateError.message : 'خطأ غير معروف',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsSubmittingTemplate(false);
     }
@@ -253,7 +365,7 @@ function OutcomeAssessmentWorkspace() {
     }
 
     try {
-      setError('');
+      setError(null);
       setIsSubmittingNote(true);
       const response = await fetch(`${apiBaseUrl}/studies/outcome-assessment/assessor/requests/${requestId}/notes`, {
         method: 'POST',
@@ -268,13 +380,24 @@ function OutcomeAssessmentWorkspace() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to send note');
+        throw Object.assign(new Error('HTTPError'), { status: response.status });
       }
 
       setNoteMessage('');
       await loadWorkspace();
-    } catch {
-      setError('Unable to send note.');
+    } catch (noteError) {
+      const fallback = 'تعذر إرسال الملاحظة.';
+      if (noteError instanceof Error && noteError.message === 'HTTPError' && 'status' in noteError) {
+        const fakeResponse = { status: Number(noteError.status) } as Response;
+        setError(classifyHttpError(fakeResponse, fallback));
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: noteError instanceof Error ? noteError.message : 'خطأ غير معروف',
+          canRetry: true,
+        });
+      }
     } finally {
       setIsSubmittingNote(false);
     }
@@ -285,26 +408,41 @@ function OutcomeAssessmentWorkspace() {
       return;
     }
 
-    const response = await fetch(`${apiBaseUrl}/studies/${workspace.request.studyId}/files/${fileId}/download`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      setError(null);
+      const response = await fetch(`${apiBaseUrl}/studies/${workspace.request.studyId}/files/${fileId}/download`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!response.ok) {
-      setError('Unable to download blinded sample asset.');
-      return;
+      if (!response.ok) {
+        throw Object.assign(new Error('HTTPError'), { status: response.status });
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      const fallback = 'تعذر تحميل ملف العينة المحجوب.';
+      if (downloadError instanceof Error && downloadError.message === 'HTTPError' && 'status' in downloadError) {
+        const fakeResponse = { status: Number(downloadError.status) } as Response;
+        setError(classifyHttpError(fakeResponse, fallback));
+      } else {
+        setError({
+          type: 'unknown',
+          message: fallback,
+          detail: downloadError instanceof Error ? downloadError.message : 'خطأ غير معروف',
+          canRetry: true,
+        });
+      }
     }
-
-    const blob = await response.blob();
-    const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = fileName;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(objectUrl);
   };
 
   return (
@@ -356,16 +494,120 @@ function OutcomeAssessmentWorkspace() {
             </div>
           </div>
 
-          {error ? <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
+          {error ? (
+            <div className={`mb-6 rounded-2xl border p-5 shadow-sm ${
+              error.type === 'permission' ? 'border-amber-200 bg-amber-50' :
+              error.type === 'not_found' ? 'border-slate-200 bg-slate-50' :
+              error.type === 'no_template' ? 'border-sky-200 bg-sky-50' :
+              error.type === 'network' ? 'border-orange-200 bg-orange-50' :
+              'border-rose-200 bg-rose-50'
+            }`}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                    error.type === 'permission' ? 'bg-amber-100 text-amber-700' :
+                    error.type === 'not_found' ? 'bg-slate-100 text-slate-700' :
+                    error.type === 'no_template' ? 'bg-sky-100 text-sky-700' :
+                    error.type === 'network' ? 'bg-orange-100 text-orange-700' :
+                    'bg-rose-100 text-rose-700'
+                  }`}>
+                    {error.type === 'permission' ? <ShieldAlert className="h-5 w-5" /> :
+                     error.type === 'not_found' ? <FileQuestion className="h-5 w-5" /> :
+                     error.type === 'no_template' ? <FileText className="h-5 w-5" /> :
+                     error.type === 'network' ? <Wifi className="h-5 w-5" /> :
+                     <AlertCircle className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className={`text-sm font-black ${
+                      error.type === 'permission' ? 'text-amber-900' :
+                      error.type === 'not_found' ? 'text-slate-900' :
+                      error.type === 'no_template' ? 'text-sky-900' :
+                      error.type === 'network' ? 'text-orange-900' :
+                      'text-rose-900'
+                    }`}>{error.message}</h3>
+                    {error.detail ? (
+                      <p className={`mt-1 text-xs ${
+                        error.type === 'permission' ? 'text-amber-700' :
+                        error.type === 'not_found' ? 'text-slate-600' :
+                        error.type === 'no_template' ? 'text-sky-700' :
+                        error.type === 'network' ? 'text-orange-700' :
+                        'text-rose-700'
+                      }`}>{error.detail}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                  {error.type === 'permission' ? (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>تسجيل الدخول بحساب آخر</span>
+                    </button>
+                  ) : null}
+                  {error.type === 'not_found' ? (
+                    <Link
+                      to="/clinical-evaluator-dashboard"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      <span>العودة إلى لوحة المقيم</span>
+                    </Link>
+                  ) : null}
+                  {error.canRetry ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadWorkspace()}
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span>إعادة المحاولة</span>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {isLoading ? (
             <div className="flex min-h-[300px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center gap-3 text-slate-600">
                 <LoaderCircle className="h-5 w-5 animate-spin" />
-                <span>Loading workspace...</span>
+                <span>جارٍ تحميل مساحة الفحص...</span>
               </div>
             </div>
-          ) : !workspace ? null : (
+          ) : !workspace ? (
+            <div className="rounded-2xl bg-white p-10 shadow-sm ring-1 ring-slate-200">
+              <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-500">
+                  <FileQuestion className="h-8 w-8" />
+                </div>
+                <h2 className="mt-6 text-xl font-black text-slate-900">مساحة الفحص غير متاحة</h2>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  لم يتم تحميل بيانات طلب الفحص الحالي. قد يكون السبب نهاية صلاحية الجلسة، أو عدم وجود صلاحيات، أو حذف الطلب من قِبل فريق البحث.
+                </p>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void loadWorkspace()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span>تحديث الصفحة</span>
+                  </button>
+                  <Link
+                    to="/clinical-evaluator-dashboard"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Home className="h-4 w-4" />
+                    <span>العودة إلى لوحة التحكم</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
             <div className="grid gap-6">
               <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 <div className="flex items-center gap-2">
@@ -431,6 +673,16 @@ function OutcomeAssessmentWorkspace() {
                           <div key={asset.id} className="rounded-2xl border border-slate-200 p-4">
                             <p className="font-semibold text-slate-900">{asset.assetType}</p>
                             <p className="mt-1 text-sm text-slate-500">{asset.originalName}</p>
+                            {asset.assetType === 'stl' ? (
+                              <div className="mt-4">
+                                <StlViewer
+                                  studyId={workspace.request.studyId}
+                                  fileId={asset.fileId}
+                                  fileName={asset.originalName}
+                                  token={token!}
+                                />
+                              </div>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => void downloadFile(asset.fileId, asset.originalName)}

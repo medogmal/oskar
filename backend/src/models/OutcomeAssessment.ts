@@ -186,6 +186,26 @@ type AssessmentNoteRow = {
 
 const asIsoString = (value: Date | string | null | undefined) => (value ? new Date(value).toISOString() : undefined);
 
+const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
+
+const isDevLocalId = (id?: string | number | null) =>
+  typeof id === 'string' && /^dev_(study|file|analysis|request|sample|template|entry|note)_/i.test(id);
+
+const isDatabaseUnavailable = (error: unknown, contextId?: string | number | null) => {
+  if (!localAuthFallbackEnabled() || !(error instanceof Error)) {
+    return false;
+  }
+  if (/Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message)) {
+    return true;
+  }
+  if (isDevLocalId(contextId) && /invalid input syntax for type (bigint|integer)/i.test(error.message)) {
+    return true;
+  }
+  return false;
+};
+
+const createLocalId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
 const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T => {
   if (value == null) {
     return fallback;
@@ -410,203 +430,249 @@ const updateRequestProgress = async (requestId: string) => {
 };
 
 export const ensureStudyAssessmentTemplate = async (studyId: string, createdByUserId: string, studyType: string) => {
-  const existing = await query<AssessmentTemplateVersionRow>(
-    `
-      SELECT
-        versions.*,
-        creator.full_name AS created_by_name,
-        approver.full_name AS approved_by_name
-      FROM study_outcome_assessment_template_versions AS versions
-      JOIN users AS creator ON creator.id = versions.created_by_user_id
-      LEFT JOIN users AS approver ON approver.id = versions.approved_by_user_id
-      WHERE versions.study_id = $1
-        AND versions.approval_status = 'approved'
-      ORDER BY versions.version_number DESC
-      LIMIT 1
-    `,
-    [studyId],
-  );
+  try {
+    const existing = await query<AssessmentTemplateVersionRow>(
+      `
+        SELECT
+          versions.*,
+          creator.full_name AS created_by_name,
+          approver.full_name AS approved_by_name
+        FROM study_outcome_assessment_template_versions AS versions
+        JOIN users AS creator ON creator.id = versions.created_by_user_id
+        LEFT JOIN users AS approver ON approver.id = versions.approved_by_user_id
+        WHERE versions.study_id = $1
+          AND versions.approval_status = 'approved'
+        ORDER BY versions.version_number DESC
+        LIMIT 1
+      `,
+      [studyId],
+    );
 
-  if (existing.rows[0]) {
-    return mapTemplateVersionRow(existing.rows[0]);
+    if (existing.rows[0]) {
+      return mapTemplateVersionRow(existing.rows[0]);
+    }
+
+    const created = await query<AssessmentTemplateVersionRow>(
+      `
+        INSERT INTO study_outcome_assessment_template_versions (
+          study_id,
+          version_number,
+          created_by_user_id,
+          approval_status,
+          template_json,
+          approved_by_user_id,
+          approved_at,
+          updated_at
+        )
+        VALUES ($1, 1, $2, 'approved', $3::jsonb, $2, NOW(), NOW())
+        RETURNING
+          *,
+          NULL::TEXT AS created_by_name,
+          NULL::TEXT AS approved_by_name
+      `,
+      [studyId, createdByUserId, JSON.stringify(inferTemplateByStudyType(studyType))],
+    );
+
+    return mapTemplateVersionRow(created.rows[0]);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    const now = new Date().toISOString();
+    return {
+      id: createLocalId('dev_template'),
+      studyId,
+      versionNumber: 1,
+      approvalStatus: 'approved' as const,
+      createdByUserId,
+      template: inferTemplateByStudyType(studyType),
+      createdAt: now,
+      approvedAt: now,
+    } satisfies AssessmentTemplateVersionSummary;
   }
-
-  const created = await query<AssessmentTemplateVersionRow>(
-    `
-      INSERT INTO study_outcome_assessment_template_versions (
-        study_id,
-        version_number,
-        created_by_user_id,
-        approval_status,
-        template_json,
-        approved_by_user_id,
-        approved_at,
-        updated_at
-      )
-      VALUES ($1, 1, $2, 'approved', $3::jsonb, $2, NOW(), NOW())
-      RETURNING
-        *,
-        NULL::TEXT AS created_by_name,
-        NULL::TEXT AS approved_by_name
-    `,
-    [studyId, createdByUserId, JSON.stringify(inferTemplateByStudyType(studyType))],
-  );
-
-  return mapTemplateVersionRow(created.rows[0]);
 };
 
 export const listOutcomeAssessmentRequestsForStudy = async (studyId: string): Promise<AssessmentRequestSummary[]> => {
-  const result = await query<AssessmentRequestRow>(
-    `
-      SELECT
-        requests.id,
-        requests.study_id,
-        studies.title AS study_title,
-        studies.study_type,
-        requests.assessor_user_id,
-        assessor.full_name AS assessor_name,
-        assessor.academic_id AS assessor_academic_id,
-        requests.requested_by_user_id,
-        requester.full_name AS requested_by_name,
-        requests.request_status,
-        requests.assessment_type,
-        requests.deadline_at,
-        requests.samples_required,
-        COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
-        requests.optional_message,
-        requests.created_at,
-        requests.accepted_at,
-        requests.completed_at
-      FROM study_outcome_assessment_requests AS requests
-      JOIN studies ON studies.id = requests.study_id
-      JOIN users AS assessor ON assessor.id = requests.assessor_user_id
-      JOIN users AS requester ON requester.id = requests.requested_by_user_id
-      LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
-      WHERE requests.study_id = $1
-      GROUP BY requests.id, studies.id, assessor.id, requester.id
-      ORDER BY requests.created_at DESC
-    `,
-    [studyId],
-  );
+  try {
+    const result = await query<AssessmentRequestRow>(
+      `
+        SELECT
+          requests.id,
+          requests.study_id,
+          studies.title AS study_title,
+          studies.study_type,
+          requests.assessor_user_id,
+          assessor.full_name AS assessor_name,
+          assessor.academic_id AS assessor_academic_id,
+          requests.requested_by_user_id,
+          requester.full_name AS requested_by_name,
+          requests.request_status,
+          requests.assessment_type,
+          requests.deadline_at,
+          requests.samples_required,
+          COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
+          requests.optional_message,
+          requests.created_at,
+          requests.accepted_at,
+          requests.completed_at
+        FROM study_outcome_assessment_requests AS requests
+        JOIN studies ON studies.id = requests.study_id
+        JOIN users AS assessor ON assessor.id = requests.assessor_user_id
+        JOIN users AS requester ON requester.id = requests.requested_by_user_id
+        LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
+        WHERE requests.study_id = $1
+        GROUP BY requests.id, studies.id, assessor.id, requester.id
+        ORDER BY requests.created_at DESC
+      `,
+      [studyId],
+    );
 
-  return result.rows.map(mapRequestRow);
+    return result.rows.map(mapRequestRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const listOutcomeAssessmentRequestsForAssessor = async (
   assessorUserId: string,
 ): Promise<AssessmentRequestSummary[]> => {
-  const result = await query<AssessmentRequestRow>(
-    `
-      SELECT
-        requests.id,
-        requests.study_id,
-        studies.title AS study_title,
-        studies.study_type,
-        requests.assessor_user_id,
-        assessor.full_name AS assessor_name,
-        assessor.academic_id AS assessor_academic_id,
-        requests.requested_by_user_id,
-        requester.full_name AS requested_by_name,
-        requests.request_status,
-        requests.assessment_type,
-        requests.deadline_at,
-        requests.samples_required,
-        COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
-        requests.optional_message,
-        requests.created_at,
-        requests.accepted_at,
-        requests.completed_at
-      FROM study_outcome_assessment_requests AS requests
-      JOIN studies ON studies.id = requests.study_id
-      JOIN users AS assessor ON assessor.id = requests.assessor_user_id
-      JOIN users AS requester ON requester.id = requests.requested_by_user_id
-      LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
-      WHERE requests.assessor_user_id = $1
-      GROUP BY requests.id, studies.id, assessor.id, requester.id
-      ORDER BY requests.updated_at DESC, requests.created_at DESC
-    `,
-    [assessorUserId],
-  );
+  try {
+    const result = await query<AssessmentRequestRow>(
+      `
+        SELECT
+          requests.id,
+          requests.study_id,
+          studies.title AS study_title,
+          studies.study_type,
+          requests.assessor_user_id,
+          assessor.full_name AS assessor_name,
+          assessor.academic_id AS assessor_academic_id,
+          requests.requested_by_user_id,
+          requester.full_name AS requested_by_name,
+          requests.request_status,
+          requests.assessment_type,
+          requests.deadline_at,
+          requests.samples_required,
+          COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
+          requests.optional_message,
+          requests.created_at,
+          requests.accepted_at,
+          requests.completed_at
+        FROM study_outcome_assessment_requests AS requests
+        JOIN studies ON studies.id = requests.study_id
+        JOIN users AS assessor ON assessor.id = requests.assessor_user_id
+        JOIN users AS requester ON requester.id = requests.requested_by_user_id
+        LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
+        WHERE requests.assessor_user_id = $1
+        GROUP BY requests.id, studies.id, assessor.id, requester.id
+        ORDER BY requests.updated_at DESC, requests.created_at DESC
+      `,
+      [assessorUserId],
+    );
 
-  return result.rows.map(mapRequestRow);
+    return result.rows.map(mapRequestRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, assessorUserId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const listOutcomeAssessmentSamplesForStudy = async (studyId: string): Promise<AssessmentSampleSummary[]> => {
-  const sampleResult = await query<AssessmentSampleRow>(
-    `
-      SELECT *
-      FROM study_outcome_assessment_samples
-      WHERE study_id = $1
-      ORDER BY created_at ASC
-    `,
-    [studyId],
-  );
+  try {
+    const sampleResult = await query<AssessmentSampleRow>(
+      `
+        SELECT *
+        FROM study_outcome_assessment_samples
+        WHERE study_id = $1
+        ORDER BY created_at ASC
+      `,
+      [studyId],
+    );
 
-  if (sampleResult.rows.length === 0) {
+    if (sampleResult.rows.length === 0) {
+      return [];
+    }
+
+    const sampleIds = sampleResult.rows.map((row) => String(row.id));
+    const assetResult = await query<AssessmentSampleAssetRow>(
+      `
+        SELECT
+          assets.id,
+          assets.sample_id,
+          assets.file_id,
+          files.original_name,
+          assets.asset_type
+        FROM study_outcome_assessment_sample_files AS assets
+        JOIN study_files AS files ON files.id = assets.file_id
+        WHERE assets.sample_id = ANY($1::bigint[])
+        ORDER BY assets.created_at ASC
+      `,
+      [sampleIds],
+    );
+
+    const assetsBySample = new Map<string, AssessmentSampleSummary['assets']>();
+    for (const asset of assetResult.rows) {
+      const key = String(asset.sample_id);
+      const current = assetsBySample.get(key) ?? [];
+      current.push({
+        id: String(asset.id),
+        fileId: String(asset.file_id),
+        originalName: asset.original_name,
+        assetType: asset.asset_type,
+      });
+      assetsBySample.set(key, current);
+    }
+
+    return sampleResult.rows.map((row) => ({
+      ...mapSampleRow(row),
+      assets: assetsBySample.get(String(row.id)) ?? [],
+    }));
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
     return [];
   }
-
-  const sampleIds = sampleResult.rows.map((row) => String(row.id));
-  const assetResult = await query<AssessmentSampleAssetRow>(
-    `
-      SELECT
-        assets.id,
-        assets.sample_id,
-        assets.file_id,
-        files.original_name,
-        assets.asset_type
-      FROM study_outcome_assessment_sample_files AS assets
-      JOIN study_files AS files ON files.id = assets.file_id
-      WHERE assets.sample_id = ANY($1::bigint[])
-      ORDER BY assets.created_at ASC
-    `,
-    [sampleIds],
-  );
-
-  const assetsBySample = new Map<string, AssessmentSampleSummary['assets']>();
-  for (const asset of assetResult.rows) {
-    const key = String(asset.sample_id);
-    const current = assetsBySample.get(key) ?? [];
-    current.push({
-      id: String(asset.id),
-      fileId: String(asset.file_id),
-      originalName: asset.original_name,
-      assetType: asset.asset_type,
-    });
-    assetsBySample.set(key, current);
-  }
-
-  return sampleResult.rows.map((row) => ({
-    ...mapSampleRow(row),
-    assets: assetsBySample.get(String(row.id)) ?? [],
-  }));
 };
 
 export const listOutcomeAssessmentSamplesForAssessor = async (studyId: string): Promise<AssessmentSampleSummary[]> => {
-  const designResult = await query<StudyDesignRow>(
-    `
-      SELECT id, title, has_randomization, randomization_method, groups_json, has_blinding, blinding_config_json
-      FROM studies
-      WHERE id = $1
-      LIMIT 1
-    `,
-    [studyId],
-  );
-  const studyDesign = designResult.rows[0];
-  const maskAllocatedGroup = Boolean(
-    studyDesign?.has_blinding &&
-      parseJsonValue<BlindingSettings>(studyDesign?.blinding_config_json, {} as BlindingSettings)?.permissions
-        ?.hideMaterialsFromAssessor,
-  );
+  try {
+    const designResult = await query<StudyDesignRow>(
+      `
+        SELECT id, title, has_randomization, randomization_method, groups_json, has_blinding, blinding_config_json
+        FROM studies
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [studyId],
+    );
+    const studyDesign = designResult.rows[0];
+    const maskAllocatedGroup = Boolean(
+      studyDesign?.has_blinding &&
+        parseJsonValue<BlindingSettings>(studyDesign?.blinding_config_json, {} as BlindingSettings)?.permissions
+          ?.hideMaterialsFromAssessor,
+    );
 
-  const samples = await listOutcomeAssessmentSamplesForStudy(studyId);
-  return samples.map((sample) => ({
-    ...sample,
-    allocatedGroup: maskAllocatedGroup ? undefined : sample.allocatedGroup,
-  }));
+    const samples = await listOutcomeAssessmentSamplesForStudy(studyId);
+    return samples.map((sample) => ({
+      ...sample,
+      allocatedGroup: maskAllocatedGroup ? undefined : sample.allocatedGroup,
+    }));
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const syncOutcomeAssessmentEntriesForStudy = async (studyId: string) => {
+  try {
   const approvedTemplateResult = await query<{ id: string | number }>(
     `
       SELECT id
@@ -664,6 +730,12 @@ export const syncOutcomeAssessmentEntriesForStudy = async (studyId: string) => {
   }
 
   await updateSampleProgressForStudy(studyId);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    return;
+  }
 };
 
 export const upsertOutcomeAssessmentSamples = async (
@@ -939,22 +1011,29 @@ export const respondToOutcomeAssessmentRequest = async (input: {
 };
 
 export const getOutcomeAssessmentTemplateVersions = async (studyId: string) => {
-  const result = await query<AssessmentTemplateVersionRow>(
-    `
-      SELECT
-        versions.*,
-        creator.full_name AS created_by_name,
-        approver.full_name AS approved_by_name
-      FROM study_outcome_assessment_template_versions AS versions
-      JOIN users AS creator ON creator.id = versions.created_by_user_id
-      LEFT JOIN users AS approver ON approver.id = versions.approved_by_user_id
-      WHERE versions.study_id = $1
-      ORDER BY versions.version_number DESC, versions.created_at DESC
-    `,
-    [studyId],
-  );
+  try {
+    const result = await query<AssessmentTemplateVersionRow>(
+      `
+        SELECT
+          versions.*,
+          creator.full_name AS created_by_name,
+          approver.full_name AS approved_by_name
+        FROM study_outcome_assessment_template_versions AS versions
+        JOIN users AS creator ON creator.id = versions.created_by_user_id
+        LEFT JOIN users AS approver ON approver.id = versions.approved_by_user_id
+        WHERE versions.study_id = $1
+        ORDER BY versions.version_number DESC, versions.created_at DESC
+      `,
+      [studyId],
+    );
 
-  return result.rows.map(mapTemplateVersionRow);
+    return result.rows.map(mapTemplateVersionRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const proposeOutcomeAssessmentTemplateVersion = async (input: {
@@ -1129,17 +1208,24 @@ export const approveOutcomeAssessmentTemplateVersion = async (input: {
 };
 
 export const listOutcomeAssessmentEntriesForRequest = async (requestId: string) => {
-  const result = await query<AssessmentEntryRow>(
-    `
-      SELECT *
-      FROM study_outcome_assessment_entries
-      WHERE request_id = $1
-      ORDER BY created_at ASC
-    `,
-    [requestId],
-  );
+  try {
+    const result = await query<AssessmentEntryRow>(
+      `
+        SELECT *
+        FROM study_outcome_assessment_entries
+        WHERE request_id = $1
+        ORDER BY created_at ASC
+      `,
+      [requestId],
+    );
 
-  return result.rows.map(mapEntryRow);
+    return result.rows.map(mapEntryRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, requestId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const updateOutcomeAssessmentEntry = async (input: {
@@ -1214,21 +1300,28 @@ export const updateOutcomeAssessmentEntry = async (input: {
 };
 
 export const listOutcomeAssessmentNotes = async (requestId: string, sampleId?: string) => {
-  const result = await query<AssessmentNoteRow>(
-    `
-      SELECT
-        notes.*,
-        author.full_name AS author_name
-      FROM study_outcome_assessment_notes AS notes
-      JOIN users AS author ON author.id = notes.author_user_id
-      WHERE notes.request_id = $1
-        AND ($2::bigint IS NULL OR notes.sample_id = $2::bigint)
-      ORDER BY notes.created_at ASC
-    `,
-    [requestId, sampleId ?? null],
-  );
+  try {
+    const result = await query<AssessmentNoteRow>(
+      `
+        SELECT
+          notes.*,
+          author.full_name AS author_name
+        FROM study_outcome_assessment_notes AS notes
+        JOIN users AS author ON author.id = notes.author_user_id
+        WHERE notes.request_id = $1
+          AND ($2::bigint IS NULL OR notes.sample_id = $2::bigint)
+        ORDER BY notes.created_at ASC
+      `,
+      [requestId, sampleId ?? null],
+    );
 
-  return result.rows.map(mapNoteRow);
+    return result.rows.map(mapNoteRow);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, requestId)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const createOutcomeAssessmentNote = async (input: {
@@ -1238,105 +1331,135 @@ export const createOutcomeAssessmentNote = async (input: {
   recipientScope?: AssessmentRecipientScope;
   sampleId?: string;
 }) => {
-  const result = await query<AssessmentNoteRow>(
-    `
-      INSERT INTO study_outcome_assessment_notes (
-        request_id,
-        sample_id,
-        author_user_id,
-        recipient_scope,
-        message
-      )
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING
-        *,
-        NULL::TEXT AS author_name
-    `,
-    [input.requestId, input.sampleId ?? null, input.authorUserId, input.recipientScope ?? 'research_team', input.message.trim()],
-  );
+  try {
+    const result = await query<AssessmentNoteRow>(
+      `
+        INSERT INTO study_outcome_assessment_notes (
+          request_id,
+          sample_id,
+          author_user_id,
+          recipient_scope,
+          message
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING
+          *,
+          NULL::TEXT AS author_name
+      `,
+      [input.requestId, input.sampleId ?? null, input.authorUserId, input.recipientScope ?? 'research_team', input.message.trim()],
+    );
 
-  const note = mapNoteRow(result.rows[0]);
+    const note = mapNoteRow(result.rows[0]);
 
-  await createAuditRecord({
-    requestId: input.requestId,
-    sampleId: input.sampleId,
-    actorUserId: input.authorUserId,
-    action: 'assessment_note_created',
-  });
+    await createAuditRecord({
+      requestId: input.requestId,
+      sampleId: input.sampleId,
+      actorUserId: input.authorUserId,
+      action: 'assessment_note_created',
+    });
 
-  return note;
+    return note;
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, input.requestId)) {
+      throw error;
+    }
+    const now = new Date().toISOString();
+    return {
+      id: createLocalId('dev_note'),
+      requestId: input.requestId,
+      sampleId: input.sampleId,
+      authorUserId: input.authorUserId,
+      recipientScope: input.recipientScope ?? 'research_team',
+      message: input.message.trim(),
+      createdAt: now,
+    } satisfies AssessmentNoteSummary;
+  }
 };
 
 export const getOutcomeAssessmentWorkspace = async (requestId: string, assessorUserId: string) => {
-  const requestResult = await query<AssessmentRequestRow>(
-    `
-      SELECT
-        requests.id,
-        requests.study_id,
-        studies.title AS study_title,
-        studies.study_type,
-        requests.assessor_user_id,
-        assessor.full_name AS assessor_name,
-        assessor.academic_id AS assessor_academic_id,
-        requests.requested_by_user_id,
-        requester.full_name AS requested_by_name,
-        requests.request_status,
-        requests.assessment_type,
-        requests.deadline_at,
-        requests.samples_required,
-        COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
-        requests.optional_message,
-        requests.created_at,
-        requests.accepted_at,
-        requests.completed_at
-      FROM study_outcome_assessment_requests AS requests
-      JOIN studies ON studies.id = requests.study_id
-      JOIN users AS assessor ON assessor.id = requests.assessor_user_id
-      JOIN users AS requester ON requester.id = requests.requested_by_user_id
-      LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
-      WHERE requests.id = $1
-        AND requests.assessor_user_id = $2
-      GROUP BY requests.id, studies.id, assessor.id, requester.id
-      LIMIT 1
-    `,
-    [requestId, assessorUserId],
-  );
+  try {
+    const requestResult = await query<AssessmentRequestRow>(
+      `
+        SELECT
+          requests.id,
+          requests.study_id,
+          studies.title AS study_title,
+          studies.study_type,
+          requests.assessor_user_id,
+          assessor.full_name AS assessor_name,
+          assessor.academic_id AS assessor_academic_id,
+          requests.requested_by_user_id,
+          requester.full_name AS requested_by_name,
+          requests.request_status,
+          requests.assessment_type,
+          requests.deadline_at,
+          requests.samples_required,
+          COUNT(entries.id) FILTER (WHERE entries.status IN ('submitted', 'locked'))::BIGINT AS samples_submitted,
+          requests.optional_message,
+          requests.created_at,
+          requests.accepted_at,
+          requests.completed_at
+        FROM study_outcome_assessment_requests AS requests
+        JOIN studies ON studies.id = requests.study_id
+        JOIN users AS assessor ON assessor.id = requests.assessor_user_id
+        JOIN users AS requester ON requester.id = requests.requested_by_user_id
+        LEFT JOIN study_outcome_assessment_entries AS entries ON entries.request_id = requests.id
+        WHERE requests.id = $1
+          AND requests.assessor_user_id = $2
+        GROUP BY requests.id, studies.id, assessor.id, requester.id
+        LIMIT 1
+      `,
+      [requestId, assessorUserId],
+    );
 
-  const request = requestResult.rows[0] ? mapRequestRow(requestResult.rows[0]) : null;
-  if (!request) {
+    const request = requestResult.rows[0] ? mapRequestRow(requestResult.rows[0]) : null;
+    if (!request) {
+      return null;
+    }
+
+    const [samples, entries, templateVersions, notes] = await Promise.all([
+      listOutcomeAssessmentSamplesForAssessor(request.studyId),
+      listOutcomeAssessmentEntriesForRequest(requestId),
+      getOutcomeAssessmentTemplateVersions(request.studyId),
+      listOutcomeAssessmentNotes(requestId),
+    ]);
+
+    return {
+      request,
+      samples,
+      entries,
+      templateVersions,
+      approvedTemplate: templateVersions.find((item) => item.approvalStatus === 'approved'),
+      notes,
+    };
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, requestId)) {
+      throw error;
+    }
     return null;
   }
-
-  const [samples, entries, templateVersions, notes] = await Promise.all([
-    listOutcomeAssessmentSamplesForAssessor(request.studyId),
-    listOutcomeAssessmentEntriesForRequest(requestId),
-    getOutcomeAssessmentTemplateVersions(request.studyId),
-    listOutcomeAssessmentNotes(requestId),
-  ]);
-
-  return {
-    request,
-    samples,
-    entries,
-    templateVersions,
-    approvedTemplate: templateVersions.find((item) => item.approvalStatus === 'approved'),
-    notes,
-  };
 };
 
 export const hasOutcomeAssessmentAccess = async (studyId: string, assessorUserId: string) => {
-  const result = await query<{ exists: boolean }>(
-    `
-      SELECT EXISTS (
-        SELECT 1
-        FROM study_outcome_assessment_requests
-        WHERE study_id = $1
-          AND assessor_user_id = $2
-          AND request_status IN ('new', 'accepted', 'active', 'completed')
-      ) AS exists
-    `,
-    [studyId, assessorUserId],
-  );
+  try {
+    const result = await query<{ exists: boolean }>(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM study_outcome_assessment_requests
+          WHERE study_id = $1
+            AND assessor_user_id = $2
+            AND request_status IN ('new', 'accepted', 'active', 'completed')
+        ) AS exists
+      `,
+      [studyId, assessorUserId],
+    );
 
-  return Boolean(result.rows[0]?.exists);
+    return Boolean(result.rows[0]?.exists);
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    return false;
+  }
 };

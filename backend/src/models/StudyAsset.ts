@@ -102,10 +102,21 @@ const mapStudyAnalysis = (row: StudyAnalysisRow): StudyAnalysisRecord => ({
 
 const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
 
-const isDatabaseUnavailable = (error: unknown) =>
-  localAuthFallbackEnabled() &&
-  error instanceof Error &&
-  /Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message);
+const isDevLocalId = (id?: string | number | null) =>
+  typeof id === 'string' && /^dev_(study|file|analysis)_/i.test(id);
+
+const isDatabaseUnavailable = (error: unknown, contextId?: string | number | null) => {
+  if (!localAuthFallbackEnabled() || !(error instanceof Error)) {
+    return false;
+  }
+  if (/Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message)) {
+    return true;
+  }
+  if (isDevLocalId(contextId) && /invalid input syntax for type (bigint|integer)/i.test(error.message)) {
+    return true;
+  }
+  return false;
+};
 
 const localStudyFilesPath = path.resolve(process.cwd(), 'data', 'dev-study-files.json');
 const localStudyAnalysesPath = path.resolve(process.cwd(), 'data', 'dev-study-analyses.json');
@@ -160,7 +171,7 @@ export const createStudyFileRecord = async (input: {
 
     return getStudyFileById(String(result.rows[0].id));
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) {
+    if (!isDatabaseUnavailable(error, input.studyId)) {
       throw error;
     }
 
@@ -201,7 +212,7 @@ export const getStudyFileById = async (fileId: string): Promise<StudyFileRecord 
     const row = result.rows[0];
     return row ? mapStudyFile(row) : null;
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) {
+    if (!isDatabaseUnavailable(error, fileId)) {
       throw error;
     }
 
@@ -227,7 +238,7 @@ export const listStudyFiles = async (studyId: string): Promise<StudyFileRecord[]
 
     return result.rows.map(mapStudyFile);
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) {
+    if (!isDatabaseUnavailable(error, studyId)) {
       throw error;
     }
 
@@ -251,64 +262,113 @@ export const createStudyAnalysisRecord = async (input: {
   ocr?: Record<string, unknown>;
   reportRelativePath?: string;
 }) => {
-  const result = await query<StudyAnalysisRow>(
-    `
-      INSERT INTO study_analyses (
-        study_id, source_file_id, created_by_user_id, title, analysis_type, assistant_mode, prompt,
-        config_json, profile_json, result_json, assistant_json, ocr_json, report_relative_path, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, NOW())
-      RETURNING
-        study_analyses.*,
-        NULL::TEXT AS created_by_name
-    `,
-    [
-      input.studyId,
-      input.sourceFileId ?? null,
-      input.createdByUserId,
-      input.title,
-      input.analysisType ?? null,
-      input.assistantMode ?? null,
-      input.prompt ?? null,
-      JSON.stringify(input.config ?? {}),
-      input.profile ? JSON.stringify(input.profile) : null,
-      input.result ? JSON.stringify(input.result) : null,
-      input.assistant ? JSON.stringify(input.assistant) : null,
-      input.ocr ? JSON.stringify(input.ocr) : null,
-      input.reportRelativePath ?? null,
-    ],
-  );
+  try {
+    const result = await query<StudyAnalysisRow>(
+      `
+        INSERT INTO study_analyses (
+          study_id, source_file_id, created_by_user_id, title, analysis_type, assistant_mode, prompt,
+          config_json, profile_json, result_json, assistant_json, ocr_json, report_relative_path, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, NOW())
+        RETURNING
+          study_analyses.*,
+          NULL::TEXT AS created_by_name
+      `,
+      [
+        input.studyId,
+        input.sourceFileId ?? null,
+        input.createdByUserId,
+        input.title,
+        input.analysisType ?? null,
+        input.assistantMode ?? null,
+        input.prompt ?? null,
+        JSON.stringify(input.config ?? {}),
+        input.profile ? JSON.stringify(input.profile) : null,
+        input.result ? JSON.stringify(input.result) : null,
+        input.assistant ? JSON.stringify(input.assistant) : null,
+        input.ocr ? JSON.stringify(input.ocr) : null,
+        input.reportRelativePath ?? null,
+      ],
+    );
 
-  return getStudyAnalysisById(String(result.rows[0].id));
+    return getStudyAnalysisById(String(result.rows[0].id));
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, input.studyId)) {
+      throw error;
+    }
+
+    const now = new Date().toISOString();
+    const record: StudyAnalysisRecord = {
+      id: createLocalId('dev_analysis'),
+      studyId: input.studyId,
+      sourceFileId: input.sourceFileId,
+      title: input.title,
+      analysisType: input.analysisType,
+      assistantMode: input.assistantMode,
+      prompt: input.prompt,
+      config: input.config ?? {},
+      profile: input.profile,
+      result: input.result,
+      assistant: input.assistant,
+      ocr: input.ocr,
+      reportRelativePath: input.reportRelativePath,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const analyses = await readJsonArray<StudyAnalysisRecord>(localStudyAnalysesPath);
+    analyses.unshift(record);
+    await writeJsonArray(localStudyAnalysesPath, analyses);
+    return record;
+  }
 };
 
 export const updateStudyAnalysisReportPath = async (analysisId: string, reportRelativePath: string) => {
-  await query(
-    `
-      UPDATE study_analyses
-      SET report_relative_path = $2, updated_at = NOW()
-      WHERE id = $1
-    `,
-    [analysisId, reportRelativePath],
-  );
+  try {
+    await query(
+      `
+        UPDATE study_analyses
+        SET report_relative_path = $2, updated_at = NOW()
+        WHERE id = $1
+      `,
+      [analysisId, reportRelativePath],
+    );
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, analysisId)) {
+      throw error;
+    }
+    const analyses = await readJsonArray<StudyAnalysisRecord>(localStudyAnalysesPath);
+    const idx = analyses.findIndex((a) => a.id === analysisId);
+    if (idx >= 0) {
+      analyses[idx] = { ...analyses[idx], reportRelativePath, updatedAt: new Date().toISOString() };
+      await writeJsonArray(localStudyAnalysesPath, analyses);
+    }
+  }
 };
 
 export const getStudyAnalysisById = async (analysisId: string): Promise<StudyAnalysisRecord | null> => {
-  const result = await query<StudyAnalysisRow>(
-    `
-      SELECT
-        study_analyses.*,
-        users.full_name AS created_by_name
-      FROM study_analyses
-      JOIN users ON users.id = study_analyses.created_by_user_id
-      WHERE study_analyses.id = $1
-      LIMIT 1
-    `,
-    [analysisId],
-  );
+  try {
+    const result = await query<StudyAnalysisRow>(
+      `
+        SELECT
+          study_analyses.*,
+          users.full_name AS created_by_name
+        FROM study_analyses
+        JOIN users ON users.id = study_analyses.created_by_user_id
+        WHERE study_analyses.id = $1
+        LIMIT 1
+      `,
+      [analysisId],
+    );
 
-  const row = result.rows[0];
-  return row ? mapStudyAnalysis(row) : null;
+    const row = result.rows[0];
+    return row ? mapStudyAnalysis(row) : null;
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, analysisId)) {
+      throw error;
+    }
+    const analyses = await readJsonArray<StudyAnalysisRecord>(localStudyAnalysesPath);
+    return analyses.find((analysis) => analysis.id === analysisId) ?? null;
+  }
 };
 
 export const listStudyAnalyses = async (studyId: string): Promise<StudyAnalysisRecord[]> => {
@@ -328,7 +388,7 @@ export const listStudyAnalyses = async (studyId: string): Promise<StudyAnalysisR
 
     return result.rows.map(mapStudyAnalysis);
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) {
+    if (!isDatabaseUnavailable(error, studyId)) {
       throw error;
     }
 

@@ -140,6 +140,21 @@ type CreateStudyForm = {
   requiresClinicalEvaluation: boolean;
 };
 
+type CreateStudyFieldKey =
+  | 'title'
+  | 'studyType'
+  | 'workflowType'
+  | 'targetSampleSize'
+  | 'supervisorUserId'
+  | 'groupsInput'
+  | 'blindedParties'
+  | 'blindingScope'
+  | 'blindingTargetVariablesInput'
+  | 'blindingProtocolText'
+  | 'general';
+
+type CreateStudyFieldErrors = Partial<Record<CreateStudyFieldKey, string[]>>;
+
 const initialFormState: CreateStudyForm = {
   title: '',
   studyType: 'rct',
@@ -325,6 +340,92 @@ const applyStudyTypePreset = (
   };
 };
 
+const mapCreateErrorField = (field: string, message: string): CreateStudyFieldKey => {
+  if (field === 'title') return 'title';
+  if (field === 'studyType') return 'studyType';
+  if (field === 'workflowType') return 'workflowType';
+  if (field === 'targetSampleSize') return 'targetSampleSize';
+  if (field === 'supervisorUserId') return 'supervisorUserId';
+  if (field === 'groups' || field.startsWith('groups.')) return 'groupsInput';
+  if (field === 'blindedParties' || field.startsWith('blindedParties.')) return 'blindedParties';
+  if (field === 'blindingScope' || field.startsWith('blindingScope.')) return 'blindingScope';
+  if (field === 'blindingTargetVariables' || field.startsWith('blindingTargetVariables.')) return 'blindingTargetVariablesInput';
+  if (field === 'blindingProtocolText') return 'blindingProtocolText';
+  if (message.toLowerCase().includes('supervisor')) return 'supervisorUserId';
+  return 'general';
+};
+
+const addCreateFieldError = (errors: CreateStudyFieldErrors, field: CreateStudyFieldKey, message: string) => ({
+  ...errors,
+  [field]: [...(errors[field] ?? []), message],
+});
+
+const parseCreateValidationErrors = (payload: unknown) => {
+  const fieldErrors: CreateStudyFieldErrors = {};
+  const fallbackMessage = 'تعذر إنشاء الدراسة. راجع الحقول المطلوبة وحاول مرة أخرى.';
+
+  if (!payload || typeof payload !== 'object') {
+    return { fieldErrors, message: fallbackMessage };
+  }
+
+  const payloadRecord = payload as { message?: unknown; errors?: unknown };
+  const topMessage = typeof payloadRecord.message === 'string' ? payloadRecord.message : fallbackMessage;
+  if (!Array.isArray(payloadRecord.errors)) {
+    return { fieldErrors, message: topMessage };
+  }
+
+  for (const item of payloadRecord.errors) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+    const entry = item as { field?: unknown; message?: unknown };
+    const message = typeof entry.message === 'string' ? entry.message : '';
+    if (!message) {
+      continue;
+    }
+    const fieldName = typeof entry.field === 'string' ? entry.field : '';
+    const mappedField = mapCreateErrorField(fieldName, message);
+    fieldErrors[mappedField] = [...(fieldErrors[mappedField] ?? []), message];
+  }
+
+  return {
+    fieldErrors,
+    message:
+      Object.keys(fieldErrors).length > 0
+        ? 'لم يتم إنشاء الدراسة. أكمل الحقول الناقصة أو صحح القيم الموضحة داخل النموذج.'
+        : topMessage,
+  };
+};
+
+const validateCreateStudyForm = (formState: CreateStudyForm) => {
+  let fieldErrors: CreateStudyFieldErrors = {};
+
+  if (!formState.title.trim()) {
+    fieldErrors = addCreateFieldError(fieldErrors, 'title', 'عنوان الدراسة مطلوب.');
+  }
+
+  if (!formState.studyType.trim()) {
+    fieldErrors = addCreateFieldError(fieldErrors, 'studyType', 'نوع الدراسة مطلوب.');
+  }
+
+  if (formState.workflowType === 'supervised' && !formState.supervisorUserId.trim()) {
+    fieldErrors = addCreateFieldError(fieldErrors, 'supervisorUserId', 'يجب اختيار مشرف أساسي قبل إنشاء الدراسة.');
+  }
+
+  if (normalizeGroups(formState.groupsInput).length === 0) {
+    fieldErrors = addCreateFieldError(fieldErrors, 'groupsInput', 'يجب تعريف مجموعة واحدة على الأقل.');
+  }
+
+  if (formState.targetSampleSize.trim()) {
+    const targetSampleSize = Number(formState.targetSampleSize);
+    if (!Number.isInteger(targetSampleSize) || targetSampleSize < 0) {
+      fieldErrors = addCreateFieldError(fieldErrors, 'targetSampleSize', 'حجم العينة يجب أن يكون رقمًا صحيحًا موجبًا أو صفرًا.');
+    }
+  }
+
+  return fieldErrors;
+};
+
 function Studies() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -357,6 +458,7 @@ function Studies() {
   const [studyResources, setStudyResources] = useState<StudyResources | null>(null);
   const [roleDirectory, setRoleDirectory] = useState<RoleDirectoryEntry[]>([]);
   const [error, setError] = useState('');
+  const [createFieldErrors, setCreateFieldErrors] = useState<CreateStudyFieldErrors>({});
   const [researchProposalFile, setResearchProposalFile] = useState<File | null>(null);
   const [protocolFile, setProtocolFile] = useState<File | null>(null);
   const [autofillNotice, setAutofillNotice] = useState('');
@@ -366,6 +468,9 @@ function Studies() {
   const assistantSupervisors = roleDirectory.filter((entry) => entry.accountType === 'assistant_supervisor');
   const clinicalEvaluators = roleDirectory.filter((entry) => entry.accountType === 'clinical_evaluator');
   const selectedStudyTypeInfo = getStudyTypeInfo(formState.studyType);
+  const getCreateFieldError = (...fields: CreateStudyFieldKey[]) =>
+    fields.flatMap((field) => createFieldErrors[field] ?? [])[0] ?? '';
+  const hasCreateFieldError = (...fields: CreateStudyFieldKey[]) => Boolean(getCreateFieldError(...fields));
 
   const replaceStudy = useCallback((nextStudy: Study) => {
     setStudies((prev) => prev.map((study) => (study.id === nextStudy.id ? nextStudy : study)));
@@ -486,6 +591,32 @@ function Studies() {
   };
 
   const handleChange = <K extends keyof CreateStudyForm>(field: K, value: CreateStudyForm[K]) => {
+    const errorFieldMap: Partial<Record<keyof CreateStudyForm, CreateStudyFieldKey[]>> = {
+      title: ['title'],
+      studyType: ['studyType'],
+      workflowType: ['workflowType', 'supervisorUserId'],
+      targetSampleSize: ['targetSampleSize'],
+      supervisorUserId: ['supervisorUserId'],
+      groupsInput: ['groupsInput'],
+      blindedParties: ['blindedParties', 'blindingProtocolText'],
+      blindingScope: ['blindingScope', 'blindingProtocolText'],
+      blindingTargetVariablesInput: ['blindingTargetVariablesInput', 'blindingProtocolText'],
+      blindingProtocolText: ['blindingProtocolText'],
+      hasBlinding: ['blindedParties', 'blindingScope', 'blindingTargetVariablesInput', 'blindingProtocolText'],
+      hasRandomization: ['groupsInput'],
+    };
+
+    const mappedErrors = errorFieldMap[field];
+    if (mappedErrors?.length) {
+      setCreateFieldErrors((prev) => {
+        const next = { ...prev };
+        for (const item of mappedErrors) {
+          delete next[item];
+        }
+        return next;
+      });
+    }
+
     if (field === 'studyType' && typeof value === 'string') {
       const preset = applyStudyTypePreset(value);
       setFormState((prev) => ({
@@ -521,6 +652,12 @@ function Studies() {
     values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 
   const toggleCreateBlindedParty = (value: BlindedParty) => {
+    setCreateFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.blindedParties;
+      delete next.blindingProtocolText;
+      return next;
+    });
     setFormState((prev) => ({
       ...prev,
       blindedParties: toggleChoice(prev.blindedParties, value),
@@ -528,6 +665,12 @@ function Studies() {
   };
 
   const toggleCreateBlindingScope = (value: BlindingScope) => {
+    setCreateFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.blindingScope;
+      delete next.blindingProtocolText;
+      return next;
+    });
     setFormState((prev) => ({
       ...prev,
       blindingScope: toggleChoice(prev.blindingScope, value),
@@ -596,6 +739,8 @@ function Studies() {
   const closeCreateModal = () => {
     setShowCreateModal(false);
     setAutofillNotice('');
+    setCreateFieldErrors({});
+    setError('');
     if (searchParams.get('create') === '1') {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete('create');
@@ -637,20 +782,19 @@ function Studies() {
       return;
     }
 
-    if (formState.workflowType === 'supervised' && !formState.supervisorUserId) {
-      setError('Please assign a supervisor for supervised studies.');
+    const localValidationErrors = validateCreateStudyForm(formState);
+    if (Object.keys(localValidationErrors).length > 0) {
+      setCreateFieldErrors(localValidationErrors);
+      setError('لم يتم إنشاء الدراسة. أكمل الحقول الناقصة الموضحة داخل النموذج.');
       return;
     }
 
     const groups = normalizeGroups(formState.groupsInput);
-    if (groups.length === 0) {
-      setError('Please define at least one study group.');
-      return;
-    }
 
     try {
       setIsSubmitting(true);
       setError('');
+      setCreateFieldErrors({});
 
       const response = await fetch(`${apiBaseUrl}/studies`, {
         method: 'POST',
@@ -680,7 +824,11 @@ function Studies() {
       });
 
       if (!response.ok) {
-        throw new Error('Unable to create study');
+        const payload = await response.json().catch(() => null);
+        const parsed = parseCreateValidationErrors(payload);
+        setCreateFieldErrors(parsed.fieldErrors);
+        setError(parsed.message);
+        return;
       }
 
       const createdStudy = (await response.json()) as Study;
@@ -692,13 +840,14 @@ function Studies() {
       }
       setStudies((prev) => [createdStudy, ...prev]);
       setFormState(initialFormState);
+      setCreateFieldErrors({});
       setResearchProposalFile(null);
       setProtocolFile(null);
       closeCreateModal();
       setSelectedStudy(createdStudy);
       void fetchStudyResources(createdStudy.id);
     } catch {
-      setError(t('studies.messages.createError'));
+      setError('تعذر إنشاء الدراسة حاليًا. إذا كانت الحقول صحيحة فربما توجد مشكلة مؤقتة في الخادم.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1155,6 +1304,19 @@ function Studies() {
               </div>
             ) : null}
 
+            {error ? (
+              <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <p className="font-bold">{error}</p>
+                {Object.keys(createFieldErrors).length > 0 ? (
+                  <ul className="mt-2 list-disc space-y-1 pr-5 text-xs text-rose-700">
+                    {Object.entries(createFieldErrors).flatMap(([field, messages]) =>
+                      (messages ?? []).map((message, index) => <li key={`${field}-${index}`}>{message}</li>),
+                    )}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+
             <form className="space-y-6" onSubmit={handleCreateStudy}>
               <div className="flex items-center gap-3 rounded-2xl border-2 border-teal-200 bg-teal-50 px-5 py-4">
                 <Route className="h-5 w-5 text-teal-600" />
@@ -1189,10 +1351,13 @@ function Studies() {
                         type="text"
                         value={formState.title}
                         onChange={(e) => handleChange('title', e.target.value)}
-                        className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
+                        className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white ${
+                          hasCreateFieldError('title') ? 'border-rose-400 bg-rose-50 focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                        }`}
                         placeholder={t('studies.create.placeholders.title')}
                         required
                       />
+                      {getCreateFieldError('title') ? <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('title')}</span> : null}
                     </label>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1201,7 +1366,9 @@ function Studies() {
                         <select
                           value={formState.studyType}
                           onChange={(e) => handleChange('studyType', e.target.value)}
-                          className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
+                          className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white ${
+                            hasCreateFieldError('studyType') ? 'border-rose-400 bg-rose-50 focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                          }`}
                           required
                         >
                           {CREATE_STUDY_TYPE_OPTIONS.map((opt) => (
@@ -1210,6 +1377,7 @@ function Studies() {
                             </option>
                           ))}
                         </select>
+                        {getCreateFieldError('studyType') ? <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('studyType')}</span> : null}
                       </label>
 
                       <label className="block">
@@ -1217,7 +1385,9 @@ function Studies() {
                         <select
                           value={formState.supervisorUserId}
                           onChange={(e) => handleChange('supervisorUserId', e.target.value)}
-                          className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
+                          className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white ${
+                            hasCreateFieldError('supervisorUserId') ? 'border-rose-400 bg-rose-50 focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                          }`}
                         >
                           <option value="">{t('studies.create.placeholders.noAssignment')}</option>
                           {supervisors.map((entry) => (
@@ -1226,6 +1396,9 @@ function Studies() {
                             </option>
                           ))}
                         </select>
+                        {getCreateFieldError('supervisorUserId') ? (
+                          <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('supervisorUserId')}</span>
+                        ) : null}
                       </label>
                     </div>
 
@@ -1332,9 +1505,12 @@ function Studies() {
                           type="text"
                           value={formState.groupsInput}
                           onChange={(e) => handleChange('groupsInput', e.target.value)}
-                          className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
+                          className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white ${
+                            hasCreateFieldError('groupsInput') ? 'border-rose-400 bg-rose-50 focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                          }`}
                           placeholder="Experimental, Control"
                         />
+                        {getCreateFieldError('groupsInput') ? <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('groupsInput')}</span> : null}
                       </label>
                       <label className="block">
                         <span className="mb-2 block text-xs font-extrabold text-slate-600">حجم العينة المستهدف</span>
@@ -1343,9 +1519,14 @@ function Studies() {
                           min="0"
                           value={formState.targetSampleSize}
                           onChange={(e) => handleChange('targetSampleSize', e.target.value)}
-                          className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white"
+                          className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white ${
+                            hasCreateFieldError('targetSampleSize') ? 'border-rose-400 bg-rose-50 focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                          }`}
                           placeholder="40"
                         />
+                        {getCreateFieldError('targetSampleSize') ? (
+                          <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('targetSampleSize')}</span>
+                        ) : null}
                       </label>
                     </div>
 
@@ -1381,6 +1562,7 @@ function Studies() {
 
                       <div>
                         <p className="mb-3 text-xs font-extrabold text-slate-600">أطراف التعمية</p>
+                        {getCreateFieldError('blindedParties') ? <p className="mb-3 text-xs font-bold text-rose-600">{getCreateFieldError('blindedParties')}</p> : null}
                         <div className="grid gap-3 sm:grid-cols-2">
                           {[
                             ['participant', 'المشارك / المريض', 'لا يعرف المعالجة أو المجموعة'],
@@ -1412,6 +1594,7 @@ function Studies() {
                         </div>
                         <div className="mt-4">
                           <p className="mb-2 text-xs font-extrabold text-slate-600">نطاق التعمية</p>
+                          {getCreateFieldError('blindingScope') ? <p className="mb-2 text-xs font-bold text-rose-600">{getCreateFieldError('blindingScope')}</p> : null}
                           <div className="flex flex-wrap gap-2">
                             {[
                               ['material_type', 'نوع المادة'],
@@ -1439,9 +1622,16 @@ function Studies() {
                             value={formState.blindingTargetVariablesInput}
                             onChange={(e) => handleChange('blindingTargetVariablesInput', e.target.value)}
                             disabled={!formState.hasBlinding}
-                            className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-teal-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                            className={`w-full rounded-xl border-2 px-4 py-3 text-sm font-bold outline-none transition focus:bg-white disabled:cursor-not-allowed disabled:opacity-60 ${
+                              hasCreateFieldError('blindingTargetVariablesInput')
+                                ? 'border-rose-400 bg-rose-50 focus:border-rose-500'
+                                : 'border-slate-200 bg-slate-50 focus:border-teal-500'
+                            }`}
                             placeholder="Treatment group, device name, intervention type"
                           />
+                          {getCreateFieldError('blindingTargetVariablesInput') ? (
+                            <span className="mt-2 block text-xs font-bold text-rose-600">{getCreateFieldError('blindingTargetVariablesInput')}</span>
+                          ) : null}
                           <p className="mt-2 text-[10px] font-bold text-slate-400">اكتبها مفصولة بفواصل مثل: المجموعة العلاجية، اسم الجهاز، نوع التدخل، النتيجة الأساسية.</p>
                         </label>
                       </div>

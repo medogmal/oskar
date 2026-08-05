@@ -200,8 +200,15 @@ const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T
 
 const localAuthFallbackEnabled = () => process.env.ENABLE_LOCAL_AUTH_FALLBACK !== 'false';
 
-const isDatabaseUnavailable = (error: unknown) =>
-  localAuthFallbackEnabled() && error instanceof Error;
+const isDevLocalId = (id?: string | number | null) =>
+  typeof id === 'string' && /^dev_(study|file|analysis|request|sample|template|entry|note|user)_/i.test(id);
+
+const isDatabaseUnavailable = (error: unknown, contextId?: string | number | null) => {
+  if (!localAuthFallbackEnabled() || !(error instanceof Error)) return false;
+  if (/Database has not been initialized|ECONNREFUSED|connection.*refused/i.test(error.message)) return true;
+  if (isDevLocalId(contextId) && /invalid input syntax for type (bigint|integer)/i.test(error.message)) return true;
+  return false;
+};
 
 
 const localStudyStorePath = path.resolve(process.cwd(), 'data', 'dev-studies.json');
@@ -369,12 +376,19 @@ export const findStudyByIdForUser = async (
     const row = result.rows[0];
     return row ? mapStudyRow(row) : null;
   } catch (error) {
-    if (!isDatabaseUnavailable(error)) {
+    if (!isDatabaseUnavailable(error, studyId)) {
       throw error;
     }
 
     const studies = await readLocalStudies();
-    return studies.find((study) => study.id === studyId) ?? null;
+    return (
+      studies.find(
+        (study) =>
+          study.id === studyId &&
+          (study.principalInvestigatorId === principalInvestigatorId ||
+            study.coResearcherUserId === principalInvestigatorId),
+      ) ?? null
+    );
   }
 };
 
@@ -670,6 +684,7 @@ export const reviewStudy = async (
 };
 
 export const findStudyByIdForSupervisor = async (studyId: string): Promise<StudySummary | null> => {
+  try {
   const result = await query<StudyRow>(
     `
       SELECT
@@ -704,6 +719,13 @@ export const findStudyByIdForSupervisor = async (studyId: string): Promise<Study
 
   const row = result.rows[0];
   return row ? mapStudyRow(row) : null;
+  } catch (error) {
+    if (!isDatabaseUnavailable(error, studyId)) {
+      throw error;
+    }
+    const studies = await readLocalStudies();
+    return studies.find((study) => study.id === studyId) ?? null;
+  }
 };
 
 export const resubmitStudy = async (researcherUserId: string, studyId: string): Promise<StudySummary | null> => {

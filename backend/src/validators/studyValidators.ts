@@ -7,6 +7,12 @@ const blindingScopes = ['material_type', 'treatment_procedure', 'split_mouth_sid
 const reviewDecisions = ['approved', 'changes_requested', 'rejected'] as const;
 const clinicalEvaluationDecisions = ['accepted', 'needs_revision', 'not_recommended'] as const;
 const assessmentRequestActions = ['accept', 'reject'] as const;
+const optionalUserId = (field: string, message: string) =>
+  body(field)
+    .optional({ values: 'falsy' })
+    .trim()
+    .notEmpty()
+    .withMessage(message);
 
 export const createStudyValidator = [
   body('title').trim().notEmpty().withMessage('Study title is required'),
@@ -41,7 +47,7 @@ export const createStudyValidator = [
     .optional()
     .isBoolean()
     .withMessage('Clinical evaluation flag must be boolean'),
-  body('supervisorUserId').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('Supervisor selection is invalid'),
+  optionalUserId('supervisorUserId', 'Supervisor selection is invalid'),
   body().custom((_, { req }) => {
     const workflowType = req.body.workflowType;
     const supervisorUserId = String(req.body.supervisorUserId ?? '').trim();
@@ -70,15 +76,9 @@ export const updateStudyDesignValidator = [
   body('blindingTargetVariables').optional().isArray().withMessage('Blinding target variables must be an array'),
   body('blindingTargetVariables.*').optional().trim().notEmpty().withMessage('Blinding target variable is invalid'),
   body('blindingProtocolText').optional({ values: 'falsy' }).trim(),
-  body('coResearcherUserId').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('Co-researcher selection is invalid'),
-  body('assistantSupervisorUserId')
-    .optional({ values: 'falsy' })
-    .isInt({ min: 1 })
-    .withMessage('Assistant supervisor selection is invalid'),
-  body('clinicalEvaluatorUserId')
-    .optional({ values: 'falsy' })
-    .isInt({ min: 1 })
-    .withMessage('Clinical evaluator selection is invalid'),
+  optionalUserId('coResearcherUserId', 'Co-researcher selection is invalid'),
+  optionalUserId('assistantSupervisorUserId', 'Assistant supervisor selection is invalid'),
+  optionalUserId('clinicalEvaluatorUserId', 'Clinical evaluator selection is invalid'),
   body('requiresClinicalEvaluation')
     .optional()
     .isBoolean()

@@ -55,7 +55,6 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['student', 'co_researcher', 'supervisor', 'assistant_supervisor', 'clinical_evaluator', 'institution']} />}>
               <Route path="/studies" element={<Studies />} />
               <Route path="/studies/:id" element={<StudyDashboard />} />
-              <Route path="/studies/:id/assessment-form" element={<AssessmentFormBuilder />} />
               <Route path="/studies/:id/variable-matrix" element={<VariableMappingMatrix />} />
               <Route path="/studies/:id/issues" element={<ErrorSeverityDashboard />} />
               <Route path="/studies/:id/analytics" element={<AnalyticsWorkspace />} />
@@ -78,6 +77,10 @@ function App() {
             <Route element={<ProtectedRoute allowedRoles={['clinical_evaluator']} />}>
               <Route path="/clinical-evaluator-dashboard" element={<ClinicalEvaluatorDashboard />} />
               <Route path="/outcome-assessment/:requestId" element={<OutcomeAssessmentWorkspace />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['student', 'co_researcher', 'supervisor', 'assistant_supervisor']} />}>
+              <Route path="/studies/:id/assessment-form" element={<AssessmentFormBuilder />} />
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={['institution']} />}>

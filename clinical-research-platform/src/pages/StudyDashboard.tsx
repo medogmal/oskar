@@ -365,6 +365,7 @@ function StudyDashboard() {
       : 'overview',
   );
   const dashboardPath = getDashboardPath(user?.accountType ?? 'student');
+  const canManageAssessmentForm = ['student', 'co_researcher', 'supervisor', 'assistant_supervisor'].includes(user?.accountType ?? '');
 
   const formatDate = useCallback(
     (value: string) =>
@@ -385,25 +386,48 @@ function StudyDashboard() {
     try {
       setError('');
       setIsLoading(true);
+      setNotice(null);
 
-      const [studyResponse, resourcesResponse] = await Promise.all([
-        fetch(`${apiBaseUrl}/studies/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${apiBaseUrl}/studies/${id}/resources`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
+      const studyResponse = await fetch(`${apiBaseUrl}/studies/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      if (!studyResponse.ok || !resourcesResponse.ok) {
-        throw new Error('Unable to load study workspace');
+      if (!studyResponse.ok) {
+        const payload = await studyResponse.json().catch(() => null);
+        const message = payload && typeof payload === 'object' && typeof payload.message === 'string' ? payload.message : '';
+        throw new Error(message || 'Unable to load study workspace');
       }
 
       setStudy((await studyResponse.json()) as Study);
+
+      const resourcesResponse = await fetch(`${apiBaseUrl}/studies/${id}/resources`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!resourcesResponse.ok) {
+        setResources({ files: [], analyses: [] });
+        setNotice({
+          tone: 'warning',
+          message: 'تم تحميل بيانات الدراسة، لكن تعذر تحميل الملفات والتحليلات المرتبطة حالياً.',
+        });
+        return;
+      }
+
       setResources((await resourcesResponse.json()) as StudyResources);
-    } catch {
-      setError('تعذر تحميل لوحة الدراسة حالياً.');
+    } catch (loadError) {
+      const message =
+        loadError instanceof Error && loadError.message
+          ? loadError.message
+          : 'تعذر تحميل لوحة الدراسة حالياً.';
+      setError(
+        message === 'Study not found'
+          ? 'الدراسة المطلوبة غير موجودة أو لم تعد متاحة.'
+          : message === 'This account cannot access the selected study'
+            ? 'هذا الحساب غير مخول للوصول إلى هذه الدراسة.'
+            : 'تعذر تحميل لوحة الدراسة حالياً.',
+      );
       setStudy(null);
+      setResources({ files: [], analyses: [] });
     } finally {
       setIsLoading(false);
     }
@@ -428,7 +452,7 @@ function StudyDashboard() {
       requestedTab === 'overview' ||
       requestedTab === 'patients' ||
       requestedTab === 'files' ||
-      requestedTab === 'assessment-form' ||
+      (requestedTab === 'assessment-form' && canManageAssessmentForm) ||
       requestedTab === 'calendar' ||
       requestedTab === 'access' ||
       requestedTab === 'analysis'
@@ -438,7 +462,7 @@ function StudyDashboard() {
     }
 
     setActiveTab('overview');
-  }, [searchParams]);
+  }, [canManageAssessmentForm, searchParams]);
 
   const handleLogout = () => {
     signOut();
@@ -601,16 +625,17 @@ function StudyDashboard() {
   );
 
   const tabs: Array<{ id: StudyTab; label: string; count?: number }> = useMemo(
-    () => [
-      { id: 'overview', label: 'Overview' },
-      { id: 'patients', label: 'Patients', count: study?.enrolledPatients ?? 0 },
-      { id: 'files', label: 'Files', count: resources.files.length },
-      { id: 'assessment-form', label: 'Assessment Form' },
-      { id: 'calendar', label: 'Calendar', count: calendarEvents.length },
-      { id: 'access', label: 'Access' },
-      { id: 'analysis', label: 'Analysis', count: resources.analyses.length },
-    ],
-    [calendarEvents.length, resources.analyses.length, resources.files.length, study?.enrolledPatients],
+    () =>
+      [
+        { id: 'overview', label: 'Overview' },
+        { id: 'patients', label: 'Patients', count: study?.enrolledPatients ?? 0 },
+        { id: 'files', label: 'Files', count: resources.files.length },
+        canManageAssessmentForm ? { id: 'assessment-form', label: 'Assessment Form' } : null,
+        { id: 'calendar', label: 'Calendar', count: calendarEvents.length },
+        { id: 'access', label: 'Access' },
+        { id: 'analysis', label: 'Analysis', count: resources.analyses.length },
+      ].filter((item): item is { id: StudyTab; label: string; count?: number } => Boolean(item)),
+    [calendarEvents.length, canManageAssessmentForm, resources.analyses.length, resources.files.length, study?.enrolledPatients],
   );
   const studyTypeInfo = getStudyTypeInfo(study?.studyType);
 
@@ -1091,7 +1116,7 @@ function StudyDashboard() {
           (item.key === 'dashboard' && dashboardPath === '/student-dashboard' && false) ||
           (item.key === 'methodology' && activeTab === 'overview') ||
           (item.key === 'samples' && activeTab === 'patients') ||
-          (item.key === 'form' && activeTab === 'assessment-form') ||
+          (item.key === 'form' && canManageAssessmentForm && activeTab === 'assessment-form') ||
           (item.key === 'calendar' && activeTab === 'calendar') ||
           (item.key === 'access' && activeTab === 'access') ||
           (item.key === 'analysis' && activeTab === 'analysis'),

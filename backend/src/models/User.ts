@@ -249,7 +249,8 @@ export const findUserByEmail = async (email: string): Promise<IUser | null> => {
   const normalizedEmail = email.trim().toLowerCase();
   if (localAuthFallbackEnabled()) {
     const users = await readLocalUsers();
-    return users.find((user) => user.email.toLowerCase() === normalizedEmail) ?? null;
+    const localMatch = users.find((user) => user.email.toLowerCase() === normalizedEmail) ?? null;
+    if (localMatch) return localMatch;
   }
   try {
     const result = await query<UserRow>('SELECT * FROM users WHERE email = $1 LIMIT 1', [normalizedEmail]);
@@ -269,7 +270,7 @@ export const findUserById = async (id: string): Promise<PublicUser | null> => {
   if (localAuthFallbackEnabled()) {
     const users = await readLocalUsers();
     const user = users.find((item) => item.id === id);
-    return user ? toPublicUser(user) : null;
+    if (user) return toPublicUser(user);
   }
   try {
     const result = await query<UserRow>('SELECT * FROM users WHERE id = $1 LIMIT 1', [id]);
@@ -279,7 +280,6 @@ export const findUserById = async (id: string): Promise<PublicUser | null> => {
     if (!isDatabaseUnavailable(error)) {
       throw error;
     }
-
     const users = await readLocalUsers();
     const user = users.find((item) => item.id === id);
     return user ? toPublicUser(user) : null;
@@ -442,7 +442,7 @@ export const findUserByIdAndAccountType = async (id: string, accountType: Accoun
   if (localAuthFallbackEnabled()) {
     const users = await readLocalUsers();
     const user = users.find((item) => item.id === id && item.accountType === accountType);
-    return user ? toPublicUser(user) : null;
+    if (user) return toPublicUser(user);
   }
   try {
     const result = await query<UserRow>(
@@ -477,7 +477,7 @@ export const findUserByAcademicIdAndAccountType = async (
     const user = users.find(
       (item) => item.academicId?.trim().toLowerCase() === normalizedAcademicId && item.accountType === accountType,
     );
-    return user ? toPublicUser(user) : null;
+    if (user) return toPublicUser(user);
   }
 
   try {

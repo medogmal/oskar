@@ -108,6 +108,46 @@ const resolveGovernanceStudyAccess = async (req: AuthRequest, res: Response, stu
   return null;
 };
 
+const resolveStudyAccess = async (req: AuthRequest, res: Response, studyId: string) => {
+  if (!req.user) {
+    res.status(401).json({ message: 'Not authorized' });
+    return null;
+  }
+
+  if (['student', 'co_researcher'].includes(req.user.accountType)) {
+    const study = await findStudyByIdForUser(req.user.id, studyId);
+    if (!study) {
+      res.status(404).json({ message: 'Study not found' });
+      return null;
+    }
+    return study;
+  }
+
+  const study = await findStudyByIdForSupervisor(studyId);
+  if (!study) {
+    res.status(404).json({ message: 'Study not found' });
+    return null;
+  }
+
+  if (req.user.accountType === 'institution') {
+    return study;
+  }
+
+  if (
+    ['supervisor', 'assistant_supervisor'].includes(req.user.accountType) &&
+    (study.supervisorUserId === req.user.id || study.assistantSupervisorUserId === req.user.id)
+  ) {
+    return study;
+  }
+
+  if (req.user.accountType === 'clinical_evaluator' && study.assignedClinicalEvaluatorUserId === req.user.id) {
+    return study;
+  }
+
+  res.status(403).json({ message: 'This account cannot access the selected study' });
+  return null;
+};
+
 export const getStudies = async (req: AuthRequest, res: Response) => {
   if (!ensureResearcher(req, res)) {
     return;
@@ -118,29 +158,20 @@ export const getStudies = async (req: AuthRequest, res: Response) => {
 };
 
 export const getStudyById = async (req: AuthRequest, res: Response) => {
-  if (!ensureResearcher(req, res)) {
-    return;
-  }
-
   const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const study = await findStudyByIdForUser(req.user!.id, studyId);
-
+  const study = await resolveStudyAccess(req, res, studyId);
   if (!study) {
-    return res.status(404).json({ message: 'Study not found' });
+    return;
   }
 
   return res.json(study);
 };
 
 export const getStudyVariableMatrixRecord = async (req: AuthRequest, res: Response) => {
-  if (!ensureResearcher(req, res)) {
-    return;
-  }
-
   const studyId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const study = await findStudyByIdForUser(req.user!.id, studyId);
+  const study = await resolveStudyAccess(req, res, studyId);
   if (!study) {
-    return res.status(404).json({ message: 'Study not found' });
+    return;
   }
 
   const matrix = await getVariableMatrixByStudy(studyId);

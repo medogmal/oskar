@@ -32,6 +32,21 @@ SEMANTIC_SYNONYMS: dict[str, list[str]] = {
     "meta_analysis": ["prisma", "moose", "heterogeneity", "egger", "funnel", "pooling"],
 }
 
+PRIMARY_REFERENCE_HINTS: dict[str, list[str]] = {
+    "consort_items": [
+        "CONSORT_2010",
+        "CONSORT_CHECKLIST",
+        "CONSORT_EXPLANATION",
+        "CONSORT_FLOW",
+    ],
+    "ich_e6": [
+        "ICH_E6R3",
+        "ICH_E8R1",
+        "ICH_E3",
+        "ICH_E2A",
+    ],
+}
+
 
 def _tokenize(text: str) -> list[str]:
     """Tokenize English and Arabic text into lowercase words/terms (min length 2)."""
@@ -343,6 +358,69 @@ class LocalRAGEngine:
         ranked.sort(key=lambda item: item[0], reverse=True)
         return ranked
 
+    def _detect_query_intent(self, question: str, base_tokens: list[str]) -> str:
+        normalized = question.strip().lower()
+        token_set = set(base_tokens)
+
+        if (
+            "consort" in normalized
+            and ("25" in normalized or "25." in normalized or "items" in token_set or "بنود" in token_set)
+        ):
+            return "consort_items"
+
+        if "ich e6" in normalized or "e6" in token_set:
+            return "ich_e6"
+
+        if (
+            ("summary" in token_set or "summarize" in token_set or "summary" in normalized)
+            or ("لخص" in normalized or "تلخيص" in normalized or "ملخص" in normalized)
+        ) and ("study" in token_set or "دراسة" in normalized or "بحث" in normalized):
+            return "study_summary"
+
+        return "general"
+
+    def _prioritize_primary_references(
+        self,
+        ranked_docs: list[tuple[float, KnowledgeDocument]],
+        intent: str,
+    ) -> list[tuple[float, KnowledgeDocument]]:
+        preferred_ids = PRIMARY_REFERENCE_HINTS.get(intent, [])
+        if not preferred_ids:
+            return ranked_docs
+
+        boosted: list[tuple[float, KnowledgeDocument]] = []
+        for score, doc in ranked_docs:
+            next_score = score
+            if doc.doc_id in preferred_ids:
+                next_score += 5.0
+            elif doc.category == "reporting_extension" and intent == "consort_items":
+                next_score -= 1.4
+            boosted.append((next_score, doc))
+
+        boosted.sort(key=lambda item: item[0], reverse=True)
+        return boosted
+
+    def _narrow_candidates_for_intent(
+        self,
+        candidate_docs: list[KnowledgeDocument],
+        intent: str,
+    ) -> list[KnowledgeDocument]:
+        if intent == "consort_items":
+            narrowed = [
+                doc for doc in candidate_docs
+                if doc.doc_id in PRIMARY_REFERENCE_HINTS["consort_items"] or doc.category == "reporting"
+            ]
+            return narrowed or candidate_docs
+
+        if intent == "ich_e6":
+            narrowed = [
+                doc for doc in candidate_docs
+                if doc.doc_id in PRIMARY_REFERENCE_HINTS["ich_e6"] or doc.category == "clinical_practice"
+            ]
+            return narrowed or candidate_docs
+
+        return candidate_docs
+
     def _select_diverse_top_matches(
         self,
         ranked_docs: list[tuple[float, KnowledgeDocument]],
@@ -539,6 +617,7 @@ class LocalRAGEngine:
         base_tokens = _tokenize(question)
         q_tokens = self._expand_query_tokens(question, study_type)
         concepts = self._detect_query_concepts(q_tokens, study_type)
+        intent = self._detect_query_intent(question, base_tokens)
         if not q_tokens:
             return {
                 "answer": "الرجاء تقديم استفسار بحثي محدد للبحث في المكتبة المعرفية.",
@@ -547,6 +626,22 @@ class LocalRAGEngine:
                     "strategy": "filtered_only",
                     "fallbackApplied": False,
                     "attempts": [{"label": "empty_query", "citationCount": 0, "useful": False}],
+                },
+            }
+
+        if intent == "study_summary":
+            return {
+                "answer": (
+                    "لا يمكن تلخيص دراسة علمية بدقة من عنوان عام فقط. "
+                    "الرجاء رفع ملف الدراسة أو لصق نص الملخص/المقدمة/النتائج، ثم أعد الطلب بصيغة مثل: "
+                    "'لخص هذه الدراسة' أو 'استخرج الهدف والمنهجية والنتائج الأساسية'."
+                ),
+                "citations": [],
+                "retrieval": {
+                    "strategy": "guardrail_only",
+                    "fallbackApplied": False,
+                    "intent": intent,
+                    "attempts": [{"label": "study_summary_requires_document", "citationCount": 0, "useful": False}],
                 },
             }
 
@@ -559,6 +654,7 @@ class LocalRAGEngine:
             ]
         else:
             candidate_docs = list(self.documents)
+        candidate_docs = self._narrow_candidates_for_intent(candidate_docs, intent)
 
         # First Attempt: Search with filter_source if requested
         attempts = []
@@ -575,11 +671,13 @@ class LocalRAGEngine:
                 attempts.append({"label": "filtered_source", "citationCount": 0, "useful": False})
 
         ranked_scores = self._rank_documents(q_tokens, concepts, effective_docs, study_type)
+        ranked_scores = self._prioritize_primary_references(ranked_scores, intent)
 
         # If filtered search gave no matches, fallback to broader candidate docs
         if not ranked_scores and filter_source and not used_fallback:
             used_fallback = True
             ranked_scores = self._rank_documents(q_tokens, concepts, candidate_docs, study_type)
+            ranked_scores = self._prioritize_primary_references(ranked_scores, intent)
 
         top_matches = self._select_diverse_top_matches(ranked_scores, limit)
 
@@ -588,6 +686,8 @@ class LocalRAGEngine:
 
         for idx, doc in enumerate(top_matches, start=1):
             citations.append({
+                "id": doc.doc_id,
+                "title": doc.title,
                 "source_file": doc.source_file,
                 "source_url": doc.source_url,
                 "page": doc.page or 1,
@@ -597,10 +697,7 @@ class LocalRAGEngine:
             evidence_lines.append(f"[{idx}] {doc.title} ({doc.source_file}): {doc.content[:300]}")
 
         if citations:
-            answer = (
-                f"بناءً على مراجع المكتبة المعرفية المعتمدة لهذا المنهج:\n\n"
-                + "\n\n".join(evidence_lines[:3])
-            )
+            answer = self._synthesize_grounded_answer(question, intent, top_matches, citations)
         else:
             answer = (
                 "لم يتم العثور على مراجع مباشرة تغطي الاستفسار المظبوط بالضبط، "
@@ -617,6 +714,7 @@ class LocalRAGEngine:
                 "queryTerms": base_tokens[:12],
                 "expandedTerms": q_tokens[:20],
                 "concepts": concepts,
+                "intent": intent,
                 "attempts": attempts or [{"label": "search_executed", "citationCount": len(citations), "useful": len(citations) > 0}],
             },
         }
@@ -640,6 +738,78 @@ class LocalRAGEngine:
                     expanded.update(values)
 
         return list(expanded)
+
+    def _synthesize_grounded_answer(
+        self,
+        question: str,
+        intent: str,
+        top_matches: list[KnowledgeDocument],
+        citations: list[dict[str, Any]],
+    ) -> str:
+        if intent == "consort_items":
+            return self._build_consort_items_answer(citations)
+        if intent == "ich_e6":
+            return self._build_ich_e6_answer(citations)
+
+        lead_lines = [
+            "خلاصة مبنية على المراجع الأعلى صلة في المكتبة المعرفية:",
+        ]
+        for idx, doc in enumerate(top_matches[:3], start=1):
+            lead_lines.append(
+                f"{idx}. {doc.title}: {doc.content[:240].strip()}"
+            )
+        lead_lines.append("المراجع المعتمدة المذكورة أدناه هي التي بُنيت عليها الإجابة.")
+        return "\n".join(lead_lines)
+
+    def _build_consort_items_answer(self, citations: list[dict[str, Any]]) -> str:
+        sections = [
+            "1. العنوان والملخص: يجب تحديد أن الدراسة تجربة عشوائية بوضوح، مع ملخص منظم يوضح التصميم والتدخلات والنتائج.",
+            "2. المقدمة: توضح الخلفية العلمية والفرضية أو الأهداف الأساسية والثانوية.",
+            "3. المنهجية: تشمل تصميم التجربة، معايير الأهلية، مكان الدراسة، تفاصيل التدخلات، تعريف النتائج، حساب حجم العينة، وآلية العشوائية والإخفاء والتعمية.",
+            "4. النتائج: تشمل تدفق المشاركين، أعداد التحليل، الخصائص الأساسية، نتائج كل Outcome، الأضرار أو الأحداث السلبية، وأي تحليلات إضافية.",
+            "5. المناقشة: تفسر القيود، وقابلية التعميم، والتوازن بين الفوائد والمخاطر، ومعنى النتائج سريريًا ومنهجيًا.",
+            "6. المعلومات الأخرى: تشمل رقم التسجيل، توفر البروتوكول، مصادر التمويل، ودور الجهة الداعمة.",
+        ]
+        item_note = (
+            "تفصيلاً، بنود CONSORT الـ25 تُنظم عادةً تحت هذه المحاور الكبرى، "
+            "ويُستخدم CONSORT Checklist وCONSORT Explanation & Elaboration لشرح كل بند فرعي عمليًا عند كتابة التقرير النهائي."
+        )
+        refs = self._format_citation_footnotes(citations)
+        return "\n".join([
+            "شرح منظم لبنود CONSORT الـ25:",
+            item_note,
+            *sections,
+            "المراجع الأساسية المستخدمة:",
+            refs,
+        ])
+
+    def _build_ich_e6_answer(self, citations: list[dict[str, Any]]) -> str:
+        sections = [
+            "1. المبادئ العامة لـ GCP: حماية حقوق ورفاه وسلامة المشاركين، وأن تكون الفوائد والمخاطر مبررة، وأن تُجرى الدراسة وفق بروتوكول معتمد.",
+            "2. المسؤوليات الأخلاقية والرقابية: تشمل IRB/IEC approval، والموافقة المستنيرة، وحماية الخصوصية والسرية، والإبلاغ عن أي تغييرات جوهرية.",
+            "3. مسؤوليات الباحث: الالتزام بالبروتوكول، التأكد من أهلية المشاركين، حفظ السجلات، الإبلاغ عن السلامة، وضمان تفويض المهام بشكل موثق.",
+            "4. مسؤوليات الراعي: تصميم الدراسة، اختيار المواقع، الإشراف والـ monitoring، إدارة الجودة المبنية على المخاطر، وضمان سلامة البيانات.",
+            "5. إدارة البيانات والجودة: دقة CRF/EDC، traceability، essential documents، audit trail، تصحيح الانحرافات، والتحقق من اتساق البيانات.",
+            "6. السلامة والإبلاغ: توثيق adverse events وserious adverse events والإبلاغ عنها ضمن الأطر الزمنية النظامية.",
+            "7. التوثيق والأرشفة: حفظ الملفات الأساسية والنسخ المعتمدة للبروتوكول والـ investigator brochure والموافقات والسجلات النهائية.",
+        ]
+        refs = self._format_citation_footnotes(citations)
+        return "\n".join([
+            "ملخص تفصيلي عملي لمعايير ICH E6:",
+            "ICH E6 يضع إطار Good Clinical Practice الذي يحكم السلوك الأخلاقي، جودة التنفيذ، ومصداقية البيانات في الدراسات السريرية.",
+            *sections,
+            "المراجع الأساسية المستخدمة:",
+            refs,
+        ])
+
+    def _format_citation_footnotes(self, citations: list[dict[str, Any]]) -> str:
+        lines: list[str] = []
+        for citation in citations[:5]:
+            title = str(citation.get("title") or citation.get("id") or citation.get("source_file") or "Unknown reference")
+            section = str(citation.get("section") or "General")
+            source_file = str(citation.get("source_file") or "")
+            lines.append(f"- {title} | {source_file} | {section}")
+        return "\n".join(lines)
 
 
 # Global Singleton RAG Engine instance
