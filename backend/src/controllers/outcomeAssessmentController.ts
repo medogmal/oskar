@@ -195,10 +195,21 @@ const normalizeStudyType = (value: unknown) => {
   if (normalized.includes('cross') || normalized.includes('sectional') || normalized.includes('survey')) {
     return 'cross_sectional';
   }
+  if (
+    normalized.includes('systematic') ||
+    normalized.includes('review') ||
+    normalized.includes('prisma') ||
+    normalized.includes('prospero')
+  ) {
+    return 'systematic_review';
+  }
+  if (normalized.includes('meta') || normalized.includes('pooled') || normalized.includes('heterogeneity')) {
+    return 'meta_analysis';
+  }
   if (normalized.includes('vitro') || normalized.includes('lab')) {
     return 'in_vitro';
   }
-  return ['rct', 'prospective', 'retrospective', 'cross_sectional', 'in_vitro'].includes(normalized)
+  return ['rct', 'prospective', 'retrospective', 'cross_sectional', 'in_vitro', 'systematic_review', 'meta_analysis'].includes(normalized)
     ? normalized
     : 'rct';
 };

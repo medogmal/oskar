@@ -1,7 +1,7 @@
 """
 ClinResearch AI — Knowledge Base Reference Catalog
 ===================================================
-Contains the full 130-reference catalog organized by study type.
+Contains the full 140-reference catalog organized by study type.
 Each reference carries metadata for RAG filtering, citation, and isolation.
 """
 
@@ -69,7 +69,7 @@ VALID_STUDY_TYPES: list[str] = [member.value for member in StudyType]
 _SHARED = "shared"
 
 # ---------------------------------------------------------------------------
-# Reference dataclass-like dicts — 130 total
+# Reference dataclass-like dicts — 140 total
 # ---------------------------------------------------------------------------
 
 REFERENCE_CATALOG: list[dict[str, Any]] = [
@@ -322,6 +322,20 @@ REFERENCE_CATALOG: list[dict[str, Any]] = [
     {"id": "UMLS", "title": "UMLS", "category": "medical_dictionary", "subcategory": "القواميس الطبية", "study_types": [_SHARED], "description_en": "Unified Medical Language System", "description_ar": "نظام اللغة الطبية الموحد"},
     {"id": "LOINC", "title": "LOINC", "category": "medical_dictionary", "subcategory": "القواميس الطبية", "study_types": [_SHARED], "description_en": "Logical Observation Identifiers Names and Codes", "description_ar": "معرفات ورموز المراقبة المنطقية"},
     {"id": "ICD11", "title": "ICD-11", "category": "medical_dictionary", "subcategory": "القواميس الطبية", "study_types": [_SHARED], "description_en": "International Classification of Diseases 11th Revision", "description_ar": "التصنيف الدولي للأمراض — الإصدار الحادي عشر"},
+
+    # =========================================================================
+    # 7. Systematic Review and Meta-analysis
+    # =========================================================================
+    {"id": "PRISMA_2020", "title": "PRISMA 2020 Statement", "category": "evidence_synthesis_reporting", "subcategory": "Systematic review reporting", "study_types": ["systematic_review", "meta_analysis"], "description_en": "Preferred Reporting Items for Systematic Reviews and Meta-Analyses 2020 statement for transparent evidence synthesis reporting.", "description_ar": "معيار PRISMA 2020 لتقارير المراجعات المنهجية والتحليل الشمولي"},
+    {"id": "PRISMA_2020_CHECKLIST", "title": "PRISMA 2020 Checklist", "category": "evidence_synthesis_reporting", "subcategory": "Systematic review checklist", "study_types": ["systematic_review", "meta_analysis"], "description_en": "PRISMA item checklist covering title, abstract, rationale, objectives, eligibility criteria, search, selection, synthesis, bias, and certainty.", "description_ar": "قائمة تحقق PRISMA 2020"},
+    {"id": "PRISMA_P_2015", "title": "PRISMA-P 2015", "category": "review_protocol", "subcategory": "Systematic review protocol", "study_types": ["systematic_review", "meta_analysis"], "description_en": "Preferred Reporting Items for Systematic Review and Meta-Analysis Protocols for pre-specified review protocols.", "description_ar": "إرشادات بروتوكول المراجعة المنهجية PRISMA-P"},
+    {"id": "PROSPERO_REGISTRATION", "title": "PROSPERO Registration Guidance", "category": "review_protocol", "subcategory": "Protocol registration", "study_types": ["systematic_review", "meta_analysis"], "description_en": "International prospective register requirements for systematic review protocol registration and amendments.", "description_ar": "إرشادات تسجيل بروتوكولات المراجعات في PROSPERO"},
+    {"id": "AMSTAR2", "title": "AMSTAR 2", "category": "quality_assessment", "subcategory": "Systematic review quality", "study_types": ["systematic_review"], "description_en": "Critical appraisal tool for systematic reviews that include randomized or non-randomized studies of healthcare interventions.", "description_ar": "أداة تقييم جودة المراجعات المنهجية AMSTAR 2"},
+    {"id": "ROBIS", "title": "ROBIS", "category": "bias_assessment", "subcategory": "Review-level risk of bias", "study_types": ["systematic_review"], "description_en": "Risk of Bias in Systematic Reviews tool for assessing concerns with review conduct and interpretation.", "description_ar": "أداة تقييم خطر التحيز في المراجعات المنهجية"},
+    {"id": "COCHRANE_SR_HANDBOOK", "title": "Cochrane Handbook for Systematic Reviews", "category": "evidence_synthesis_methods", "subcategory": "Systematic review methods", "study_types": ["systematic_review", "meta_analysis"], "description_en": "Cochrane methods guidance for protocol development, study selection, risk-of-bias assessment, synthesis, and certainty of evidence.", "description_ar": "دليل كوكرين لمنهجية المراجعات المنهجية"},
+    {"id": "MOOSE_GUIDELINES", "title": "MOOSE Guidelines", "category": "meta_analysis_reporting", "subcategory": "Observational meta-analysis reporting", "study_types": ["meta_analysis"], "description_en": "Meta-analysis Of Observational Studies in Epidemiology reporting guidance for observational evidence synthesis.", "description_ar": "إرشادات MOOSE للتحليل الشمولي للدراسات الرصدية"},
+    {"id": "PRISMA_NMA", "title": "PRISMA-NMA Extension", "category": "network_meta_analysis", "subcategory": "Network meta-analysis reporting", "study_types": ["meta_analysis"], "description_en": "PRISMA extension for network meta-analysis, including network geometry, consistency, and comparative treatment effects.", "description_ar": "امتداد PRISMA للتحليل الشمولي الشبكي"},
+    {"id": "PUBLICATION_BIAS_TESTS", "title": "Publication Bias and Small-study Effects", "category": "meta_analysis_statistics", "subcategory": "Publication bias", "study_types": ["meta_analysis"], "description_en": "Meta-analysis methods for funnel plots, Egger regression, Begg rank correlation, trim-and-fill, and sensitivity analysis.", "description_ar": "طرق تقييم تحيز النشر وتأثير الدراسات الصغيرة"},
 ]
 
 # ---------------------------------------------------------------------------

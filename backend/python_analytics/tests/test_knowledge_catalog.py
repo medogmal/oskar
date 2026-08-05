@@ -18,8 +18,8 @@ from app.clinical_validation import validate_crf_template
 
 
 def test_catalog_total_references():
-    """Verify that catalog contains all 130 references."""
-    assert len(REFERENCE_CATALOG) == 130, f"Expected 130 references, got {len(REFERENCE_CATALOG)}"
+    """Verify that catalog contains the expanded 140-reference set."""
+    assert len(REFERENCE_CATALOG) == 140, f"Expected 140 references, got {len(REFERENCE_CATALOG)}"
 
 
 def test_unique_reference_ids():
@@ -30,7 +30,7 @@ def test_unique_reference_ids():
 
 def test_study_types_validation():
     """Verify valid study type check."""
-    for st in ["rct", "prospective", "retrospective", "cross_sectional", "in_vitro"]:
+    for st in ["rct", "prospective", "retrospective", "cross_sectional", "in_vitro", "systematic_review", "meta_analysis"]:
         assert is_valid_study_type(st)
     assert not is_valid_study_type("invalid_type")
 
@@ -63,6 +63,23 @@ def test_in_vitro_references_isolation():
     assert "STROBE_STATEMENT" not in invitro_ids
 
 
+def test_evidence_synthesis_references_isolation():
+    """Verify systematic review and meta-analysis references are isolated by study type."""
+    systematic_ids = get_reference_ids_for_study_type("systematic_review")
+    meta_ids = get_reference_ids_for_study_type("meta_analysis")
+
+    assert "PRISMA_2020" in systematic_ids
+    assert "AMSTAR2" in systematic_ids
+    assert "ROBIS" in systematic_ids
+    assert "MOOSE_GUIDELINES" not in systematic_ids
+
+    assert "PRISMA_2020" in meta_ids
+    assert "MOOSE_GUIDELINES" in meta_ids
+    assert "PRISMA_NMA" in meta_ids
+    assert "PUBLICATION_BIAS_TESTS" in meta_ids
+    assert "ISO_4049" not in meta_ids
+
+
 def test_prompt_library_building():
     """Verify that prompt builder injects study design directives correctly."""
     rct_prompt = build_system_prompt(study_type="rct", mode="protocol_understanding")
@@ -88,8 +105,10 @@ def test_prompt_library_language_lock():
 def test_catalog_summary():
     """Verify summary counts."""
     summary = get_catalog_summary()
-    assert summary["total_references"] == 130
+    assert summary["total_references"] == 140
     assert "rct" in summary["per_study_type"]
+    assert summary["per_study_type"]["systematic_review"]["specific"] > 0
+    assert summary["per_study_type"]["meta_analysis"]["specific"] > 0
 
 
 def test_crf_validation_duplicates():
@@ -100,7 +119,7 @@ def test_crf_validation_duplicates():
     ]
     report = validate_crf_template(fields, "rct")
     assert report["valid"] is False
-    assert any("تكرار متغير" in err for err in report["errors"])
+    assert any(issue["code"] == "CRF_DUPLICATE_VARIABLE" for issue in report["issues"])
 
 
 def test_crf_validation_in_vitro_conflicts():
@@ -110,7 +129,7 @@ def test_crf_validation_in_vitro_conflicts():
         {"label": "Patient Age", "responseType": "numeric"}
     ]
     report = validate_crf_template(fields, "in_vitro")
-    assert any("تعارض منطقي" in warn for warn in report["warnings"])
+    assert any(issue["code"] == "IN_VITRO_PATIENT_DEMOGRAPHICS" for issue in report["issues"])
 
 
 def test_crf_validation_rct_missing_group():
@@ -120,7 +139,7 @@ def test_crf_validation_rct_missing_group():
     ]
     report = validate_crf_template(fields, "rct")
     assert report["valid"] is False
-    assert any("Group Allocation" in err for err in report["errors"])
+    assert any(issue["code"] == "GROUP_ALLOCATION_MISSING" for issue in report["issues"])
 
 
 def test_crf_validation_sap_compatibility():
@@ -130,5 +149,59 @@ def test_crf_validation_sap_compatibility():
     ]
     report = validate_crf_template(fields, "prospective")
     # Should flag a warning for SAP incompatibility
-    assert any("خطة التحليل الإحصائي" in warn for warn in report["warnings"])
+    assert any(issue["code"] == "SAP_GROUPING_MISMATCH" for issue in report["issues"])
+
+
+def test_crf_validation_metadata_and_objective_links():
+    """Verify outcome variables require source/method/unit/RQ/objective/statistical-test metadata."""
+    fields = [
+        {
+            "id": "pd_6m",
+            "label": "Pocket Depth at 6 months",
+            "responseType": "numeric",
+            "role": "primary_outcome",
+            "scale": "ratio",
+        }
+    ]
+    report = validate_crf_template(
+        fields,
+        "rct",
+        objectives=[{"id": "obj1"}],
+        research_questions=[{"id": "rq1"}],
+    )
+    codes = {issue["code"] for issue in report["issues"]}
+
+    assert report["valid"] is False
+    assert "VARIABLE_SOURCE_MISSING" in codes
+    assert "MEASUREMENT_METHOD_MISSING" in codes
+    assert "VARIABLE_UNIT_MISSING" in codes
+    assert "OUTCOME_NOT_LINKED_TO_RESEARCH_QUESTION" in codes
+    assert "OUTCOME_NOT_LINKED_TO_OBJECTIVE" in codes
+    assert "STATISTICAL_TEST_MISSING" in codes
+
+
+def test_crf_validation_conflicting_variable_definitions():
+    """Verify CRF validation detects non-duplicate conflicting definitions."""
+    fields = [
+        {
+            "id": "pd_mm",
+            "label": "Pocket Depth",
+            "responseType": "numeric",
+            "scale": "ratio",
+            "unit": "mm",
+            "source": "clinical_examination",
+            "measurementMethod": "Periodontal probe at six sites",
+        },
+        {
+            "id": "pd_cm",
+            "label": "Pocket Depth Value",
+            "responseType": "numeric",
+            "scale": "ratio",
+            "unit": "cm",
+            "source": "clinical_examination",
+            "measurementMethod": "Periodontal probe at six sites",
+        },
+    ]
+    report = validate_crf_template(fields, "retrospective")
+    assert any(issue["code"] == "CRF_VARIABLE_CONFLICT" for issue in report["issues"])
 

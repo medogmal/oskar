@@ -35,6 +35,7 @@ export const exportVariablesMatrixCsv = (rows: VariableMapping[], filename = 'va
     { key: 'measurementMethod', label: 'Measurement Method' },
     { key: 'unit', label: 'Unit' },
     { key: 'linkedOutcomeIds', label: 'Linked Outcomes' },
+    { key: 'linkedObjectiveIds', label: 'Linked Objectives' },
     { key: 'linkedResearchQuestionIds', label: 'Linked RQs' },
     { key: 'linkedReferenceIds', label: 'Linked References' },
     { key: 'recommendedStatisticalTest', label: 'Recommended Statistical Test' },
@@ -45,6 +46,7 @@ export const exportVariablesMatrixCsv = (rows: VariableMapping[], filename = 'va
   const mapped = rows.map((r) => ({
     ...r,
     linkedOutcomeIds: r.linkedOutcomeIds.join('; '),
+    linkedObjectiveIds: (r.linkedObjectiveIds ?? []).join('; '),
     linkedResearchQuestionIds: r.linkedResearchQuestionIds.join('; '),
     linkedReferenceIds: r.linkedReferenceIds.join('; '),
     required: r.required ? 'Yes' : 'No',

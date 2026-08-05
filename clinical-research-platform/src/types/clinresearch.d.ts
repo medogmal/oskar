@@ -51,6 +51,7 @@ export interface VariableMapping {
   measurementMethod: string;
   unit: string;
   linkedOutcomeIds: string[];
+  linkedObjectiveIds?: string[];
   linkedResearchQuestionIds: string[];
   linkedReferenceIds: string[];
   recommendedStatisticalTest: string;

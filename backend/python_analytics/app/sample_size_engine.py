@@ -74,7 +74,15 @@ def calculate_sample_size(params: dict[str, Any]) -> dict[str, Any]:
         why_formula_chosen = "Matched or repeated measurements reduce between-subject variability, so the paired t-test equation is used."
         references = ["Rosner Fundamentals of Biostatistics", "Altman 1991 Practical Statistics for Medical Research"]
 
-    elif test_type in {"two_proportion_z_test", "proportions", "z_test"}:
+    elif test_type in {
+        "two_proportion_z_test",
+        "two_proportions",
+        "two_proportion",
+        "two_sample_proportions",
+        "proportion_z_test",
+        "proportions",
+        "z_test",
+    }:
         test_label = "Two-Proportion Z-Test"
         outcome_type_detected = "binary"
         effect_size_type = effect_size_type or "Risk Difference"

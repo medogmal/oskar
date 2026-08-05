@@ -210,6 +210,7 @@ export default function VariableMappingMatrix() {
       measurementMethod: '',
       unit: '',
       linkedOutcomeIds: [],
+      linkedObjectiveIds: [],
       linkedResearchQuestionIds: [],
       linkedReferenceIds: [],
       recommendedStatisticalTest: '',
@@ -302,8 +303,22 @@ export default function VariableMappingMatrix() {
             createdAt: new Date().toISOString(),
           });
         }
+        if ((v.linkedObjectiveIds ?? []).length === 0) {
+          issues.push({
+            id: 'c-obj-' + i,
+            studyId,
+            severity: 'critical',
+            category: 'methodological',
+            status: 'open',
+            title: 'Outcome variable ' + v.label + ' not linked to any Objective',
+            detail: 'Every primary and secondary outcome MUST be explicitly linked to at least one study objective.',
+            suggestedAction: 'Edit this variable and select at least one objective.',
+            location: { fieldLabel: v.label },
+            createdAt: new Date().toISOString(),
+          });
+        }
       }
-      if ((v.scale === 'ratio' || v.scale === 'interval' || v.scale === 'count') && v.unit.trim() === '') {
+      if ((v.scale === 'ratio' || v.scale === 'interval' || v.scale === 'count' || v.scale === 'time_to_event') && v.unit.trim() === '') {
         issues.push({
           id: 'c-unit-' + i,
           studyId,
@@ -334,8 +349,9 @@ export default function VariableMappingMatrix() {
         highlights: [
           'Total variables: ' + variables.length,
           'Linked to RQs: ' + variables.filter(v => v.linkedResearchQuestionIds.length > 0).length,
+          'Linked to Objectives: ' + variables.filter(v => (v.linkedObjectiveIds ?? []).length > 0).length,
           'Missing operational definition: ' + variables.filter(v => v.definition.trim().length < 10).length,
-          'Missing numeric unit: ' + variables.filter(v => (v.scale === 'ratio' || v.scale === 'interval' || v.scale === 'count') && v.unit.trim() === '').length,
+          'Missing numeric/time unit: ' + variables.filter(v => (v.scale === 'ratio' || v.scale === 'interval' || v.scale === 'count' || v.scale === 'time_to_event') && v.unit.trim() === '').length,
         ],
         tables: [
           {
@@ -345,7 +361,7 @@ export default function VariableMappingMatrix() {
           },
           {
             caption: 'Variables Matrix (sample rows)',
-            columns: ['Label', 'Role', 'Scale', 'Source', 'Unit', 'Linked RQs', 'Linked Refs'],
+            columns: ['Label', 'Role', 'Scale', 'Source', 'Unit', 'Linked RQs', 'Linked Objectives', 'Linked Refs'],
             rows: variables.slice(0, Math.min(20, variables.length)).map(v => [
               v.label,
               roleLabel(v.role),
@@ -353,6 +369,7 @@ export default function VariableMappingMatrix() {
               sourceLabel(v.source),
               v.unit || '-',
               v.linkedResearchQuestionIds.join('; ') || '-',
+              (v.linkedObjectiveIds ?? []).join('; ') || '-',
               v.linkedReferenceIds.join('; ') || '-',
             ]),
           },
@@ -578,10 +595,10 @@ function VariableEditor({
   onClose: () => void;
 }) {
   const toggleStrArray = (
-    key: 'linkedResearchQuestionIds' | 'linkedOutcomeIds' | 'linkedReferenceIds',
+    key: 'linkedResearchQuestionIds' | 'linkedOutcomeIds' | 'linkedObjectiveIds' | 'linkedReferenceIds',
     val: string
   ) => {
-    const current = variable[key];
+    const current = variable[key] ?? [];
     const next = current.includes(val) ? current.filter(x => x !== val) : [...current, val];
     const patch: Partial<VariableMapping> = {};
     patch[key] = next;
@@ -747,10 +764,10 @@ function VariableEditor({
         {objectives.length === 0 && <p className="text-xs italic text-slate-500">Tip: Go to Study Structure page to add Objectives first.</p>}
         <div className="grid gap-1.5">
           {objectives.map(obj => {
-            const on = variable.linkedOutcomeIds.includes(obj.id);
+            const on = (variable.linkedObjectiveIds ?? []).includes(obj.id);
             return (
               <label key={obj.id} className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 text-xs text-slate-300 hover:bg-slate-900/70">
-                <input type="checkbox" checked={on} onChange={() => toggleStrArray('linkedOutcomeIds', obj.id)} className="mt-0.5 h-3.5 w-3.5 rounded border-slate-600 text-indigo-500" />
+                <input type="checkbox" checked={on} onChange={() => toggleStrArray('linkedObjectiveIds', obj.id)} className="mt-0.5 h-3.5 w-3.5 rounded border-slate-600 text-indigo-500" />
                 <span className="line-clamp-2">{obj.text}</span>
               </label>
             );

@@ -60,11 +60,51 @@ export type GovernanceSnapshot = {
   notifications: GovernanceNotification[];
 };
 
+export type PhaseApprovalGate = {
+  studyId: string;
+  targetPhase: PhaseNumber;
+  targetLabel: string;
+  allowed: boolean;
+  requiredStatus: 'approved';
+  blockers: Array<{
+    phase: PhaseNumber;
+    title: string;
+    status: PhaseApprovalStatus;
+  }>;
+  message: string;
+};
+
+export class PhaseApprovalError extends Error {
+  code = 'PHASE_APPROVAL_REQUIRED';
+  statusCode = 409;
+  details: PhaseApprovalGate;
+
+  constructor(details: PhaseApprovalGate) {
+    super(details.message);
+    this.name = 'PhaseApprovalError';
+    this.details = details;
+  }
+}
+
+export class GovernanceValidationError extends Error {
+  code: string;
+  statusCode: number;
+  details: Record<string, unknown>;
+
+  constructor(code: string, message: string, statusCode = 400, details: Record<string, unknown> = {}) {
+    super(message);
+    this.name = 'GovernanceValidationError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
 type GovernanceRow = {
   snapshot_json: GovernanceSnapshot | string | null;
 };
 
-const PHASE_INFO: Record<PhaseNumber, { title: string; description: string; deliverables: string[] }> = {
+export const PHASE_INFO: Record<PhaseNumber, { title: string; description: string; deliverables: string[] }> = {
   1: {
     title: 'Knowledge Base & RAG Setup',
     description: 'Reference governance, metadata catalog, isolation, and retrieval checks.',
@@ -119,6 +159,10 @@ const parseJsonValue = <T>(value: T | string | null | undefined, fallback: T): T
 };
 
 const isPhaseNumber = (value: unknown): value is PhaseNumber => value === 1 || value === 2 || value === 3;
+const phaseStatusesThatEnterWorkflow: PhaseApprovalStatus[] = ['pending', 'approved'];
+const phaseDecisionStatuses: PhaseApprovalStatus[] = ['approved', 'rejected', 'needs_revision'];
+const phaseDecisionAccountTypes = ['supervisor', 'assistant_supervisor', 'institution'];
+const phaseSubmissionAccountTypes = ['student', 'co_researcher', 'supervisor', 'assistant_supervisor'];
 
 const normalizePhaseStatus = (value: unknown): PhaseApprovalStatus => {
   const valid: PhaseApprovalStatus[] = ['not_submitted', 'pending', 'approved', 'rejected', 'needs_revision'];
@@ -232,6 +276,120 @@ const normalizeSnapshot = (studyId: string, raw: GovernanceSnapshot | Record<str
   return { phases, auditLogs, notifications };
 };
 
+const buildPhaseApprovalGate = (
+  studyId: string,
+  snapshot: GovernanceSnapshot,
+  targetPhase: PhaseNumber,
+  targetLabel?: string,
+): PhaseApprovalGate => {
+  const label = targetLabel || `Phase ${targetPhase} - ${PHASE_INFO[targetPhase].title}`;
+  const blockers = snapshot.phases
+    .filter((phase) => phase.phase < targetPhase && phase.status !== 'approved')
+    .map((phase) => ({
+      phase: phase.phase,
+      title: phase.title,
+      status: phase.status,
+    }));
+
+  const blockerSummary = blockers.map((blocker) => `Phase ${blocker.phase} is ${blocker.status}`).join('; ');
+
+  return {
+    studyId,
+    targetPhase,
+    targetLabel: label,
+    allowed: blockers.length === 0,
+    requiredStatus: 'approved',
+    blockers,
+    message:
+      blockers.length === 0
+        ? `${label} is allowed because all prior phases are approved.`
+        : `${label} is blocked until all prior phases are approved. ${blockerSummary}.`,
+  };
+};
+
+const assertSequentialPhaseProgression = (studyId: string, snapshot: GovernanceSnapshot) => {
+  for (const phase of snapshot.phases) {
+    if (phase.phase === 1 || !phaseStatusesThatEnterWorkflow.includes(phase.status)) {
+      continue;
+    }
+
+    const gate = buildPhaseApprovalGate(
+      studyId,
+      snapshot,
+      phase.phase,
+      `Phase ${phase.phase} ${phase.status.replace(/_/g, ' ')}`,
+    );
+    if (!gate.allowed) {
+      throw new PhaseApprovalError(gate);
+    }
+  }
+};
+
+const getPhase = (snapshot: GovernanceSnapshot, phaseNumber: PhaseNumber) =>
+  snapshot.phases.find((phase) => phase.phase === phaseNumber);
+
+const phaseDeliverablesComplete = (phase: GovernancePhase) =>
+  phase.deliverables.length > 0 && phase.deliverables.every((deliverable) => deliverable.completed);
+
+const assertPhaseTransitionIsAuthorized = (
+  previous: GovernanceSnapshot,
+  next: GovernanceSnapshot,
+  actorAccountType?: string,
+) => {
+  for (const nextPhase of next.phases) {
+    const previousPhase = getPhase(previous, nextPhase.phase);
+
+    if ((nextPhase.status === 'pending' || nextPhase.status === 'approved') && !phaseDeliverablesComplete(nextPhase)) {
+      throw new GovernanceValidationError(
+        'PHASE_DELIVERABLES_INCOMPLETE',
+        `Phase ${nextPhase.phase} cannot be ${nextPhase.status.replace(/_/g, ' ')} until all deliverables are completed.`,
+        400,
+        {
+          phase: nextPhase.phase,
+          status: nextPhase.status,
+          incompleteDeliverables: nextPhase.deliverables
+            .filter((deliverable) => !deliverable.completed)
+            .map((deliverable) => deliverable.label),
+        },
+      );
+    }
+
+    const statusChanged = previousPhase?.status !== nextPhase.status;
+    if (!statusChanged) {
+      const deliverablesChanged =
+        previousPhase?.status === 'approved' &&
+        JSON.stringify(previousPhase.deliverables) !== JSON.stringify(nextPhase.deliverables);
+      if (deliverablesChanged && !phaseDecisionAccountTypes.includes(String(actorAccountType))) {
+        throw new GovernanceValidationError(
+          'PHASE_APPROVED_DELIVERABLE_LOCKED',
+          `Phase ${nextPhase.phase} deliverables are locked after approval.`,
+          403,
+          { phase: nextPhase.phase },
+        );
+      }
+      continue;
+    }
+
+    if (nextPhase.status === 'pending' && !phaseSubmissionAccountTypes.includes(String(actorAccountType))) {
+      throw new GovernanceValidationError(
+        'PHASE_SUBMISSION_FORBIDDEN',
+        `This account cannot submit Phase ${nextPhase.phase} for approval.`,
+        403,
+        { phase: nextPhase.phase, accountType: actorAccountType },
+      );
+    }
+
+    if (phaseDecisionStatuses.includes(nextPhase.status) && !phaseDecisionAccountTypes.includes(String(actorAccountType))) {
+      throw new GovernanceValidationError(
+        'PHASE_DECISION_FORBIDDEN',
+        `Only supervisor or institution accounts can set Phase ${nextPhase.phase} to ${nextPhase.status.replace(/_/g, ' ')}.`,
+        403,
+        { phase: nextPhase.phase, status: nextPhase.status, accountType: actorAccountType },
+      );
+    }
+  }
+};
+
 const readLocalSnapshots = async (): Promise<Record<string, GovernanceSnapshot>> => {
   try {
     return JSON.parse(await readFile(localGovernanceStorePath, 'utf8')) as Record<string, GovernanceSnapshot>;
@@ -266,12 +424,25 @@ export const getGovernanceByStudy = async (studyId: string): Promise<GovernanceS
   }
 };
 
+export const getPhaseApprovalGate = async (
+  studyId: string,
+  targetPhase: PhaseNumber,
+  targetLabel?: string,
+): Promise<PhaseApprovalGate> => {
+  const snapshot = await getGovernanceByStudy(studyId);
+  return buildPhaseApprovalGate(studyId, snapshot, targetPhase, targetLabel);
+};
+
 export const saveGovernanceByStudy = async (
   studyId: string,
   actorUserId: string,
   snapshot: GovernanceSnapshot,
+  actorAccountType?: string,
 ): Promise<GovernanceSnapshot> => {
   const normalized = normalizeSnapshot(studyId, snapshot);
+  const previous = await getGovernanceByStudy(studyId);
+  assertPhaseTransitionIsAuthorized(previous, normalized, actorAccountType);
+  assertSequentialPhaseProgression(studyId, normalized);
 
   try {
     const result = await query<GovernanceRow>(

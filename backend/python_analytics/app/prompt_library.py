@@ -96,13 +96,19 @@ Instruction: Focus heavily on pooling statistics, heterogeneity testing, and pub
 # ---------------------------------------------------------------------------
 
 MODE_DIRECTIVES: dict[str, str] = {
-    "protocol_understanding": """MODE: Protocol Understanding & Deconstruction
-Goal: Analyze the researcher's protocol snippet or description.
+    "protocol_understanding": """MODE: Protocol Review & Checklist Evaluation
+Goal: Analyze and evaluate the researcher's protocol (proposal_text) against the retrieved clinical/methodological guidelines (e.g. SPIRIT for RCT, STROBE for observational, CRIS for In Vitro).
 Deliverables:
-1. Extract title, primary objective, study design type, and target population/samples.
-2. Identify primary and secondary outcome measures.
-3. Highlight missing methodological details required by the relevant guideline (e.g. SPIRIT, STROBE, CRIS).
-4. Provide structured, actionable feedback to strengthen the research protocol.""",
+1. Methodological Evaluation Checklist: You MUST compare the researcher's protocol text (protocol_text) against the retrieved guidelines. Assess each of the following items and output a clear list using this exact format:
+   - ✅ [العنوان / Title] - Clear / Present (with brief description).
+   - ✅ [الأهداف / Objectives] - Clear / Present.
+   - ⚠️ [حساب حجم العينة / Sample Size] - Missing or Incomplete (state what is missing).
+   - ⚠️ [العشوائية / Randomization] - Explain if specified or missing.
+   - ⚠️ [التعمية / Blinding] - Explain if specified or missing.
+   - ⚠️ [خطة التحليل الإحصائي / Statistical Plan] - Check if tests are specified.
+2. Missing Methodological Details: Provide a bulleted list of any critical missing information or potential sources of bias.
+3. Final Evaluation Score: You MUST output a final score out of 10 (e.g. "التقييم النهائي: 8/10") reflecting compliance with the guidelines.
+4. Language Lock: Always write the checklist items and comments in the user's language (e.g., Arabic if they ask in Arabic). Keep technical terms in their clinical forms.""",
 
     "study_elements": """MODE: Study Elements Extraction
 Goal: Deconstruct protocol text into structured components.

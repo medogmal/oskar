@@ -14,6 +14,7 @@ export type VariableMatrixRecord = {
   measurementMethod: string;
   unit: string;
   linkedOutcomeIds: string[];
+  linkedObjectiveIds?: string[];
   linkedResearchQuestionIds: string[];
   linkedReferenceIds: string[];
   recommendedStatisticalTest: string;
@@ -56,6 +57,7 @@ const normalizeMatrix = (studyId: string, records: VariableMatrixRecord[]) =>
     ...record,
     studyId,
     linkedOutcomeIds: Array.isArray(record.linkedOutcomeIds) ? record.linkedOutcomeIds.map(String) : [],
+    linkedObjectiveIds: Array.isArray(record.linkedObjectiveIds) ? record.linkedObjectiveIds.map(String) : [],
     linkedResearchQuestionIds: Array.isArray(record.linkedResearchQuestionIds) ? record.linkedResearchQuestionIds.map(String) : [],
     linkedReferenceIds: Array.isArray(record.linkedReferenceIds) ? record.linkedReferenceIds.map(String) : [],
     options: Array.isArray(record.options) ? record.options.map(String) : [],
